@@ -14,9 +14,7 @@
         <h3>Link a Device</h3>
         <p>Open WhatsApp on your phone > Linked Devices > Link a Device.</p>
         <div class="qr-box" v-if="qrCode">
-          <!-- We would normally render a QR code using a library like qrcode.vue, but for now we just show the raw data -->
-          <p class="raw-qr">QR Data Received. Please use a QR component to render it.</p>
-          <pre>{{ qrCode }}</pre>
+          <qrcode-vue :value="qrCode" :size="250" level="H" />
         </div>
         <div v-else class="loading">Generating QR Code...</div>
       </div>
@@ -36,6 +34,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { io } from 'socket.io-client'
+import QrcodeVue from 'qrcode.vue'
 
 const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
 const status = ref(tenant.sessionStatus || 'DISCONNECTED')

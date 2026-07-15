@@ -4,7 +4,11 @@
       <div class="logo">WhatsApp OTP SaaS</div>
       <div class="nav-links">
         <router-link to="/">Dashboard</router-link>
-        <router-link to="/connect">WhatsApp Connection</router-link>
+        <router-link to="/connect">WhatsApp</router-link>
+        <router-link to="/keys">API Keys</router-link>
+        <router-link to="/logs">Logs</router-link>
+        <router-link to="/billing">Billing</router-link>
+        <router-link to="/settings">Settings</router-link>
         <button @click="logout" class="btn-logout">Logout</button>
       </div>
     </nav>

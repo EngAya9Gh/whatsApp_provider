@@ -5,9 +5,8 @@ const prisma = new PrismaClient();
 
 class BillingService {
   async getUsage(tenantId) {
-    const currentMonth = new Date();
-    currentMonth.setDate(1);
-    currentMonth.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
     let usage = await prisma.usageRecord.findUnique({
       where: {
@@ -19,14 +18,28 @@ class BillingService {
     });
 
     if (!usage) {
-      usage = await prisma.usageRecord.create({
-        data: {
-          tenantId,
-          month: currentMonth,
-          messagesSent: 0,
-          messagesFailed: 0
+      try {
+        usage = await prisma.usageRecord.create({
+          data: {
+            tenantId,
+            month: currentMonth,
+            messagesSent: 0,
+            messagesFailed: 0
+          }
+        });
+      } catch (error) {
+        // If it fails with Unique Constraint, it means another request just created it.
+        // So we can safely fetch it again.
+        if (error.code === 'P2002') {
+          usage = await prisma.usageRecord.findUnique({
+            where: {
+              tenantId_month: { tenantId, month: currentMonth }
+            }
+          });
+        } else {
+          throw error;
         }
-      });
+      }
     }
 
     const tenant = await prisma.tenant.findUnique({
@@ -53,9 +66,8 @@ class BillingService {
   }
 
   async incrementUsage(tenantId, type = 'sent') {
-    const currentMonth = new Date();
-    currentMonth.setDate(1);
-    currentMonth.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
     const updateData = type === 'sent' 
       ? { messagesSent: { increment: 1 } }
