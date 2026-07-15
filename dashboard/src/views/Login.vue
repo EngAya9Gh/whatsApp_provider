@@ -67,7 +67,7 @@ const handleLogin = async () => {
     })
     localStorage.setItem('token', res.data.data.token)
     localStorage.setItem('tenant', JSON.stringify(res.data.data.tenant))
-    router.push('/')
+    router.push('/dashboard')
   } catch (err) {
     error.value = err.response?.data?.error || 'Invalid credentials'
   } finally {

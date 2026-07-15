@@ -7,7 +7,7 @@
       </div>
 
       <nav class="sidebar-nav">
-        <router-link to="/" class="nav-item" exact-active-class="active">
+        <router-link to="/dashboard" class="nav-item" active-class="active">
           <span class="nav-icon">📊</span>
           <span class="nav-label">{{ $t('sidebar.dashboard') }}</span>
         </router-link>
