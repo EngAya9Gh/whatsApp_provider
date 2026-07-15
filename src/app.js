@@ -5,7 +5,7 @@ const logger = require('./utils/logger');
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:5174'], credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -22,6 +22,7 @@ const whatsappRoutes = require('./modules/whatsapp/whatsapp.routes');
 const otpRoutes = require('./modules/otp/otp.routes');
 const billingRoutes = require('./modules/billing/billing.routes');
 const logsRoutes = require('./modules/logs/logs.routes');
+const adminRoutes = require('./modules/admin/admin.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/keys', apiKeyRoutes);
@@ -29,6 +30,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/v1/otp', otpRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/logs', logsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

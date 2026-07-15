@@ -1,0 +1,21 @@
+{
+  "sidebar": {
+    "overview": "Overview",
+    "tenants": "Tenants",
+    "billing": "Billing",
+    "logout": "Logout"
+  },
+  "login": {
+    "title": "Admin Sign In",
+    "subtitle": "Restricted access — authorized personnel only",
+    "email": "Admin Email",
+    "password": "Password",
+    "btn_sign_in": "Sign In as Admin",
+    "btn_signing_in": "Authenticating..."
+  },
+  "brand": {
+    "tagline": "Admin Control Center",
+    "title": "Manage your platform",
+    "desc": "Monitor tenants, track usage, manage billing, and keep your WhatsApp OTP platform running smoothly."
+  }
+}

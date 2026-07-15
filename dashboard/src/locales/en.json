@@ -1,0 +1,27 @@
+{
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "whatsapp": "WhatsApp",
+    "api_keys": "API Keys",
+    "message_logs": "Message Logs",
+    "billing": "Billing",
+    "settings": "Settings"
+  },
+  "login": {
+    "welcome_back": "Welcome back",
+    "sign_in_desc": "Sign in to your account",
+    "email": "Email address",
+    "password": "Password",
+    "sign_in_btn": "Sign in",
+    "signing_in": "Signing in...",
+    "no_account": "Don't have an account?",
+    "create_one": "Create one",
+    "features": {
+      "title": "OTP Platform",
+      "desc": "Send WhatsApp OTP messages to your users with a single API call.",
+      "f1": "Lightning-fast delivery",
+      "f2": "Secure API authentication",
+      "f3": "Real-time usage tracking"
+    }
+  }
+}

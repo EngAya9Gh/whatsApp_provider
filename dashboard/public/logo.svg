@@ -1,0 +1,26 @@
+<svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Styles -->
+    <style>
+        .text { font-family: system-ui, -apple-system, sans-serif; font-weight: 900; font-size: 38px; }
+        .primary { fill: #FF6600; }
+        .secondary { fill: #1E293B; }
+        .silver { fill: #334155; }
+    </style>
+
+    <!-- Icon Group -->
+    <g transform="translate(10, 14)">
+        <!-- Top Left -->
+        <rect x="0" y="0" width="13" height="13" rx="4" class="primary" />
+        <!-- Top Right -->
+        <rect x="16" y="0" width="13" height="13" rx="6.5" class="secondary" fill-opacity="0.3" />
+        <!-- Bottom Left -->
+        <rect x="0" y="16" width="13" height="13" rx="6.5" class="silver" />
+        <!-- Bottom Right -->
+        <rect x="16" y="16" width="13" height="13" rx="4" class="primary" />
+    </g>
+
+    <!-- Text Group -->
+    <text x="50" y="43" class="text secondary" letter-spacing="-1">
+        w<tspan letter-spacing="-2">a</tspan>k<tspan class="primary" letter-spacing="-6" fill-opacity="0.9">ee</tspan>l<tspan class="primary" dx="-2">.</tspan><tspan class="primary" dx="-4">.</tspan>
+    </text>
+</svg>

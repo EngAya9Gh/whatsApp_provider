@@ -56,7 +56,7 @@ const progressPercentage = computed(() => {
 
 <style scoped>
 .plan-card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-top: 1.5rem; max-width: 600px; }
-h3 { margin-top: 0; color: #374151; }
+h3 { margin-top: 0; color: #1E293B; }
 h3 span { color: #3b82f6; }
 .progress-section { margin: 2rem 0; }
 .progress-labels { display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-weight: 500; }

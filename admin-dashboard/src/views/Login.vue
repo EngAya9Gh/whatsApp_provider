@@ -1,0 +1,130 @@
+<template>
+  <div class="auth-page">
+    <div class="brand-panel">
+      <div class="brand-content">
+        <img src="/logo.svg" alt="wakeel.." class="brand-logo" />
+        <div class="brand-tagline">{{ $t('brand.tagline') }}</div>
+        <h2>{{ $t('brand.title') }}</h2>
+        <p>{{ $t('brand.desc') }}</p>
+      </div>
+      <div class="glow-orb"></div>
+    </div>
+
+    <div class="form-panel">
+      <div class="form-box">
+        <div class="lock-icon">🔐</div>
+        <h1>{{ $t('login.title') }}</h1>
+        <p class="subtitle">{{ $t('login.subtitle') }}</p>
+
+        <form @submit.prevent="handleLogin">
+          <div class="form-group">
+            <label>{{ $t('login.email') }}</label>
+            <input type="email" v-model="email" placeholder="admin@wakeel.tech" required autofocus />
+          </div>
+          <div class="form-group">
+            <label>{{ $t('login.password') }}</label>
+            <input type="password" v-model="password" placeholder="••••••••" required />
+          </div>
+          <div v-if="error" class="error-msg">{{ error }}</div>
+          <button type="submit" class="btn-submit" :disabled="loading">
+            <span v-if="loading" class="spinner"></span>
+            {{ loading ? $t('login.btn_signing_in') : $t('login.btn_sign_in') }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
+
+const email = ref('admin@wakeel.tech')
+const password = ref('')
+const error = ref('')
+const loading = ref(false)
+const router = useRouter()
+
+const handleLogin = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    const res = await axios.post('http://localhost:3000/api/admin/auth/login', {
+      email: email.value,
+      password: password.value
+    })
+    localStorage.setItem('admin_token', res.data.data.token)
+    router.push('/')
+  } catch (err) {
+    error.value = err.response?.data?.error || 'Invalid credentials'
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<style scoped>
+.auth-page { display: flex; min-height: 100vh; width: 100%; }
+
+.brand-panel {
+  flex: 1; background: #0F172A;
+  display: flex; align-items: center; justify-content: center;
+  padding: 3rem; position: relative; overflow: hidden;
+}
+.brand-content { position: relative; z-index: 2; max-width: 420px; }
+.brand-logo { height: 40px; filter: brightness(0) invert(1); margin-bottom: 1.5rem; }
+.brand-tagline {
+  display: inline-block;
+  background: rgba(255,102,0,0.15);
+  color: #FF6600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 1.25rem;
+  border: 1px solid rgba(255,102,0,0.3);
+}
+.brand-content h2 { color: white; font-size: 2rem; font-weight: 800; margin-bottom: 1rem; }
+.brand-content p { color: #6b7280; font-size: 0.95rem; line-height: 1.7; }
+.glow-orb {
+  position: absolute; width: 600px; height: 600px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,102,0,0.1) 0%, transparent 65%);
+  top: -150px; right: -150px;
+}
+
+.form-panel {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 3rem; background: #F8FAFC;
+}
+.form-box { width: 100%; max-width: 360px; }
+.lock-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+.form-box h1 { font-size: 1.75rem; font-weight: 800; color: #0F172A; margin-bottom: 0.375rem; }
+.subtitle { color: #64748B; font-size: 0.875rem; margin-bottom: 2rem; }
+
+.form-group { margin-bottom: 1.25rem; }
+label { display: block; font-size: 0.875rem; font-weight: 600; color: #1E293B; margin-bottom: 0.5rem; }
+input {
+  width: 100%; padding: 0.75rem 1rem; border: 1.5px solid #E2E8F0;
+  border-radius: 10px; font-size: 0.9rem; background: white; color: #1E293B; transition: all 0.2s;
+}
+input:focus { outline: none; border-color: #FF6600; box-shadow: 0 0 0 3px rgba(255,102,0,0.1); }
+
+.btn-submit {
+  width: 100%; padding: 0.875rem; background: #FF6600; color: white;
+  border: none; border-radius: 10px; font-weight: 700; font-size: 0.95rem;
+  cursor: pointer; margin-top: 0.5rem; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+}
+.btn-submit:hover:not(:disabled) { background: #cc5200; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(255,102,0,0.3); }
+.btn-submit:disabled { opacity: 0.7; cursor: not-allowed; }
+.spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-msg { background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-bottom: 1rem; }
+
+@media (max-width: 768px) { .brand-panel { display: none; } .form-panel { width: 100%; } }
+</style>

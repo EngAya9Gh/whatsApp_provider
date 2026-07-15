@@ -32,6 +32,7 @@
             <td>{{ key.label || 'Default Key' }}</td>
             <td class="key-cell">
               <code>sk_{{ key.keyPrefix }}************************</code>
+              <button @click="copyKey(`sk_${key.keyPrefix}************************`)" class="btn-small" style="margin-inline-start: 0.5rem;" title="Copy">📋</button>
             </td>
             <td>{{ new Date(key.createdAt).toLocaleDateString() }}</td>
             <td>
@@ -107,7 +108,7 @@ const copyKey = (text) => {
 <style scoped>
 .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
 .btn-primary { background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; }
-.btn-small { padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; border-radius: 4px; cursor: pointer; background: #e5e7eb; color: #374151; margin-left: 0.5rem; }
+.btn-small { padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; border-radius: 4px; cursor: pointer; background: #e5e7eb; color: #1E293B; margin-left: 0.5rem; }
 .btn-danger { background: #ef4444; color: white; }
 .table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
 .data-table { width: 100%; border-collapse: collapse; }
