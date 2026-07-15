@@ -1,0 +1,110 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("admins")
+}
+
+model Tenant {
+  id             String         @id @default(uuid())
+  name           String
+  email          String         @unique
+  passwordHash   String         @map("password_hash")
+  companyName    String?        @map("company_name")
+  plan           Plan           @default(FREE)
+  isActive       Boolean        @default(true) @map("is_active")
+  whatsappPhone  String?        @map("whatsapp_phone")
+  sessionStatus  SessionStatus  @default(DISCONNECTED) @map("session_status")
+  webhookUrl     String?        @db.Text @map("webhook_url")
+  monthlyLimit   Int            @default(100) @map("monthly_limit")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  apiKeys        ApiKey[]
+  messageLogs    MessageLog[]
+  usageRecords   UsageRecord[]
+
+  @@map("tenants")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  keyHash     String    @map("key_hash")
+  keyPrefix   String    @map("key_prefix")
+  label       String?
+  isActive    Boolean   @default(true) @map("is_active")
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model MessageLog {
+  id           String      @id @default(uuid())
+  tenantId     String      @map("tenant_id")
+  phone        String
+  messageType  MessageType @default(OTP) @map("message_type")
+  status       MessageStatus @default(QUEUED)
+  errorMessage String?     @db.Text @map("error_message")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("message_logs")
+}
+
+model UsageRecord {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  month           DateTime @db.Date
+  messagesSent    Int      @default(0) @map("messages_sent")
+  messagesFailed  Int      @default(0) @map("messages_failed")
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, month])
+  @@map("usage_records")
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum SessionStatus {
+  DISCONNECTED
+  CONNECTING
+  CONNECTED
+}
+
+enum MessageType {
+  OTP
+  CUSTOM
+}
+
+enum MessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
