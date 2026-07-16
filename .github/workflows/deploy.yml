@@ -19,12 +19,9 @@ jobs:
           port: 22
           script_stop: true
           script: |
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            export PATH=$PATH:/usr/local/bin:/usr/bin:/root/.nvm/versions/node/$(ls /root/.nvm/versions/node 2>/dev/null | head -1)/bin:/home/provider/.nvm/versions/node/$(ls /home/provider/.nvm/versions/node 2>/dev/null | head -1)/bin
+            export PATH=/home/provider/.nvm/versions/node/v22.23.1/bin:$PATH
 
-            echo "--- Node version: $(node -v) ---"
-            echo "--- NPM version: $(npm -v) ---"
+            echo "--- Node: $(node -v) | NPM: $(npm -v) ---"
 
             echo "1. Going to project directory..."
             cd /home/provider/htdocs/provider.wakeel.cc

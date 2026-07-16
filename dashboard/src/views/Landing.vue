@@ -84,7 +84,7 @@
           <div class="price-card popular">
             <div class="popular-badge">{{ $i18n.locale === 'ar' ? 'الأكثر طلباً' : 'Most Popular' }}</div>
             <div class="plan-name">Starter</div>
-            <div class="plan-price">$19 <span>/ mo</span></div>
+            <div class="plan-price">$20 <span>/ mo</span></div>
             <p class="plan-desc">{{ $i18n.locale === 'ar' ? 'للمشاريع الصغيرة والمتوسطة' : 'For small to medium projects' }}</p>
             <ul class="plan-features">
               <li>✔️ 1,000 {{ $i18n.locale === 'ar' ? 'رسالة شهرياً' : 'msgs / mo' }}</li>
@@ -97,7 +97,7 @@
 
           <div class="price-card">
             <div class="plan-name">Advanced</div>
-            <div class="plan-price">$29 <span>/ mo</span></div>
+            <div class="plan-price">$30 <span>/ mo</span></div>
             <p class="plan-desc">{{ $i18n.locale === 'ar' ? 'للمشاريع المتوسطة والنامية' : 'For growing and medium projects' }}</p>
             <ul class="plan-features">
               <li>✔️ 5,000 {{ $i18n.locale === 'ar' ? 'رسالة شهرياً' : 'msgs / mo' }}</li>
