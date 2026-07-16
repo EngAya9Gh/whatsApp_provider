@@ -13,7 +13,7 @@ import Landing from '../views/Landing.vue'
 const routes = [
   { path: '/login', component: Login, meta: { guest: true } },
   { path: '/register', component: Register, meta: { guest: true } },
-  { path: '/', component: Landing, meta: { guest: true } },
+  { path: '/', component: Landing },
   { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/connect', component: Connect, meta: { requiresAuth: true } },
   { path: '/keys', component: ApiKeys, meta: { requiresAuth: true } },
