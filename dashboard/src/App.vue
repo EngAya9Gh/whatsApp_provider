@@ -2,9 +2,9 @@
   <div class="app-root">
     <!-- Sidebar -->
     <aside v-if="isAuthenticated" class="sidebar">
-      <div class="sidebar-logo">
+      <router-link to="/" class="sidebar-logo">
         <img src="/logo.svg" alt="wakeel.." class="logo-img" />
-      </div>
+      </router-link>
 
       <nav class="sidebar-nav">
         <router-link to="/dashboard" class="nav-item" active-class="active">
@@ -131,6 +131,8 @@ body {
 .sidebar-logo {
   padding: 1.5rem 1.25rem;
   border-bottom: 1px solid rgba(255,255,255,0.07);
+  display: block;
+  text-decoration: none;
 }
 
 .logo-img {

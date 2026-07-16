@@ -2,10 +2,10 @@
   <div class="app-root">
     <!-- Sidebar -->
     <aside v-if="isAuthenticated" class="sidebar">
-      <div class="sidebar-logo">
+      <a href="/" class="sidebar-logo" title="Go to Landing Page">
         <img src="/logo.svg" alt="wakeel.." />
         <span class="admin-badge">Admin</span>
-      </div>
+      </a>
 
       <nav class="sidebar-nav">
         <router-link to="/" class="nav-item" exact-active-class="active">
@@ -93,6 +93,7 @@ a { text-decoration: none; color: inherit; }
   padding: 1.5rem 1.25rem;
   border-bottom: 1px solid rgba(255,255,255,0.07);
   display: flex; align-items: center; gap: 0.75rem;
+  text-decoration: none; cursor: pointer;
 }
 .sidebar-logo img { height: 32px; filter: brightness(0) invert(1); }
 .admin-badge {
