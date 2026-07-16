@@ -1,6 +1,5 @@
 <template>
   <div class="auth-page">
-    <!-- Left Panel: Brand -->
     <div class="brand-panel">
       <div class="brand-content">
         <img src="/logo.svg" alt="wakeel.." class="brand-logo" />
@@ -15,7 +14,6 @@
       <div class="brand-decoration"></div>
     </div>
 
-    <!-- Right Panel: Form -->
     <div class="form-panel">
       <div class="form-box">
         <h1>{{ $t('login.welcome_back') }}</h1>
@@ -28,7 +26,13 @@
           </div>
           <div class="form-group">
             <label>{{ $t('login.password') }}</label>
-            <input type="password" v-model="password" placeholder="••••••••••" required />
+            <div class="input-wrapper">
+              <input :type="showPassword ? 'text' : 'password'" v-model="password" placeholder="••••••••••" required />
+              <button type="button" class="eye-btn" @click="showPassword = !showPassword" tabindex="-1">
+                <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
           </div>
           <div v-if="error" class="error-msg">{{ error }}</div>
           <button type="submit" class="btn-submit" :disabled="loading">
@@ -55,6 +59,7 @@ const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const showPassword = ref(false)
 const router = useRouter()
 
 const handleLogin = async () => {
@@ -129,6 +134,27 @@ const handleLogin = async () => {
 
 .form-group { margin-bottom: 1.25rem; }
 label { display: block; font-size: 0.875rem; font-weight: 600; color: #1E293B; margin-bottom: 0.5rem; }
+
+/* Password input wrapper */
+.input-wrapper { position: relative; }
+.input-wrapper input { padding-right: 2.75rem; }
+.eye-btn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94A3B8;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  transition: color 0.2s;
+}
+.eye-btn:hover { color: #FF6600; }
+.eye-btn svg { width: 18px; height: 18px; }
+
 input {
   width: 100%;
   padding: 0.75rem 1rem;

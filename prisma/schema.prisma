@@ -30,7 +30,7 @@ model Tenant {
   whatsappPhone  String?        @map("whatsapp_phone")
   sessionStatus  SessionStatus  @default(DISCONNECTED) @map("session_status")
   webhookUrl     String?        @db.Text @map("webhook_url")
-  monthlyLimit   Int            @default(100) @map("monthly_limit")
+  monthlyLimit   Int            @default(20) @map("monthly_limit")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 

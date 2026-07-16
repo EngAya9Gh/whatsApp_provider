@@ -105,7 +105,7 @@ class AdminService {
     const validPlans = ['FREE', 'STARTER', 'PRO', 'ENTERPRISE'];
     if (!validPlans.includes(plan)) throw new Error('Invalid plan');
 
-    const limits = { FREE: 100, STARTER: 1000, PRO: 10000, ENTERPRISE: 0 };
+    const limits = { FREE: 20, STARTER: 1000, PRO: 10000, ENTERPRISE: 0 };
 
     return prisma.tenant.update({
       where: { id },
