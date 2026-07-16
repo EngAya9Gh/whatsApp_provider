@@ -2,10 +2,10 @@
   <div class="page-container">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Message Templates</h1>
-        <p class="page-subtitle">Create reusable message templates for quick and automated sending.</p>
+        <h1 class="page-title">{{ $t('templates.title') || 'Message Templates' }}</h1>
+        <p class="page-subtitle">{{ $t('templates.subtitle') || 'Create reusable message templates for quick and automated sending.' }}</p>
       </div>
-      <button @click="showCreateModal = true" class="btn-primary">+ Create Template</button>
+      <button @click="showCreateModal = true" class="btn-primary">+ {{ $t('templates.new_template') || 'Create Template' }}</button>
     </div>
 
     <!-- Error/Success Alerts -->
@@ -16,7 +16,7 @@
     <div v-if="loading && templates.length === 0" class="loading-state">Loading templates...</div>
     
     <div v-else-if="templates.length === 0" class="empty-state">
-      No templates found. Create your first template to get started!
+      {{ $t('templates.no_templates') || 'No templates found. Create your first template to get started!' }}
     </div>
 
     <div v-else class="templates-grid">
@@ -30,13 +30,13 @@
         </div>
         <div class="template-id">
           <small>ID:</small> <code>{{ template.id }}</code>
-          <button @click="copyId(template.id)" class="copy-btn">📋</button>
+          <button @click="copyId(template.id)" class="copy-btn" :title="$t('templates.id_copy') || 'Copy ID'">📋</button>
         </div>
         <div class="template-content">
           <p>{{ template.content }}</p>
         </div>
         <div class="card-footer">
-          <small>Created: {{ new Date(template.createdAt).toLocaleDateString() }}</small>
+          <small>{{ $t('templates.created') || 'Created' }}: {{ new Date(template.createdAt).toLocaleDateString() }}</small>
         </div>
       </div>
     </div>
@@ -44,24 +44,25 @@
     <!-- Create/Edit Modal -->
     <div v-if="showCreateModal" class="modal-overlay" @click.self="closeModal">
       <div class="modal">
-        <h2>{{ editingTemplate ? 'Edit Template' : 'Create Template' }}</h2>
+        <h2>{{ editingTemplate ? ($t('templates.edit_title') || 'Edit Template') : ($t('templates.create_title') || 'Create Template') }}</h2>
         
         <form @submit.prevent="saveTemplate">
           <div class="form-group">
-            <label>Template Name</label>
+            <label>{{ $t('templates.name') || 'Template Name' }}</label>
             <input type="text" v-model="formData.name" placeholder="e.g. Welcome Message" required class="form-input" />
           </div>
 
           <div class="form-group">
-            <label>Message Content</label>
-            <textarea v-model="formData.content" rows="6" placeholder="Hello {{name}}, your order {{order_id}} is ready!" required class="form-input"></textarea>
-            <small class="hint">Use double curly braces for variables, e.g., <code>{{variable_name}}</code>.</small>
+            <label>{{ $t('templates.content') || 'Message Content' }}</label>
+            <textarea v-model="formData.content" rows="6" :placeholder="$t('templates.placeholder') || 'Hello {{name}}, your order {{order_id}} is ready!'" required class="form-input"></textarea>
+            <small class="hint" v-html="$t('templates.hint') || 'Use double curly braces for variables, e.g., <code>{{variable_name}}</code>.'"></small>
           </div>
 
           <div class="modal-actions">
-            <button type="button" @click="closeModal" class="btn-secondary">Cancel</button>
+            <button type="button" @click="closeModal" class="btn-secondary">{{ $t('templates.cancel') || 'Cancel' }}</button>
             <button type="submit" class="btn-primary" :disabled="saving">
-              {{ saving ? 'Saving...' : 'Save Template' }}
+              <span v-if="saving" class="spinner"></span>
+              {{ saving ? '...' : (editingTemplate ? ($t('templates.save') || 'Save Changes') : ($t('templates.create') || 'Create Template')) }}
             </button>
           </div>
         </form>

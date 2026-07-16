@@ -7,7 +7,7 @@
       </a>
 
       <nav class="sidebar-nav">
-        <router-link to="/dashboard" class="nav-item" active-class="active">
+        <router-link to="/dashboard" class="nav-item" exact-active-class="active">
           <span class="nav-icon">📊</span>
           <span class="nav-label">{{ $t('sidebar.dashboard') }}</span>
         </router-link>
@@ -17,15 +17,15 @@
         </router-link>
         <router-link to="/send-message" class="nav-item" active-class="active">
           <span class="nav-icon">📨</span>
-          <span class="nav-label">Send Message</span>
+          <span class="nav-label">{{ $t('sidebar.send_message') }}</span>
         </router-link>
         <router-link to="/campaigns" class="nav-item" active-class="active">
           <span class="nav-icon">🚀</span>
-          <span class="nav-label">Campaigns</span>
+          <span class="nav-label">{{ $t('sidebar.campaigns') }}</span>
         </router-link>
         <router-link to="/templates" class="nav-item" active-class="active">
           <span class="nav-icon">📋</span>
-          <span class="nav-label">Templates</span>
+          <span class="nav-label">{{ $t('sidebar.templates') }}</span>
         </router-link>
         <router-link to="/keys" class="nav-item" active-class="active">
           <span class="nav-icon">🔑</span>

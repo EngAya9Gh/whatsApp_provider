@@ -2,10 +2,10 @@
   <div class="page-container">
     <div class="page-header">
       <div>
-        <h1 class="page-title">Bulk Campaigns</h1>
-        <p class="page-subtitle">Send messages to thousands of contacts via Excel/CSV safely.</p>
+        <h1 class="page-title">{{ $t('campaigns.title') || 'Bulk Campaigns' }}</h1>
+        <p class="page-subtitle">{{ $t('campaigns.subtitle') || 'Send messages to thousands of contacts via Excel/CSV safely.' }}</p>
       </div>
-      <button @click="showCreateModal = true" class="btn-primary">+ New Campaign</button>
+      <button @click="showCreateModal = true" class="btn-primary">+ {{ $t('campaigns.new_campaign') || 'New Campaign' }}</button>
     </div>
 
     <!-- Error/Success Alerts -->
@@ -48,13 +48,13 @@
         </div>
 
         <div class="card-footer">
-          <small>Created: {{ new Date(campaign.createdAt).toLocaleDateString() }}</small>
+          <small>{{ $t('campaigns.created') || 'Created' }}: {{ new Date(campaign.createdAt).toLocaleDateString() }}</small>
           <div style="display: flex; gap: 0.5rem;">
             <button v-if="campaign.status === 'PENDING'" @click="startCampaign(campaign.id)" class="btn-start" :disabled="startingId === campaign.id">
               {{ startingId === campaign.id ? 'Starting...' : '▶ Start' }}
             </button>
             <button v-else @click="loadStats(campaign.id)" class="btn-text">Refresh Stats</button>
-            <button v-if="campaign.status !== 'PENDING'" @click="openTargetsModal(campaign.id)" class="btn-text" style="color: #3B82F6;">Details</button>
+            <button v-if="campaign.status !== 'PENDING'" @click="openTargetsModal(campaign.id)" class="btn-text" style="color: #3B82F6;">{{ $t('campaigns.details') || 'Details' }}</button>
           </div>
         </div>
       </div>
@@ -63,45 +63,44 @@
     <!-- Create Campaign Modal -->
     <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
       <div class="modal">
-        <h2>Create New Campaign</h2>
+        <h2>{{ $t('campaigns.create_title') || 'Create New Campaign' }}</h2>
         
         <form @submit.prevent="submitCampaign">
           <div class="form-group">
-            <label>Campaign Name</label>
+            <label>{{ $t('campaigns.campaign_name') || 'Campaign Name' }}</label>
             <input type="text" v-model="formData.name" placeholder="e.g. Summer Sale Offer" required class="form-input" />
           </div>
 
           <div class="form-group">
-            <label>Upload Contacts (Excel / CSV)</label>
+            <label>{{ $t('campaigns.upload_csv') || 'Upload Contacts (Excel / CSV)' }}</label>
             <input type="file" @change="handleFileChange" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" required class="form-input" />
-            <small class="hint">The system will automatically find the column containing phone numbers.</small>
+            <small class="hint">{{ $t('campaigns.csv_help') || 'The system will automatically find the column containing phone numbers.' }}</small>
           </div>
 
           <div class="form-group">
-            <label>Message Type</label>
+            <label>{{ $t('campaigns.message_type') || 'Message Type' }}</label>
             <div class="radio-group" style="display:flex; gap:1rem; margin-bottom: 0.5rem;">
-              <label><input type="radio" v-model="formData.type" value="text" /> Text Message</label>
-              <label><input type="radio" v-model="formData.type" value="template" /> Template</label>
+              <label><input type="radio" v-model="formData.type" value="text" /> {{ $t('campaigns.type_text') || 'Text Message' }}</label>
+              <label><input type="radio" v-model="formData.type" value="template" /> {{ $t('campaigns.type_template') || 'Template' }}</label>
             </div>
           </div>
 
           <div class="form-group" v-if="formData.type === 'text'">
-            <label>Message Content</label>
-            <textarea v-model="formData.message" rows="5" placeholder="Write your marketing message here..." required class="form-input"></textarea>
+            <label>{{ $t('campaigns.message_content') || 'Message Content' }}</label>
+            <textarea v-model="formData.message" rows="5" :placeholder="$t('campaigns.message_placeholder') || 'Write your marketing message here...'" required class="form-input"></textarea>
           </div>
 
           <div class="form-group" v-if="formData.type === 'template'">
-            <label>Select Template</label>
+            <label>{{ $t('campaigns.select_template') || 'Select Template' }}</label>
             <select v-model="formData.templateId" required class="form-input">
-              <option value="" disabled>Choose a template...</option>
+              <option value="" disabled>{{ $t('campaigns.select_template') || 'Choose a template...' }}</option>
               <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label>Attach Image (Optional)</label>
+            <label>{{ $t('campaigns.upload_media') || 'Attach Image (Optional)' }}</label>
             <input type="file" @change="handleImageChange" accept="image/*" class="form-input" />
-            <small class="hint">This image will be sent along with your message.</small>
           </div>
 
           <div class="warning-box">
@@ -110,9 +109,9 @@
           </div>
 
           <div class="modal-actions">
-            <button type="button" @click="showCreateModal = false" class="btn-secondary">Cancel</button>
+            <button type="button" @click="showCreateModal = false" class="btn-secondary">{{ $t('campaigns.cancel') || 'Cancel' }}</button>
             <button type="submit" class="btn-primary" :disabled="saving">
-              {{ saving ? 'Saving...' : 'Create Campaign' }}
+              {{ saving ? ($t('campaigns.creating') || 'Creating...') : ($t('campaigns.create') || 'Create Campaign') }}
             </button>
           </div>
         </form>
@@ -123,9 +122,9 @@
     <div v-if="showTargetsModal" class="modal-overlay" @click.self="showTargetsModal = false">
       <div class="modal targets-modal">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-          <h2 style="margin: 0;">Campaign Details: {{ selectedCampaign?.name }}</h2>
+          <h2 style="margin: 0;">{{ $t('campaigns.campaign_details') || 'Campaign Details' }}: {{ selectedCampaign?.name }}</h2>
           <button v-if="hasFailedTargets" @click="retryFailed" class="btn-primary" style="padding: 0.5rem 1rem;">
-            Retry Failed Numbers
+            {{ $t('campaigns.retry_failed') || 'Retry Failed Numbers' }}
           </button>
         </div>
         
@@ -137,35 +136,35 @@
               <span style="font-weight: 700; color: #1E293B;">{{ selectedCampaign.name }}</span>
             </div>
             <div class="info-item">
-              <span class="label">Status:</span>
+              <span class="label">{{ $t('campaigns.status') || 'Status' }}:</span>
               <span :class="['status-badge', selectedCampaign.status.toLowerCase()]">{{ selectedCampaign.status }}</span>
             </div>
             <div class="info-item">
-              <span class="label">Created:</span>
+              <span class="label">{{ $t('campaigns.created') || 'Created' }}:</span>
               <span>{{ new Date(selectedCampaign.createdAt).toLocaleString() }}</span>
             </div>
             <div class="info-item" v-if="selectedCampaign.mediaPath">
-              <span class="label">Media Attachment:</span>
+              <span class="label">{{ $t('campaigns.media_attachment') || 'Media Attachment' }}:</span>
               <img v-if="selectedCampaign.mediaMime?.startsWith('image/')" :src="'/' + selectedCampaign.mediaPath" class="media-preview-img" />
-              <a v-else :href="'/' + selectedCampaign.mediaPath" target="_blank" style="color: #3B82F6;">View Attached Document</a>
+              <a v-else :href="'/' + selectedCampaign.mediaPath" target="_blank" style="color: #3B82F6;">{{ $t('campaigns.view_doc') || 'View Attached Document' }}</a>
             </div>
             <div class="info-item full-width">
-              <span class="label">Message Content:</span>
+              <span class="label">{{ $t('campaigns.message_content') || 'Message Content' }}:</span>
               <div class="message-preview">{{ getMessageContent(selectedCampaign) }}</div>
             </div>
           </div>
         </div>
 
-        <h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">Target Numbers</h3>
+        <h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">{{ $t('campaigns.target_numbers') || 'Target Numbers' }}</h3>
         <div v-if="targetsLoading" class="loading-state">Loading numbers...</div>
         
         <div v-else class="targets-container">
           <table class="targets-table">
             <thead>
               <tr>
-                <th>Phone Number</th>
-                <th>Status</th>
-                <th>Error Reason</th>
+                <th>{{ $t('campaigns.phone_number') || 'Phone Number' }}</th>
+                <th>{{ $t('campaigns.status') || 'Status' }}</th>
+                <th>{{ $t('campaigns.error_reason') || 'Error Reason' }}</th>
               </tr>
             </thead>
             <tbody>
@@ -181,7 +180,7 @@
         </div>
 
         <div class="modal-actions">
-          <button type="button" @click="showTargetsModal = false" class="btn-secondary">Close</button>
+          <button type="button" @click="showTargetsModal = false" class="btn-secondary">{{ $t('campaigns.close') || 'Close' }}</button>
         </div>
       </div>
     </div>

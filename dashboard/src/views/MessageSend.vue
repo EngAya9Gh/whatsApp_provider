@@ -1,8 +1,8 @@
 <template>
   <div class="page-container">
     <div class="page-header">
-      <h1 class="page-title">Send Message</h1>
-      <p class="page-subtitle">Test sending messages directly from your dashboard.</p>
+      <h1 class="page-title">{{ $t('send_message.title') || 'Send Message' }}</h1>
+      <p class="page-subtitle">{{ $t('send_message.subtitle') || 'Test sending messages directly from your dashboard.' }}</p>
     </div>
 
     <div class="grid-layout">
@@ -10,59 +10,59 @@
       <div class="card form-card">
         <form @submit.prevent="handleSend">
           <div class="form-group">
-            <label>Message Type</label>
+            <label>{{ $t('send_message.type') || 'Message Type' }}</label>
             <div class="radio-group">
               <label class="radio-label">
-                <input type="radio" v-model="messageType" value="text" /> Text
+                <input type="radio" v-model="messageType" value="text" /> {{ $t('send_message.type_text') || 'Text' }}
               </label>
               <label class="radio-label">
-                <input type="radio" v-model="messageType" value="image" /> Image
+                <input type="radio" v-model="messageType" value="image" /> {{ $t('send_message.type_image') || 'Image' }}
               </label>
               <label class="radio-label">
-                <input type="radio" v-model="messageType" value="pdf" /> PDF
+                <input type="radio" v-model="messageType" value="pdf" /> {{ $t('send_message.type_pdf') || 'PDF' }}
               </label>
               <label class="radio-label">
-                <input type="radio" v-model="messageType" value="template" /> Template
+                <input type="radio" v-model="messageType" value="template" /> {{ $t('send_message.type_template') || 'Template' }}
               </label>
             </div>
           </div>
 
           <div class="form-group">
-            <label>Recipient Phone Number</label>
-            <input type="text" v-model="phone" placeholder="966500000000" required class="form-input" />
-            <small class="hint">Include country code without + or 00.</small>
+            <label>{{ $t('send_message.phone') || 'Recipient Phone Number' }}</label>
+            <input type="text" v-model="phone" :placeholder="$t('send_message.phone_placeholder') || '966500000000'" required class="form-input" />
+            <small class="hint">{{ $t('send_message.phone_hint') || 'Include country code without + or 00.' }}</small>
           </div>
 
           <!-- Text Input -->
           <div v-if="messageType === 'text'" class="form-group">
-            <label>Message Content</label>
-            <textarea v-model="textContent" rows="4" placeholder="Hello, this is a custom message..." required class="form-input"></textarea>
+            <label>{{ $t('send_message.message') || 'Message Content' }}</label>
+            <textarea v-model="textContent" rows="4" :placeholder="$t('send_message.message_placeholder') || 'Hello, this is a custom message...'" required class="form-input"></textarea>
           </div>
 
           <!-- Media Inputs (File Upload) -->
           <div v-if="messageType === 'image' || messageType === 'pdf'" class="form-group">
-            <label>Upload File</label>
+            <label>{{ $t('send_message.media') || 'Upload File' }}</label>
             <input type="file" @change="handleFileChange" :accept="messageType === 'image' ? 'image/*' : 'application/pdf'" required class="form-input" />
-            <small class="hint">Max file size: 10MB.</small>
+            <small class="hint">{{ $t('send_message.media_hint') || 'Max file size: 10MB.' }}</small>
           </div>
 
           <div v-if="messageType === 'image' || messageType === 'pdf'" class="form-group">
-            <label>Caption (Optional)</label>
-            <input type="text" v-model="caption" placeholder="Check out this file..." class="form-input" />
+            <label>{{ $t('send_message.caption') || 'Caption (Optional)' }}</label>
+            <input type="text" v-model="caption" placeholder="..." class="form-input" />
           </div>
 
           <!-- Template Inputs -->
           <div v-if="messageType === 'template'" class="form-group">
-            <label>Select Template</label>
+            <label>{{ $t('send_message.select_template') || 'Select Template' }}</label>
             <select v-model="selectedTemplateId" @change="extractVariables" required class="form-input">
-              <option value="" disabled>Choose a template...</option>
+              <option value="" disabled>{{ $t('send_message.select_template') || 'Choose a template...' }}</option>
               <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
             </select>
           </div>
 
           <!-- Dynamic Template Variables -->
           <div v-if="messageType === 'template' && templateVariables.length > 0" class="variables-box">
-            <h4>Fill in Variables:</h4>
+            <h4>{{ $t('send_message.fill_variables') || 'Fill in Variables:' }}</h4>
             <div v-for="variable in templateVariables" :key="variable" class="form-group" style="margin-bottom: 0.5rem;">
               <label>{{ variable }}</label>
               <input type="text" v-model="variableValues[variable]" :placeholder="`Value for ${variable}`" required class="form-input" />
@@ -73,33 +73,33 @@
           <div v-if="success" class="success-msg">{{ success }}</div>
 
           <div class="form-group">
-            <label>Your API Key</label>
+            <label>{{ $t('send_message.api_key') || 'Your API Key' }}</label>
             <input type="password" v-model="apiKey" placeholder="sk_..." required class="form-input api-key-input" />
-            <small class="hint">Paste an active API key to authorize the request.</small>
+            <small class="hint">{{ $t('send_message.api_hint') || 'Paste an active API key to authorize the request.' }}</small>
           </div>
 
           <button type="submit" class="btn-submit" :disabled="loading">
             <span v-if="loading" class="spinner"></span>
-            {{ loading ? 'Sending...' : 'Send Message' }}
+            {{ loading ? ($t('send_message.sending') || 'Sending...') : ($t('send_message.send') || 'Send Message') }}
           </button>
         </form>
       </div>
 
       <!-- Preview or Info -->
       <div class="card info-card">
-        <h2 class="card-title">How it works</h2>
+        <h2 class="card-title">{{ $t('send_message.how_it_works') || 'How it works' }}</h2>
         <p class="info-text">
-          This tool uses your own API to send messages. When you click send, the dashboard makes a request to:
+          {{ $t('send_message.info_text') || 'This tool uses your own API to send messages. When you click send, the dashboard makes a request to:' }}
         </p>
         <code class="endpoint-code">POST /api/v1/{{ messageType === 'template' ? 'templates/send' : (messageType === 'text' ? 'message/send' : 'message/upload-media') }}</code>
         
         <div class="tips-box">
-          <h4>💡 Pro Tips</h4>
+          <h4>{{ $t('send_message.pro_tips') || '💡 Pro Tips' }}</h4>
           <ul>
-            <li>Ensure your WhatsApp is connected (Check the WhatsApp tab).</li>
-            <li>Text and Template messages are delivered instantly.</li>
-            <li>Media messages (images and PDFs) are securely uploaded and sent.</li>
-            <li>All messages count towards your monthly limit.</li>
+            <li>{{ $t('send_message.tip_1') || 'Ensure your WhatsApp is connected (Check the WhatsApp tab).' }}</li>
+            <li>{{ $t('send_message.tip_2') || 'Text and Template messages are delivered instantly.' }}</li>
+            <li>{{ $t('send_message.tip_3') || 'Media messages (images and PDFs) are securely uploaded and sent.' }}</li>
+            <li>{{ $t('send_message.tip_4') || 'All messages count towards your monthly limit.' }}</li>
           </ul>
         </div>
       </div>
