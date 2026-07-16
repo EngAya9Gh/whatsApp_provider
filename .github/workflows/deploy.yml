@@ -31,6 +31,7 @@ jobs:
 
             echo "3. Setting up Backend..."
             npm install
+            npx prisma db push
             npx prisma generate
 
             echo "4. Building Provider Dashboard..."
@@ -43,7 +44,11 @@ jobs:
             cd admin-dashboard
             npm install
             npm run build
+            
+            echo "6. Merging Admin Panel into Main Dashboard..."
+            rm -rf ../dashboard/dist/admin
+            cp -r dist ../dashboard/dist/admin
             cd ..
 
-            echo "6. Restarting Node.js Server..."
+            echo "7. Restarting Node.js Server..."
             pm2 restart whatsapp-api

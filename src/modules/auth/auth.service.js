@@ -18,12 +18,15 @@ class AuthService {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(data.password, salt);
 
+    const plansConfig = require('../../config/plans');
     const tenant = await prisma.tenant.create({
       data: {
         name: data.name,
         email: data.email,
         passwordHash,
-        companyName: data.companyName
+        companyName: data.companyName,
+        plan: 'FREE',
+        monthlyLimit: plansConfig.FREE.limit
       }
     });
 

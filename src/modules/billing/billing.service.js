@@ -47,12 +47,16 @@ class BillingService {
       select: { monthlyLimit: true, plan: true }
     });
 
+    // Override the DB limit with the dynamic config limit, so any change in plans.js applies instantly
+    const plansConfig = require('../../config/plans');
+    const dynamicLimit = plansConfig[tenant.plan]?.limit ?? tenant.monthlyLimit;
+
     return {
       plan: tenant.plan,
-      monthlyLimit: tenant.monthlyLimit,
+      monthlyLimit: dynamicLimit,
       messagesSent: usage.messagesSent,
       messagesFailed: usage.messagesFailed,
-      remaining: Math.max(0, tenant.monthlyLimit - usage.messagesSent),
+      remaining: Math.max(0, dynamicLimit - usage.messagesSent),
       month: currentMonth
     };
   }

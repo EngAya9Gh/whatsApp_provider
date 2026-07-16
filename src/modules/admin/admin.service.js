@@ -102,14 +102,13 @@ class AdminService {
   }
 
   async updateTenantPlan(id, plan) {
-    const validPlans = ['FREE', 'STARTER', 'PRO', 'ENTERPRISE'];
+    const plansConfig = require('../../config/plans');
+    const validPlans = Object.keys(plansConfig);
     if (!validPlans.includes(plan)) throw new Error('Invalid plan');
-
-    const limits = { FREE: 20, STARTER: 1000, PRO: 10000, ENTERPRISE: 0 };
 
     return prisma.tenant.update({
       where: { id },
-      data: { plan, monthlyLimit: limits[plan] }
+      data: { plan, monthlyLimit: plansConfig[plan].limit }
     });
   }
 

@@ -69,56 +69,19 @@
         
         <div class="pricing-grid">
           
-          <div class="price-card">
-            <div class="plan-name">Free</div>
-            <div class="plan-price">$0 <span>/ mo</span></div>
-            <p class="plan-desc">{{ $i18n.locale === 'ar' ? 'للتجربة والمشاريع الناشئة' : 'For testing and startups' }}</p>
+          <div v-for="plan in pricingPlans" :key="plan.id" class="price-card" :class="{ popular: plan.isPopular }">
+            <div v-if="plan.isPopular" class="popular-badge">{{ $i18n.locale === 'ar' ? 'الأكثر طلباً' : 'Most Popular' }}</div>
+            <div class="plan-name">{{ plan.name }}</div>
+            <div class="plan-price">${{ plan.price }} <span>/ mo</span></div>
+            <p class="plan-desc">{{ $i18n.locale === 'ar' ? plan.descAr : plan.descEn }}</p>
             <ul class="plan-features">
-              <li>✔️ 20 {{ $i18n.locale === 'ar' ? 'رسالة شهرياً' : 'msgs / mo' }}</li>
-              <li>✔️ 1 {{ $i18n.locale === 'ar' ? 'رقم واتساب' : 'WhatsApp number' }}</li>
-              <li>✔️ Community Support</li>
+              <li>✔️ {{ plan.limit }} {{ $i18n.locale === 'ar' ? 'رسالة شهرياً' : 'msgs / mo' }}</li>
+              <li>✔️ {{ plan.numbers }} {{ $i18n.locale === 'ar' ? (plan.numbers == 1 ? 'رقم واتساب' : 'أرقام واتساب') : (plan.numbers == 1 ? 'WhatsApp number' : 'WhatsApp numbers') }}</li>
+              <li v-for="feature in plan.extraFeatures" :key="feature.en">✔️ {{ $i18n.locale === 'ar' ? feature.ar : feature.en }}</li>
             </ul>
-            <router-link to="/register" class="btn-secondary block-btn">{{ $i18n.locale === 'ar' ? 'اختر الباقة' : 'Choose Plan' }}</router-link>
-          </div>
-
-          <div class="price-card popular">
-            <div class="popular-badge">{{ $i18n.locale === 'ar' ? 'الأكثر طلباً' : 'Most Popular' }}</div>
-            <div class="plan-name">Starter</div>
-            <div class="plan-price">$20 <span>/ mo</span></div>
-            <p class="plan-desc">{{ $i18n.locale === 'ar' ? 'للمشاريع الصغيرة والمتوسطة' : 'For small to medium projects' }}</p>
-            <ul class="plan-features">
-              <li>✔️ 1,000 {{ $i18n.locale === 'ar' ? 'رسالة شهرياً' : 'msgs / mo' }}</li>
-              <li>✔️ 1 {{ $i18n.locale === 'ar' ? 'رقم واتساب' : 'WhatsApp number' }}</li>
-              <li>✔️ API Access</li>
-              <li>✔️ Priority Email Support</li>
-            </ul>
-            <router-link to="/register" class="btn-primary block-btn">{{ $i18n.locale === 'ar' ? 'ابدأ مع Starter' : 'Start with Starter' }}</router-link>
-          </div>
-
-          <div class="price-card">
-            <div class="plan-name">Advanced</div>
-            <div class="plan-price">$30 <span>/ mo</span></div>
-            <p class="plan-desc">{{ $i18n.locale === 'ar' ? 'للمشاريع المتوسطة والنامية' : 'For growing and medium projects' }}</p>
-            <ul class="plan-features">
-              <li>✔️ 5,000 {{ $i18n.locale === 'ar' ? 'رسالة شهرياً' : 'msgs / mo' }}</li>
-              <li>✔️ 2 {{ $i18n.locale === 'ar' ? 'أرقام واتساب' : 'WhatsApp numbers' }}</li>
-              <li>✔️ API Access</li>
-              <li>✔️ Priority Email Support</li>
-            </ul>
-            <router-link to="/register" class="btn-secondary block-btn">{{ $i18n.locale === 'ar' ? 'اختر الباقة' : 'Choose Plan' }}</router-link>
-          </div>
-
-          <div class="price-card">
-            <div class="plan-name">Pro</div>
-            <div class="plan-price">$49 <span>/ mo</span></div>
-            <p class="plan-desc">{{ $i18n.locale === 'ar' ? 'للشركات والمواقع الكبيرة' : 'For large companies and sites' }}</p>
-            <ul class="plan-features">
-              <li>✔️ 10,000 {{ $i18n.locale === 'ar' ? 'رسالة شهرياً' : 'msgs / mo' }}</li>
-              <li>✔️ Up to 3 {{ $i18n.locale === 'ar' ? 'أرقام واتساب' : 'WhatsApp numbers' }}</li>
-              <li>✔️ Webhooks & API</li>
-              <li>✔️ 24/7 Premium Support</li>
-            </ul>
-            <router-link to="/register" class="btn-secondary block-btn">{{ $i18n.locale === 'ar' ? 'اختر الباقة' : 'Choose Plan' }}</router-link>
+            <router-link to="/register" :class="plan.isPopular ? 'btn-primary block-btn' : 'btn-secondary block-btn'">
+              {{ $i18n.locale === 'ar' ? 'اختر الباقة' : 'Choose Plan' }}
+            </router-link>
           </div>
 
         </div>
@@ -148,6 +111,65 @@ const { locale } = useI18n()
 const toggleLanguage = () => {
   locale.value = locale.value === 'en' ? 'ar' : 'en'
 }
+
+// 📌 هنا يمكنك تعديل كل باقات الموقع بسهولة في مكان واحد
+const pricingPlans = [
+  {
+    id: 'free',
+    name: 'Free',
+    price: 0,
+    limit: 20,
+    numbers: 1,
+    descAr: 'للتجربة والمشاريع الناشئة',
+    descEn: 'For testing and startups',
+    isPopular: false,
+    extraFeatures: [
+      { ar: 'دعم فني عبر المجتمع', en: 'Community Support' }
+    ]
+  },
+  {
+    id: 'starter',
+    name: 'Starter',
+    price: 20,
+    limit: '1,000',
+    numbers: 1,
+    descAr: 'للمشاريع الصغيرة والمتوسطة',
+    descEn: 'For small to medium projects',
+    isPopular: true,
+    extraFeatures: [
+      { ar: 'إمكانية استخدام API', en: 'API Access' },
+      { ar: 'دعم فني عبر الإيميل', en: 'Priority Email Support' }
+    ]
+  },
+  {
+    id: 'advanced',
+    name: 'Advanced',
+    price: 30,
+    limit: '5,000',
+    numbers: 2,
+    descAr: 'للمشاريع المتوسطة والنامية',
+    descEn: 'For growing and medium projects',
+    isPopular: false,
+    extraFeatures: [
+      { ar: 'إمكانية استخدام API', en: 'API Access' },
+      { ar: 'دعم فني عبر الإيميل', en: 'Priority Email Support' }
+    ]
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: 49,
+    limit: '10,000',
+    numbers: 3,
+    descAr: 'للشركات والمواقع الكبيرة',
+    descEn: 'For large companies and sites',
+    isPopular: false,
+    extraFeatures: [
+      { ar: 'Webhooks & API', en: 'Webhooks & API' },
+      { ar: 'دعم فني مميز 24/7', en: '24/7 Premium Support' }
+    ]
+  }
+]
 </script>
 
 <style scoped>
