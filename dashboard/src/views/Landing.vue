@@ -5,7 +5,7 @@
     <nav class="landing-nav">
       <div class="nav-container">
         <div class="logo">
-          <span class="logo-text">Wakeel OTP</span>
+          <span class="logo-text">Wakeel</span>
         </div>
         <div class="nav-actions">
           <!-- Language Switcher -->
@@ -23,9 +23,9 @@
     <header class="hero-section">
       <div class="hero-bg-glow"></div>
       <div class="hero-content">
-        <h1 class="hero-title">{{ $i18n.locale === 'ar' ? 'منصة التحقق عبر الواتساب الأسرع والأوفر' : 'The Fastest & Most Affordable WhatsApp OTP Platform' }}</h1>
+        <h1 class="hero-title">{{ $i18n.locale === 'ar' ? 'منصة المراسلة والحملات عبر الواتساب الأسرع والأوفر' : 'The Fastest & Most Affordable WhatsApp Messaging & Campaigns Platform' }}</h1>
         <p class="hero-subtitle">
-          {{ $i18n.locale === 'ar' ? 'اربط تطبيقك أو موقعك بخدمة الواتساب في دقائق، وأرسل رسائل التحقق (OTP) والإشعارات لعملائك بأقل تكلفة ممكنة وبموثوقية تامة.' : 'Integrate your app or website with WhatsApp in minutes. Send OTPs and notifications to your customers with the lowest cost and highest reliability.' }}
+          {{ $i18n.locale === 'ar' ? 'اربط تطبيقك أو موقعك بخدمة الواتساب في دقائق، وأرسل الإشعارات، الحملات التسويقية، ورسائل التحقق لعملائك بأقل تكلفة ممكنة وبموثوقية تامة.' : 'Integrate your app or website with WhatsApp in minutes. Send notifications, marketing campaigns, and OTPs to your customers with the lowest cost and highest reliability.' }}
         </p>
         <div class="hero-cta">
           <router-link to="/register" class="btn-primary btn-large">{{ $i18n.locale === 'ar' ? 'ابدأ مجاناً الآن' : 'Start for Free Now' }}</router-link>
@@ -43,7 +43,7 @@
           <div class="feature-card">
             <div class="feature-icon">⚡</div>
             <h3>{{ $i18n.locale === 'ar' ? 'توصيل فائق السرعة' : 'Lightning Fast Delivery' }}</h3>
-            <p>{{ $i18n.locale === 'ar' ? 'يتم إرسال رسائل التحقق وتصل للمستخدمين في ثوانٍ معدودة بفضل بنيتنا التحتية الموزعة.' : 'OTP messages are delivered to users in seconds thanks to our distributed infrastructure.' }}</p>
+            <p>{{ $i18n.locale === 'ar' ? 'يتم إرسال رسائلك وحملاتك وتصل للمستخدمين في ثوانٍ معدودة بفضل بنيتنا التحتية الموزعة.' : 'Your messages and campaigns are delivered to users in seconds thanks to our distributed infrastructure.' }}</p>
           </div>
 
           <div class="feature-card">
