@@ -8,13 +8,19 @@ const router = express.Router();
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
+    const fs = require('fs');
     if (file.fieldname === 'image') {
-      cb(null, 'uploads/campaigns/');
+      const dir = 'uploads/campaigns/';
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      cb(null, dir);
     } else {
-      // For excel files, we don't strictly need to save them, but we must provide a destination if using diskStorage for all.
-      // Wait, let's just use memory storage for excel, but multer doesn't allow mixed storage types directly easily.
-      // So let's save excel temporarily too.
-      cb(null, 'uploads/');
+      const dir = 'uploads/';
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      cb(null, dir);
     }
   },
   filename: function (req, file, cb) {

@@ -11,13 +11,16 @@ class CampaignService {
   async parseFile(file) {
     const phones = new Set();
     const filePath = file.path;
+    const fs = require('fs');
+    console.log('[DEBUG] Parsing file:', filePath);
+    console.log('[DEBUG] File exists?', fs.existsSync(filePath));
+    console.log('[DEBUG] CWD:', process.cwd());
     
     if (file.mimetype === 'text/csv') {
       await new Promise((resolve, reject) => {
         fs.createReadStream(filePath)
           .pipe(csv())
           .on('data', (data) => {
-            // Find a column that looks like a phone number
             const phone = Object.values(data).find(val => /^[0-9]{10,15}$/.test(val?.toString().replace(/[^0-9]/g, '')));
             if (phone) phones.add(phone.replace(/[^0-9]/g, ''));
           })
@@ -25,11 +28,11 @@ class CampaignService {
           .on('error', reject);
       });
     } else {
-      // Excel (xlsx, xls)
+      const xlsx = require('xlsx');
       const workbook = xlsx.readFile(filePath);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 }); // array of arrays
+      const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
       
       data.forEach(row => {
         row.forEach(cell => {
@@ -41,7 +44,6 @@ class CampaignService {
       });
     }
     
-    // Clean up temp excel file
     fs.unlink(filePath, () => {});
 
     return Array.from(phones);
