@@ -37,6 +37,11 @@ const startServer = async () => {
     // Restore existing WhatsApp sessions
     await sessionManager.restoreAllSessions();
 
+    // Initialize default plans
+    const planService = require('./modules/plan/plan.service');
+    await planService.initPlans();
+    logger.info('Initialized Subscription Plans');
+
     server.listen(config.port, () => {
       logger.info(`Server is running on port ${config.port} in ${config.env} mode`);
     });

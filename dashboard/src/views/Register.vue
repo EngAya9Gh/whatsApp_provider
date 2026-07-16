@@ -38,6 +38,16 @@
               </button>
             </div>
           </div>
+          
+          <div class="form-group">
+            <label>Select Plan</label>
+            <select v-model="selectedPlan" required class="plan-select">
+              <option v-for="plan in availablePlans" :key="plan.planCode" :value="plan.planCode">
+                {{ plan.name }} - ${{ plan.price }}/mo ({{ plan.limit }} Messages)
+              </option>
+            </select>
+          </div>
+
           <div v-if="error" class="error-msg">{{ error }}</div>
           <div v-if="success" class="success-msg">{{ success }}</div>
           <button type="submit" class="btn-submit" :disabled="loading">
@@ -56,18 +66,30 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 
 const name = ref('')
 const email = ref('')
 const password = ref('')
+const selectedPlan = ref('FREE')
+const availablePlans = ref([])
+
 const error = ref('')
 const success = ref('')
 const loading = ref(false)
 const showPassword = ref(false)
 const router = useRouter()
+
+onMounted(async () => {
+  try {
+    const res = await axios.get('/api/plans')
+    availablePlans.value = res.data.data
+  } catch (err) {
+    console.error('Failed to load plans', err)
+  }
+})
 
 const handleRegister = async () => {
   loading.value = true
@@ -78,7 +100,8 @@ const handleRegister = async () => {
       name: name.value,
       email: email.value,
       password: password.value,
-      companyName: name.value
+      companyName: name.value,
+      plan: selectedPlan.value
     })
     success.value = 'Account created! Redirecting to login...'
     setTimeout(() => router.push('/login'), 1800)
@@ -128,8 +151,8 @@ label { display: block; font-size: 0.875rem; font-weight: 600; color: #1E293B; m
 .eye-btn:hover { color: #FF6600; }
 .eye-btn svg { width: 18px; height: 18px; }
 
-input { width: 100%; padding: 0.75rem 1rem; border: 1.5px solid #E2E8F0; border-radius: 10px; font-size: 0.9rem; transition: all 0.2s; background: white; color: #1E293B; }
-input:focus { outline: none; border-color: #FF6600; box-shadow: 0 0 0 3px rgba(255,102,0,0.1); }
+input, select { width: 100%; padding: 0.75rem 1rem; border: 1.5px solid #E2E8F0; border-radius: 10px; font-size: 0.9rem; transition: all 0.2s; background: white; color: #1E293B; }
+input:focus, select:focus { outline: none; border-color: #FF6600; box-shadow: 0 0 0 3px rgba(255,102,0,0.1); }
 .btn-submit { width: 100%; padding: 0.875rem; background: #FF6600; color: white; border: none; border-radius: 10px; font-weight: 700; font-size: 0.95rem; cursor: pointer; margin-top: 0.5rem; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
 .btn-submit:hover:not(:disabled) { background: #cc5200; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(255,102,0,0.3); }
 .btn-submit:disabled { opacity: 0.7; cursor: not-allowed; }

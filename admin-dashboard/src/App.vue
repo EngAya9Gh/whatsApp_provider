@@ -17,6 +17,9 @@
         <router-link to="/billing" class="nav-item" active-class="active">
           <span class="nav-icon">💰</span> {{ $t('sidebar.billing') }}
         </router-link>
+        <router-link to="/plans" class="nav-item" active-class="active">
+          <span class="nav-icon">📦</span> {{ $t('sidebar.plans') }}
+        </router-link>
       </nav>
 
       <div class="sidebar-footer">

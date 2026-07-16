@@ -167,3 +167,16 @@ model Invoice {
 
   @@map("invoices")
 }
+
+model PlanSetting {
+  id        String   @id @default(uuid())
+  planCode  Plan     @unique @map("plan_code")
+  name      String
+  price     Float
+  limit     Int
+  features  String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("plan_settings")
+}

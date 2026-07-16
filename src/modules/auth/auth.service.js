@@ -18,15 +18,23 @@ class AuthService {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(data.password, salt);
 
-    const plansConfig = require('../../config/plans');
+    // Look up the requested plan in the DB
+    const planCode = data.plan || 'FREE';
+    const planSetting = await prisma.planSetting.findUnique({
+      where: { planCode }
+    });
+    
+    // Default fallback if not found in DB
+    const limit = planSetting ? planSetting.limit : 10;
+
     const tenant = await prisma.tenant.create({
       data: {
         name: data.name,
         email: data.email,
         passwordHash,
         companyName: data.companyName,
-        plan: 'FREE',
-        monthlyLimit: plansConfig.FREE.limit
+        plan: planCode,
+        monthlyLimit: limit
       }
     });
 

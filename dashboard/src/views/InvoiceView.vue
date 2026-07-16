@@ -164,6 +164,8 @@ onMounted(fetchInvoice)
   align-items: flex-start;
   padding: 3rem 1rem;
   font-family: 'Inter', system-ui, sans-serif;
+  direction: ltr;
+  text-align: left;
 }
 
 .loading, .error {
@@ -221,7 +223,7 @@ onMounted(fetchInvoice)
 .invoice-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   border-bottom: 2px solid #F1F5F9;
   padding-bottom: 2rem;
   margin-bottom: 2.5rem;
@@ -238,9 +240,9 @@ onMounted(fetchInvoice)
   width: auto;
 }
 
-.invoice-title { text-align: right; }
-.invoice-title h2 { margin: 0; color: #0F172A; font-size: 1.8rem; font-weight: 800; }
-.invoice-id { color: #94A3B8; font-weight: 600; margin-top: 0.25rem; font-size: 0.9rem; }
+.invoice-title { display: flex; flex-direction: column; justify-content: center; text-align: right; }
+.invoice-title h2 { margin: 0; color: #0F172A; font-size: 1.8rem; font-weight: 800; line-height: 1; }
+.invoice-id { color: #94A3B8; font-weight: 600; margin-top: 0.5rem; font-size: 0.9rem; }
 
 .invoice-body { margin-bottom: 3rem; }
 
