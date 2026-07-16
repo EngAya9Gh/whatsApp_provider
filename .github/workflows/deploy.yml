@@ -18,31 +18,29 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           port: 22
           script: |
-            source ~/.profile || true
-            source ~/.bashrc || true
-            export PATH=$PATH:/usr/local/bin:/usr/bin:/bin
-            
-            echo "1. Going to project directory..."
-            cd /home/provider/htdocs/provider.wakeel.cc
-            
-            echo "2. Pulling latest code from GitHub..."
-            git pull origin main
-            
-            echo "3. Setting up Backend..."
-            npm install
-            npx prisma generate
-            
-            echo "4. Building Provider Dashboard..."
-            cd dashboard
-            npm install
-            npm run build
-            cd ..
-            
-            echo "5. Building Admin Dashboard..."
-            cd admin-dashboard
-            npm install
-            npm run build
-            cd ..
-            
-            echo "6. Restarting Node.js Server..."
-            pm2 restart whatsapp-api
+            bash -l -c '
+              echo "1. Going to project directory..."
+              cd /home/provider/htdocs/provider.wakeel.cc
+              
+              echo "2. Pulling latest code from GitHub..."
+              git pull origin main
+              
+              echo "3. Setting up Backend..."
+              npm install
+              npx prisma generate
+              
+              echo "4. Building Provider Dashboard..."
+              cd dashboard
+              npm install
+              npm run build
+              cd ..
+              
+              echo "5. Building Admin Dashboard..."
+              cd admin-dashboard
+              npm install
+              npm run build
+              cd ..
+              
+              echo "6. Restarting Node.js Server..."
+              pm2 restart whatsapp-api
+            '
