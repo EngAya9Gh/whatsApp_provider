@@ -95,14 +95,22 @@
           <!-- List Inputs -->
           <div v-if="messageType === 'list'" class="form-group interactive-box">
             <label>List Title</label>
-            <input v-model="listTitle" placeholder="Awesome Options" required class="form-input" style="margin-bottom:0.5rem;" maxlength="60" />
-            <label>List Body (Message)</label>
-            <textarea v-model="listBody" rows="2" placeholder="Please select an option" required class="form-input" style="margin-bottom:0.5rem;" maxlength="1024"></textarea>
-            <label>Main Button Text (To open list)</label>
-            <input v-model="listButtonText" placeholder="View Options" required class="form-input" style="margin-bottom:1rem;" maxlength="20" />
+            <input v-model="listTitle" placeholder="Awesome Options" required class="form-input" style="margin-bottom:0.2rem;" maxlength="60" />
+            <small class="hint" style="margin-bottom:1rem;">العنوان العريض الذي يظهر أعلى الرسالة (مثال: "قائمة منتجاتنا")</small>
 
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-              <label>Sections (Min 1)</label>
+            <label>List Body (Message)</label>
+            <textarea v-model="listBody" rows="2" placeholder="Please select an option" required class="form-input" style="margin-bottom:0.2rem;" maxlength="1024"></textarea>
+            <small class="hint" style="margin-bottom:1rem;">النص الأساسي الذي يشرح للعميل ماذا يفعل (مثال: "يرجى اختيار المنتج")</small>
+
+            <label>Main Button Text (To open list)</label>
+            <input v-model="listButtonText" placeholder="View Options" required class="form-input" style="margin-bottom:0.2rem;" maxlength="20" />
+            <small class="hint" style="margin-bottom:1.5rem;">الكلمة المكتوبة على الزر لكي تفتح القائمة المنبثقة (مثال: "عرض الخيارات")</small>
+
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; align-items: center;">
+              <div>
+                <label style="margin: 0;">Sections (Min 1)</label>
+                <small class="hint" style="margin-top:0;">تقسيم القائمة لعناوين رئيسية (مثال: قسم "العطور"، وقسم "المكياج")</small>
+              </div>
               <button type="button" @click="addSection" class="btn-text" style="color:#10B981">+ Add Section</button>
             </div>
             <div v-for="(section, sIdx) in listSections" :key="sIdx" class="section-box">
@@ -111,8 +119,11 @@
                 <button type="button" @click="removeSection(sIdx)" class="btn-text" style="color:#DC2626" :disabled="listSections.length <= 1">✕</button>
               </div>
               <div class="rows-box">
-                <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
-                  <label style="font-size:0.8rem; margin:0;">Rows</label>
+                <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; align-items: center;">
+                  <div>
+                    <label style="font-size:0.8rem; margin:0;">Rows (Options)</label>
+                    <small class="hint" style="font-size: 0.7rem; margin-top: 0;">الخيارات التي سيختار منها العميل (مثال: "عطر العود")</small>
+                  </div>
                   <button type="button" @click="addRow(sIdx)" class="btn-text" style="font-size:0.8rem; color:#3B82F6">+ Add Row</button>
                 </div>
                 <div v-for="(row, rIdx) in section.rows" :key="rIdx" style="display:flex; gap:0.5rem; margin-bottom:0.5rem; align-items:center;">
