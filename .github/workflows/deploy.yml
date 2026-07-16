@@ -27,7 +27,8 @@ jobs:
             cd /home/provider/htdocs/provider.wakeel.cc
 
             echo "2. Pulling latest code from GitHub..."
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             echo "3. Setting up Backend..."
             npm install

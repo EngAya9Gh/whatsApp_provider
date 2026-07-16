@@ -146,14 +146,10 @@ class WhatsAppService {
       await sock.sendPresenceUpdate('paused', formattedPhone);
 
       const result = await sock.sendMessage(formattedPhone, {
-        listMessage: {
-          title,
-          text: body,
-          footerText: '',
-          buttonText,
-          listType: 1,
-          sections
-        }
+        text: body,
+        title,
+        buttonText,
+        sections
       });
       return result;
     } catch (error) {
