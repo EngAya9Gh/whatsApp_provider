@@ -138,7 +138,7 @@ const fetchTenant = async () => {
   error.value = ''
   try {
     const token = localStorage.getItem('admin_token')
-    const res = await axios.get(`http://localhost:3000/api/admin/tenants/${route.params.id}`, {
+    const res = await axios.get(`/api/admin/tenants/${route.params.id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     tenant.value = res.data.data
@@ -154,7 +154,7 @@ const updatePlan = async () => {
   isUpdatingPlan.value = true
   try {
     const token = localStorage.getItem('admin_token')
-    await axios.put(`http://localhost:3000/api/admin/tenants/${route.params.id}/plan`, 
+    await axios.put(`/api/admin/tenants/${route.params.id}/plan`, 
       { plan: selectedPlan.value },
       { headers: { Authorization: `Bearer ${token}` } }
     )
@@ -172,7 +172,7 @@ const toggleStatus = async () => {
   if (!confirm(`Are you sure you want to ${action} this account?`)) return
   try {
     const token = localStorage.getItem('admin_token')
-    await axios.put(`http://localhost:3000/api/admin/tenants/${route.params.id}/toggle`, 
+    await axios.put(`/api/admin/tenants/${route.params.id}/toggle`, 
       {},
       { headers: { Authorization: `Bearer ${token}` } }
     )

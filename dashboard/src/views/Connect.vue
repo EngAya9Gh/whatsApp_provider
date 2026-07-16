@@ -44,7 +44,7 @@ const loading = ref(false)
 let socket = null
 
 const initSocket = () => {
-  socket = io('http://localhost:3000')
+  socket = io('/', { path: '/socket.io' })
   socket.on('connect', () => {
     socket.emit('join-tenant', tenant.id)
   })
@@ -69,7 +69,7 @@ const initSocket = () => {
 onMounted(async () => {
   const token = localStorage.getItem('token')
   try {
-    const res = await axios.get('http://localhost:3000/api/whatsapp/status', {
+    const res = await axios.get('/api/whatsapp/status', {
       headers: { Authorization: `Bearer ${token}` }
     })
     status.value = res.data.data.sessionStatus
@@ -91,7 +91,7 @@ const connect = async () => {
   loading.value = true
   const token = localStorage.getItem('token')
   try {
-    await axios.post('http://localhost:3000/api/whatsapp/connect', {}, {
+    await axios.post('/api/whatsapp/connect', {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
     status.value = 'CONNECTING'
@@ -106,7 +106,7 @@ const connect = async () => {
 const disconnect = async () => {
   const token = localStorage.getItem('token')
   try {
-    await axios.post('http://localhost:3000/api/whatsapp/disconnect', {}, {
+    await axios.post('/api/whatsapp/disconnect', {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
     status.value = 'DISCONNECTED'

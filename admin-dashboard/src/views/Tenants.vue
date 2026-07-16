@@ -87,7 +87,7 @@ const fetchTenants = async () => {
   error.value = ''
   try {
     const token = localStorage.getItem('admin_token')
-    const res = await axios.get(`http://localhost:3000/api/admin/tenants?page=${currentPage.value}&search=${searchQuery.value}`, {
+    const res = await axios.get(`/api/admin/tenants?page=${currentPage.value}&search=${searchQuery.value}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     tenants.value = res.data.data.tenants

@@ -110,7 +110,7 @@ const fetchStats = async () => {
   error.value = ''
   try {
     const token = localStorage.getItem('admin_token')
-    const res = await axios.get('http://localhost:3000/api/admin/stats', {
+    const res = await axios.get('/api/admin/stats', {
       headers: { Authorization: `Bearer ${token}` }
     })
     stats.value = res.data.data

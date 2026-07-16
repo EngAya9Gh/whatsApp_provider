@@ -56,7 +56,7 @@ const newlyGeneratedKey = ref(null)
 const fetchKeys = async () => {
   const token = localStorage.getItem('token')
   try {
-    const res = await axios.get('http://localhost:3000/api/keys', {
+    const res = await axios.get('/api/keys', {
       headers: { Authorization: `Bearer ${token}` }
     })
     keys.value = res.data.data
@@ -72,7 +72,7 @@ const generateKey = async () => {
   newlyGeneratedKey.value = null
   const token = localStorage.getItem('token')
   try {
-    const res = await axios.post('http://localhost:3000/api/keys', {}, {
+    const res = await axios.post('/api/keys', {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
     newlyGeneratedKey.value = res.data.data.key
@@ -88,7 +88,7 @@ const revokeKey = async (id) => {
   if (!confirm('Are you sure you want to revoke this key? Any apps using it will stop working.')) return
   const token = localStorage.getItem('token')
   try {
-    await axios.delete(`http://localhost:3000/api/keys/${id}`, {
+    await axios.delete(`/api/keys/${id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     // Hide the newly generated key if it was the one deleted

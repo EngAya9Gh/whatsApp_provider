@@ -34,7 +34,7 @@ const usage = ref(null)
 onMounted(async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('http://localhost:3000/api/billing/usage', {
+    const res = await axios.get('/api/billing/usage', {
       headers: { Authorization: `Bearer ${token}` }
     })
     usage.value = res.data.data

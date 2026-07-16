@@ -40,7 +40,7 @@ const logs = ref([])
 onMounted(async () => {
   const token = localStorage.getItem('token')
   try {
-    const res = await axios.get('http://localhost:3000/api/logs', {
+    const res = await axios.get('/api/logs', {
       headers: { Authorization: `Bearer ${token}` }
     })
     logs.value = res.data.data

@@ -58,7 +58,7 @@ const handleLogin = async () => {
   loading.value = true
   error.value = ''
   try {
-    const res = await axios.post('http://localhost:3000/api/admin/auth/login', {
+    const res = await axios.post('/api/admin/auth/login', {
       email: email.value,
       password: password.value
     })

@@ -74,7 +74,7 @@ const handleRegister = async () => {
   error.value = ''
   success.value = ''
   try {
-    await axios.post('http://localhost:3000/api/auth/register', {
+    await axios.post('/api/auth/register', {
       name: name.value,
       email: email.value,
       password: password.value,
