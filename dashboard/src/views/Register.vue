@@ -39,14 +39,7 @@
             </div>
           </div>
           
-          <div class="form-group">
-            <label>Select Plan</label>
-            <select v-model="selectedPlan" required class="plan-select">
-              <option v-for="plan in availablePlans" :key="plan.planCode" :value="plan.planCode">
-                {{ plan.name }} - ${{ plan.price }}/mo ({{ plan.limit }} Messages)
-              </option>
-            </select>
-          </div>
+          
 
           <div v-if="error" class="error-msg">{{ error }}</div>
           <div v-if="success" class="success-msg">{{ success }}</div>
@@ -101,7 +94,7 @@ const handleRegister = async () => {
       email: email.value,
       password: password.value,
       companyName: name.value,
-      plan: selectedPlan.value
+      
     })
     success.value = 'Account created! Redirecting to login...'
     setTimeout(() => router.push('/login'), 1800)
