@@ -17,6 +17,8 @@ app.use((req, res, next) => {
 
 // Serve uploaded files statically
 const path = require('path');
+// Static Files
+app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Routes

@@ -145,8 +145,8 @@
             </div>
             <div class="info-item" v-if="selectedCampaign.mediaPath">
               <span class="label">{{ $t('campaigns.media_attachment') || 'Media Attachment' }}:</span>
-              <img v-if="selectedCampaign.mediaMime?.startsWith('image/')" :src="'/' + selectedCampaign.mediaPath" class="media-preview-img" />
-              <a v-else :href="'/' + selectedCampaign.mediaPath" target="_blank" style="color: #3B82F6;">{{ $t('campaigns.view_doc') || 'View Attached Document' }}</a>
+              <img v-if="selectedCampaign.mediaMime?.startsWith('image/')" :src="'/api/' + selectedCampaign.mediaPath" class="media-preview-img" />
+              <a v-else :href="'/api/' + selectedCampaign.mediaPath" target="_blank" style="color: #3B82F6;">{{ $t('campaigns.view_doc') || 'View Attached Document' }}</a>
             </div>
             <div class="info-item full-width">
               <span class="label">{{ $t('campaigns.message_content') || 'Message Content' }}:</span>
