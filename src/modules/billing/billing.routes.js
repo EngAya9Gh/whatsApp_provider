@@ -8,5 +8,6 @@ router.use(authMiddleware);
 
 router.get('/usage', billingController.getUsage);
 router.get('/history', billingController.getHistory);
+router.get('/invoices', billingController.getInvoices);
 
 module.exports = router;

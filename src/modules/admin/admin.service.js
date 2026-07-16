@@ -94,7 +94,8 @@ class AdminService {
       include: {
         apiKeys: { select: { id: true, keyPrefix: true, label: true, createdAt: true, lastUsedAt: true, isActive: true } },
         usageRecords: { orderBy: { month: 'desc' }, take: 6 },
-        messageLogs: { orderBy: { createdAt: 'desc' }, take: 20 }
+        messageLogs: { orderBy: { createdAt: 'desc' }, take: 20 },
+        invoices: { orderBy: { createdAt: 'desc' } }
       }
     });
     if (!tenant) throw new Error('Tenant not found');
@@ -119,6 +120,42 @@ class AdminService {
     return prisma.tenant.update({
       where: { id },
       data: { isActive: !tenant.isActive }
+    });
+  }
+
+  async createInvoice(tenantId, amount, description, billingCycle = 'Monthly', status = 'PENDING') {
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new Error('Tenant not found');
+
+    return prisma.invoice.create({
+      data: {
+        tenantId,
+        amount,
+        description,
+        billingCycle,
+        status
+      }
+    });
+  }
+
+  async updateInvoiceStatus(id, status) {
+    const validStatuses = ['PENDING', 'PAID', 'CANCELLED'];
+    if (!validStatuses.includes(status)) throw new Error('Invalid status');
+
+    return prisma.invoice.update({
+      where: { id },
+      data: { status }
+    });
+  }
+
+  async getAllInvoices() {
+    return prisma.invoice.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        tenant: {
+          select: { name: true, email: true }
+        }
+      }
     });
   }
 }

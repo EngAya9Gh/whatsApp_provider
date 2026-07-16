@@ -65,6 +65,35 @@ class AdminController {
       next(error);
     }
   }
+
+  async createInvoice(req, res, next) {
+    try {
+      const { amount, description, billingCycle, status } = req.body;
+      const invoice = await adminService.createInvoice(req.params.id, amount, description, billingCycle, status);
+      res.json({ success: true, data: invoice });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateInvoiceStatus(req, res, next) {
+    try {
+      const { status } = req.body;
+      const invoice = await adminService.updateInvoiceStatus(req.params.id, status);
+      res.json({ success: true, data: invoice });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getAllInvoices(req, res, next) {
+    try {
+      const invoices = await adminService.getAllInvoices();
+      res.json({ success: true, data: invoices });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new AdminController();

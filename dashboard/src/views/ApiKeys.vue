@@ -42,6 +42,61 @@
         </tbody>
       </table>
     </div>
+
+    <!-- API Documentation -->
+    <div class="card doc-card">
+      <h2 class="card-title">API Documentation</h2>
+      <p class="doc-text">Use your API Key in the <code>Authorization</code> header as a Bearer token.</p>
+      
+      <div class="doc-endpoint">
+        <h4>1. Send OTP Message</h4>
+        <code>POST {{ baseUrl }}/api/v1/otp/send</code>
+        <pre class="code-block">
+{
+  "phone": "966500000000"
+}
+        </pre>
+      </div>
+
+      <div class="doc-endpoint">
+        <h4>2. Send Custom Text Message</h4>
+        <code>POST {{ baseUrl }}/api/v1/message/send</code>
+        <pre class="code-block">
+{
+  "phone": "966500000000",
+  "message": "Hello, this is a custom message!"
+}
+        </pre>
+      </div>
+
+      <div class="doc-endpoint">
+        <h4>3. Upload & Send Media (Image/PDF)</h4>
+        <code>POST {{ baseUrl }}/api/v1/message/upload-media</code>
+        <p class="doc-text" style="font-size: 0.85rem; margin-top: 0.5rem;">Note: This request requires <code>Content-Type: multipart/form-data</code></p>
+        <pre class="code-block">
+Form Data:
+- phone: "966500000000"
+- type: "image" (or "pdf")
+- caption: "Optional caption"
+- file: (Attach File Binary)
+        </pre>
+      </div>
+
+      <div class="doc-endpoint">
+        <h4>4. Send Message via Template</h4>
+        <code>POST {{ baseUrl }}/api/v1/templates/send</code>
+        <pre class="code-block">
+{
+  "phone": "966500000000",
+  "templateId": "your-template-id",
+  "variables": {
+    "name": "Ahmed",
+    "order_id": "12345"
+  }
+}
+        </pre>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -52,6 +107,7 @@ import axios from 'axios'
 const keys = ref([])
 const loading = ref(false)
 const newlyGeneratedKey = ref(null)
+const baseUrl = ref(window.location.origin)
 
 const fetchKeys = async () => {
   const token = localStorage.getItem('token')
@@ -120,4 +176,11 @@ code { background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 4px; color: 
 .success-banner { background: #d1fae5; color: #065f46; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid #10b981; }
 .key-display { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
 .key-display code { font-size: 1.25rem; padding: 0.5rem 1rem; background: white; border: 1px solid #a7f3d0; color: #047857; }
+
+/* New styles for docs */
+.doc-card { background: white; border-radius: 8px; padding: 2rem; margin-top: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.doc-text { color: #4b5563; margin-bottom: 1.5rem; }
+.doc-endpoint { margin-bottom: 2rem; }
+.doc-endpoint h4 { margin-bottom: 0.5rem; color: #1f2937; }
+.code-block { background: #1f2937; color: #e5e7eb; padding: 1rem; border-radius: 6px; font-family: monospace; font-size: 0.875rem; overflow-x: auto; margin-top: 0.5rem; }
 </style>

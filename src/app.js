@@ -15,6 +15,10 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve uploaded files statically
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Routes
 const authRoutes = require('./modules/auth/auth.routes');
 const apiKeyRoutes = require('./modules/apiKey/apiKey.routes');
@@ -23,14 +27,22 @@ const otpRoutes = require('./modules/otp/otp.routes');
 const billingRoutes = require('./modules/billing/billing.routes');
 const logsRoutes = require('./modules/logs/logs.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
+const messageRoutes = require('./modules/message/message.routes');
+const templateRoutes = require('./modules/template/template.routes');
+const campaignRoutes = require('./modules/campaign/campaign.routes');
+const invoiceRoutes = require('./modules/invoice/invoice.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/keys', apiKeyRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/v1/otp', otpRoutes);
+app.use('/api/v1/message', messageRoutes);
+app.use('/api/v1/templates', templateRoutes);
+app.use('/api/v1/campaigns', campaignRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/invoices', invoiceRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

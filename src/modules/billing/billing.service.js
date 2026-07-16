@@ -69,6 +69,13 @@ class BillingService {
     });
   }
 
+  async getInvoices(tenantId) {
+    return prisma.invoice.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
   async incrementUsage(tenantId, type = 'sent') {
     const now = new Date();
     const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));

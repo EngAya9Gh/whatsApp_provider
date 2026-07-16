@@ -26,6 +26,39 @@
         </div>
       </div>
     </div>
+
+    <div class="plan-card" style="margin-top: 2rem; max-width: 800px;">
+      <h3>Your Invoices</h3>
+      <table class="invoices-table" v-if="invoices.length > 0">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Cycle</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="inv in invoices" :key="inv.id">
+            <td>{{ new Date(inv.createdAt).toLocaleDateString() }}</td>
+            <td>{{ inv.description }}</td>
+            <td>{{ inv.billingCycle }}</td>
+            <td class="amount">{{ inv.amount }}</td>
+            <td>
+              <span class="status-badge" :class="inv.status.toLowerCase()">{{ inv.status }}</span>
+            </td>
+            <td>
+              <router-link :to="`/invoice/${inv.id}`" class="view-link" target="_blank">View Receipt</router-link>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-else class="empty-state">
+        No invoices found.
+      </div>
+    </div>
   </div>
 </template>
 
@@ -34,6 +67,7 @@ import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 
 const usage = ref(null)
+const invoices = ref([])
 
 onMounted(async () => {
   const token = localStorage.getItem('token')
@@ -44,6 +78,15 @@ onMounted(async () => {
     usage.value = res.data.data
   } catch (err) {
     console.error('Failed to load usage')
+  }
+
+  try {
+    const invRes = await axios.get('/api/billing/invoices', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    invoices.value = invRes.data.data
+  } catch (err) {
+    console.error('Failed to load invoices')
   }
 })
 
@@ -68,4 +111,15 @@ h3 span { color: #3b82f6; }
 .stat label { color: #6b7280; font-size: 0.875rem; }
 .stat .value { font-size: 1.5rem; font-weight: bold; color: #111827; }
 .stat .value.failed { color: #ef4444; }
+
+.invoices-table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+.invoices-table th, .invoices-table td { padding: 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+.invoices-table th { color: #6b7280; font-weight: 600; font-size: 0.875rem; text-transform: uppercase; }
+.invoices-table .amount { font-weight: 700; color: #111827; }
+.status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.status-badge.pending { background: #fef3c7; color: #d97706; }
+.status-badge.paid { background: #d1fae5; color: #059669; }
+.view-link { color: #3b82f6; text-decoration: none; font-weight: 600; font-size: 0.875rem; }
+.view-link:hover { text-decoration: underline; }
+.empty-state { text-align: center; color: #6b7280; padding: 2rem 0; font-style: italic; }
 </style>

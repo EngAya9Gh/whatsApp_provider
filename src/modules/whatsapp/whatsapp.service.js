@@ -49,6 +49,46 @@ class WhatsAppService {
       throw { status: 500, message: 'Failed to send message via WhatsApp' };
     }
   }
+
+  async sendMediaMessage(tenantId, phone, type, url, caption, mimetype, fileName) {
+    const sock = sessionManager.getSession(tenantId);
+    if (!sock) {
+      throw { status: 400, message: 'WhatsApp session is not connected' };
+    }
+
+    const formattedPhone = phone.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+
+    try {
+      await sock.presenceSubscribe(formattedPhone);
+      await sock.sendPresenceUpdate('composing', formattedPhone);
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      await sock.sendPresenceUpdate('paused', formattedPhone);
+
+      let messagePayload = {};
+      if (type === 'image') {
+        messagePayload = { 
+          image: Buffer.isBuffer(url) ? url : { url }, 
+          caption: caption || '' 
+        };
+        if (mimetype) messagePayload.mimetype = mimetype;
+      } else if (type === 'pdf') {
+        messagePayload = { 
+          document: Buffer.isBuffer(url) ? url : { url }, 
+          mimetype: mimetype || 'application/pdf', 
+          fileName: fileName || 'document.pdf', 
+          caption: caption || '' 
+        };
+      } else {
+        throw new Error('Unsupported media type');
+      }
+
+      const result = await sock.sendMessage(formattedPhone, messagePayload);
+      return result;
+    } catch (error) {
+      logger.error(`Failed to send media for tenant ${tenantId}: ${error.message || error}`);
+      throw { status: 500, message: `Failed to send media via WhatsApp: ${error.message || error}` };
+    }
+  }
 }
 
 module.exports = new WhatsAppService();

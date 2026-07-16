@@ -34,9 +34,12 @@ model Tenant {
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
-  apiKeys        ApiKey[]
-  messageLogs    MessageLog[]
-  usageRecords   UsageRecord[]
+  apiKeys          ApiKey[]
+  messageLogs      MessageLog[]
+  usageRecords     UsageRecord[]
+  messageTemplates MessageTemplate[]
+  campaigns        Campaign[]
+  invoices         Invoice[]
 
   @@map("tenants")
 }
@@ -108,4 +111,59 @@ enum MessageStatus {
   DELIVERED
   READ
   FAILED
+}
+
+model MessageTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("message_templates")
+}
+
+model Campaign {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  message   String?  @db.Text
+  templateId String? @map("template_id")
+  mediaPath String?  @map("media_path")
+  mediaMime String?  @map("media_mime")
+  status    String   @default("PENDING") // PENDING, RUNNING, COMPLETED
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  targets   CampaignTarget[]
+
+  @@map("campaigns")
+}
+
+model CampaignTarget {
+  id         String   @id @default(uuid())
+  campaignId String   @map("campaign_id")
+  phone      String
+  status     String   @default("PENDING") // PENDING, SENT, FAILED
+  error      String?  @db.Text
+  
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_targets")
+}
+
+model Invoice {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  amount       String
+  description  String   @db.Text
+  billingCycle String   @default("Monthly") @map("billing_cycle")
+  status       String   @default("PENDING") // PENDING, PAID
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
 }

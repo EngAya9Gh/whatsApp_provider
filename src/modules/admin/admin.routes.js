@@ -33,5 +33,8 @@ router.get('/tenants', adminAuth, adminController.getTenants.bind(adminControlle
 router.get('/tenants/:id', adminAuth, adminController.getTenantById.bind(adminController));
 router.put('/tenants/:id/plan', adminAuth, adminController.updatePlan.bind(adminController));
 router.put('/tenants/:id/toggle', adminAuth, adminController.toggleTenant.bind(adminController));
+router.post('/tenants/:id/invoices', adminAuth, adminController.createInvoice.bind(adminController));
+router.get('/invoices', adminAuth, adminController.getAllInvoices.bind(adminController));
+router.put('/invoices/:id/status', adminAuth, adminController.updateInvoiceStatus.bind(adminController));
 
 module.exports = router;

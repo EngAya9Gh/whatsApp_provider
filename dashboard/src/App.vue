@@ -1,10 +1,10 @@
 <template>
   <div class="app-root">
     <!-- Sidebar -->
-    <aside v-if="isAuthenticated" class="sidebar">
-      <router-link to="/" class="sidebar-logo">
+    <aside v-if="showSidebar" class="sidebar">
+      <a href="/" target="_blank" class="sidebar-logo">
         <img src="/logo.svg" alt="wakeel.." class="logo-img" />
-      </router-link>
+      </a>
 
       <nav class="sidebar-nav">
         <router-link to="/dashboard" class="nav-item" active-class="active">
@@ -13,7 +13,19 @@
         </router-link>
         <router-link to="/connect" class="nav-item" active-class="active">
           <span class="nav-icon">📱</span>
-          <span class="nav-label">{{ $t('sidebar.whatsapp') }}</span>
+          <span class="nav-label">{{ $t('sidebar.whatsapp') || 'WhatsApp' }}</span>
+        </router-link>
+        <router-link to="/send-message" class="nav-item" active-class="active">
+          <span class="nav-icon">📨</span>
+          <span class="nav-label">Send Message</span>
+        </router-link>
+        <router-link to="/campaigns" class="nav-item" active-class="active">
+          <span class="nav-icon">🚀</span>
+          <span class="nav-label">Campaigns</span>
+        </router-link>
+        <router-link to="/templates" class="nav-item" active-class="active">
+          <span class="nav-icon">📋</span>
+          <span class="nav-label">Templates</span>
         </router-link>
         <router-link to="/keys" class="nav-item" active-class="active">
           <span class="nav-icon">🔑</span>
@@ -47,7 +59,7 @@
     </aside>
 
     <!-- Main Content -->
-    <div class="main-content" :class="{ 'full-width': !isAuthenticated }">
+    <div class="main-content" :class="{ 'full-width': !showSidebar }">
       <router-view />
     </div>
   </div>
@@ -64,7 +76,7 @@ const route = useRoute()
 const { locale } = useI18n()
 const currentLang = ref(locale.value)
 
-const isAuthenticated = computed(() => !route.meta.guest && !!localStorage.getItem('token'))
+const showSidebar = computed(() => !route.meta.guest && !route.meta.hideSidebar && route.path !== '/' && !!localStorage.getItem('token'))
 const tenant = computed(() => {
   try { return JSON.parse(localStorage.getItem('tenant') || '{}') } catch { return {} }
 })

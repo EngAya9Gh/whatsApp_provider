@@ -68,9 +68,11 @@ class SessionManager {
           // Logged out
           logger.info(`Tenant ${tenantId} logged out.`);
           this.sessions.delete(tenantId);
-          if (fs.existsSync(sessionPath)) {
-            fs.rmSync(sessionPath, { recursive: true, force: true });
-          }
+          setTimeout(() => {
+            if (fs.existsSync(sessionPath)) {
+              try { fs.rmSync(sessionPath, { recursive: true, force: true }); } catch (e) {}
+            }
+          }, 1500);
           await prisma.tenant.update({
             where: { id: tenantId },
             data: { sessionStatus: 'DISCONNECTED', whatsappPhone: null }
@@ -106,14 +108,23 @@ class SessionManager {
   async deleteSession(tenantId) {
     const sock = this.sessions.get(tenantId);
     if (sock) {
-      sock.logout();
       this.sessions.delete(tenantId);
+      try {
+        await sock.logout();
+      } catch (err) {
+        // Ignore logout errors
+      }
     }
     
     const sessionPath = path.join(SESSIONS_DIR, tenantId);
-    if (fs.existsSync(sessionPath)) {
-      fs.rmSync(sessionPath, { recursive: true, force: true });
-    }
+    // Delay deletion slightly to allow Baileys to finish any background writes
+    setTimeout(() => {
+      if (fs.existsSync(sessionPath)) {
+        try {
+          fs.rmSync(sessionPath, { recursive: true, force: true });
+        } catch (e) {}
+      }
+    }, 1500);
 
     await prisma.tenant.update({
       where: { id: tenantId },
