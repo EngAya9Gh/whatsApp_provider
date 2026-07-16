@@ -3,6 +3,7 @@
     "overview": "Overview",
     "tenants": "Tenants",
     "billing": "Billing",
+    "plans": "Subscription Plans",
     "logout": "Logout"
   },
   "login": {

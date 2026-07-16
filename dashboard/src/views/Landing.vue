@@ -351,6 +351,7 @@ onMounted(async () => {
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 2rem;
   align-items: center;
+  justify-content: center;
 }
 .price-card {
   background: rgba(255,255,255,0.03);
