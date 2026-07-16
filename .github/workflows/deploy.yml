@@ -18,8 +18,12 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           port: 22
           script: |
+            source ~/.profile || true
+            source ~/.bashrc || true
+            export PATH=$PATH:/usr/local/bin:/usr/bin:/bin
+            
             echo "1. Going to project directory..."
-            cd /var/www/provider.wakeel.cc
+            cd /home/provider/htdocs/provider.wakeel.cc
             
             echo "2. Pulling latest code from GitHub..."
             git pull origin main
