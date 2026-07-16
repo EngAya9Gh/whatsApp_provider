@@ -21,9 +21,13 @@
 
     <!-- Hero Section -->
     <header class="hero-section">
-      <div class="hero-bg-glow"></div>
+      <div class="hero-bg-glow hero-bg-glow-left"></div>
+      <div class="hero-bg-glow hero-bg-glow-right"></div>
       <div class="hero-content">
-        <h1 class="hero-title">{{ $i18n.locale === 'ar' ? 'منصة المراسلة والحملات عبر الواتساب الأسرع والأوفر' : 'The Fastest & Most Affordable WhatsApp Messaging & Campaigns Platform' }}</h1>
+        <h1 class="hero-title">
+          <template v-if="$i18n.locale === 'ar'">منصة المراسلة والحملات عبر <span class="highlight-whatsapp">الواتساب</span> الأسرع والأوفر</template>
+          <template v-else>The Fastest &amp; Most Affordable <span class="highlight-whatsapp">WhatsApp</span> Messaging &amp; Campaigns Platform</template>
+        </h1>
         <p class="hero-subtitle">
           {{ $i18n.locale === 'ar' ? 'اربط تطبيقك أو موقعك بخدمة الواتساب في دقائق، وأرسل الإشعارات، الحملات التسويقية، ورسائل التحقق لعملائك بأقل تكلفة ممكنة وبموثوقية تامة.' : 'Integrate your app or website with WhatsApp in minutes. Send notifications, marketing campaigns, and OTPs to your customers with the lowest cost and highest reliability.' }}
         </p>
@@ -150,7 +154,7 @@ onMounted(async () => {
   background-color: #0F172A;
   color: #E2E8F0;
   min-height: 100vh;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Tajawal', 'Inter', system-ui, sans-serif;
   overflow-x: hidden;
   position: absolute;
   top: 0; left: 0; right: 0;
@@ -259,15 +263,23 @@ onMounted(async () => {
 }
 .hero-bg-glow {
   position: absolute;
-  top: 10%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 600px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(255,102,0,0.15) 0%, transparent 60%);
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(255,102,0,0.12) 0%, transparent 65%);
   z-index: 0;
   border-radius: 50%;
   pointer-events: none;
+}
+.hero-bg-glow-left {
+  top: -10%;
+  left: -15%;
+}
+.hero-bg-glow-right {
+  bottom: -10%;
+  right: -15%;
+}
+.highlight-whatsapp {
+  color: #FF6600;
 }
 .hero-content {
   position: relative;
