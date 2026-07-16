@@ -79,9 +79,10 @@
 
           <div class="form-group">
             <label>{{ $t('campaigns.message_type') || 'Message Type' }}</label>
-            <div class="radio-group" style="display:flex; gap:1rem; margin-bottom: 0.5rem;">
+            <div class="radio-group" style="display:flex; gap:1rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
               <label><input type="radio" v-model="formData.type" value="text" /> {{ $t('campaigns.type_text') || 'Text Message' }}</label>
               <label><input type="radio" v-model="formData.type" value="template" /> {{ $t('campaigns.type_template') || 'Template' }}</label>
+              <label><input type="radio" v-model="formData.type" value="buttons" /> 🔘 {{ $t('campaigns.type_buttons') || 'With Buttons' }}</label>
             </div>
           </div>
 
@@ -98,6 +99,29 @@
             </select>
           </div>
 
+          <!-- Buttons section -->
+          <div class="form-group" v-if="formData.type === 'buttons'">
+            <label>{{ $t('campaigns.message_content') || 'Message Content' }}</label>
+            <textarea v-model="formData.message" rows="4" placeholder="Write your message here..." required class="form-input"></textarea>
+          </div>
+
+          <div v-if="formData.type === 'buttons'" class="buttons-builder">
+            <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <label style="font-weight:600;">🔘 {{ $t('campaigns.buttons') || 'Buttons' }} ({{ $t('campaigns.max_3') || 'max 3' }})</label>
+              <button type="button" @click="addButton" class="btn-text" style="color: #10B981;" :disabled="formData.buttons.length >= 3">+ {{ $t('campaigns.add_button') || 'Add Button' }}</button>
+            </div>
+            <div v-for="(btn, i) in formData.buttons" :key="i" class="button-row">
+              <input v-model="btn.text" :placeholder="$t('campaigns.button_text') || 'Button text'" class="form-input" style="flex:1;" maxlength="20" required />
+              <select v-model="btn.type" class="form-input" style="width:120px;">
+                <option value="reply">Quick Reply</option>
+                <option value="url">URL Link</option>
+              </select>
+              <input v-if="btn.type === 'url'" v-model="btn.url" placeholder="https://..." class="form-input" style="flex:1;" />
+              <button type="button" @click="removeButton(i)" class="btn-danger-text">✕</button>
+            </div>
+            <small class="hint">{{ $t('campaigns.buttons_hint') || 'When a user taps a button, their response will be tracked in the Interactions tab.' }}</small>
+          </div>
+
           <div class="form-group">
             <label>{{ $t('campaigns.upload_media') || 'Attach Image (Optional)' }}</label>
             <input type="file" @change="handleImageChange" accept="image/*" class="form-input" />
@@ -107,6 +131,7 @@
             <h4>⚠️ Anti-Ban Notice</h4>
             <p>Messages will be sent gradually (1 message every 5 seconds). The campaign will be saved as PENDING, and you can start it manually.</p>
           </div>
+
 
           <div class="modal-actions">
             <button type="button" @click="showCreateModal = false" class="btn-secondary">{{ $t('campaigns.cancel') || 'Cancel' }}</button>
@@ -118,7 +143,7 @@
       </div>
     </div>
 
-    <!-- Targets Modal -->
+    <!-- Targets/Interactions Modal -->
     <div v-if="showTargetsModal" class="modal-overlay" @click.self="showTargetsModal = false">
       <div class="modal targets-modal">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
@@ -129,54 +154,118 @@
         </div>
         
         <!-- Campaign Info Section -->
-        <div class="campaign-info-card" v-if="selectedCampaign">
-          <div class="info-grid">
+        <!-- Tabs -->
+        <div class="modal-tabs" style="display:flex; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid #E2E8F0;">
+          <button @click="activeTab = 'details'" :class="['tab-btn', { active: activeTab === 'details' }]">📋 {{ $t('campaigns.details') || 'Details' }}</button>
+          <button @click="activeTab = 'targets'" :class="['tab-btn', { active: activeTab === 'targets' }]">👥 {{ $t('campaigns.target_numbers') || 'Numbers' }}</button>
+          <button v-if="selectedCampaign?.interactiveType === 'BUTTONS'" @click="openInteractions" :class="['tab-btn', { active: activeTab === 'interactions' }]">🔘 {{ $t('campaigns.interactions') || 'Interactions' }}</button>
+        </div>
+
+        <!-- Details Tab -->
+        <div v-if="activeTab === 'details'">
+          <div class="campaign-info-grid">
             <div class="info-item">
-              <span class="label">Campaign Title:</span>
-              <span style="font-weight: 700; color: #1E293B;">{{ selectedCampaign.name }}</span>
+              <span class="label">{{ $t('campaigns.campaign_title') || 'Campaign Title' }}:</span>
+              <strong>{{ selectedCampaign?.name }}</strong>
             </div>
             <div class="info-item">
               <span class="label">{{ $t('campaigns.status') || 'Status' }}:</span>
-              <span :class="['status-badge', selectedCampaign.status.toLowerCase()]">{{ selectedCampaign.status }}</span>
+              <span :class="['status-badge', selectedCampaign?.status?.toLowerCase()]">{{ selectedCampaign?.status }}</span>
             </div>
             <div class="info-item">
               <span class="label">{{ $t('campaigns.created') || 'Created' }}:</span>
-              <span>{{ new Date(selectedCampaign.createdAt).toLocaleString() }}</span>
+              <span>{{ new Date(selectedCampaign?.createdAt).toLocaleString() }}</span>
             </div>
-            <div class="info-item" v-if="selectedCampaign.mediaPath">
+            <div class="info-item" v-if="selectedCampaign?.mediaPath">
               <span class="label">{{ $t('campaigns.media_attachment') || 'Media Attachment' }}:</span>
               <img v-if="selectedCampaign.mediaMime?.startsWith('image/')" :src="'/api/' + selectedCampaign.mediaPath" class="media-preview-img" />
               <a v-else :href="'/api/' + selectedCampaign.mediaPath" target="_blank" style="color: #3B82F6;">{{ $t('campaigns.view_doc') || 'View Attached Document' }}</a>
             </div>
             <div class="info-item full-width">
               <span class="label">{{ $t('campaigns.message_content') || 'Message Content' }}:</span>
-              <div class="message-preview">{{ getMessageContent(selectedCampaign) }}</div>
+              <div class="message-box">{{ getMessageContent(selectedCampaign) }}</div>
+            </div>
+            <!-- Show campaign buttons if any -->
+            <div v-if="selectedCampaign?.buttons" class="info-item full-width">
+              <span class="label">🔘 {{ $t('campaigns.buttons') || 'Buttons' }}:</span>
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.4rem;">
+                <span v-for="btn in JSON.parse(selectedCampaign.buttons)" :key="btn.text" class="btn-preview-badge">
+                  {{ btn.text }} <small style="color:#64748B;">({{ btn.type }})</small>
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        <h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">{{ $t('campaigns.target_numbers') || 'Target Numbers' }}</h3>
-        <div v-if="targetsLoading" class="loading-state">Loading numbers...</div>
-        
-        <div v-else class="targets-container">
-          <table class="targets-table">
-            <thead>
-              <tr>
-                <th>{{ $t('campaigns.phone_number') || 'Phone Number' }}</th>
-                <th>{{ $t('campaigns.status') || 'Status' }}</th>
-                <th>{{ $t('campaigns.error_reason') || 'Error Reason' }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="target in targets" :key="target.id">
-                <td>{{ target.phone }}</td>
-                <td>
-                  <span :class="['status-badge', target.status.toLowerCase()]">{{ target.status }}</span>
-                </td>
-                <td style="color: #DC2626; font-size: 0.85rem;">{{ target.error || '-' }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- Numbers Tab -->
+        <div v-if="activeTab === 'targets'">
+          <div v-if="targetsLoading" class="loading-state">Loading numbers...</div>
+          <div v-else class="targets-container">
+            <table class="targets-table">
+              <thead>
+                <tr>
+                  <th>{{ $t('campaigns.phone_number') || 'Phone Number' }}</th>
+                  <th>{{ $t('campaigns.status') || 'Status' }}</th>
+                  <th>{{ $t('campaigns.error_reason') || 'Error Reason' }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="target in targets" :key="target.id">
+                  <td>{{ target.phone }}</td>
+                  <td><span :class="['status-badge', target.status.toLowerCase()]">{{ target.status }}</span></td>
+                  <td style="color: #DC2626; font-size: 0.85rem;">{{ target.error || '-' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Interactions Tab -->
+        <div v-if="activeTab === 'interactions'">
+          <div v-if="interactionsLoading" class="loading-state">Loading interactions...</div>
+          <div v-else>
+            <div v-if="interactionData" class="interactions-stats-row">
+              <div class="istat-card green">
+                <div class="istat-num">{{ interactionData.stats.interacted }}</div>
+                <div class="istat-label">{{ $t('campaigns.interacted') || 'Interacted' }}</div>
+              </div>
+              <div class="istat-card red">
+                <div class="istat-num">{{ interactionData.stats.notInteracted }}</div>
+                <div class="istat-label">{{ $t('campaigns.not_interacted') || 'No Response' }}</div>
+              </div>
+              <div class="istat-card blue" v-for="(count, btnText) in interactionData.stats.buttonBreakdown" :key="btnText">
+                <div class="istat-num">{{ count }}</div>
+                <div class="istat-label">{{ btnText }}</div>
+              </div>
+            </div>
+            <div class="targets-container" style="margin-top:1rem;">
+              <table class="targets-table">
+                <thead>
+                  <tr>
+                    <th>📱 Phone</th>
+                    <th>🔘 Button Pressed</th>
+                    <th>🕑 Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="interaction in interactionData?.interactions" :key="interaction.id">
+                    <td>{{ interaction.phone }}</td>
+                    <td><span class="status-badge completed">{{ interaction.buttonText }}</span></td>
+                    <td style="font-size:0.8rem; color:#64748B;">{{ new Date(interaction.createdAt).toLocaleString() }}</td>
+                  </tr>
+                  <tr v-if="!interactionData?.interactions?.length">
+                    <td colspan="3" style="text-align:center; color:#94A3B8; padding:2rem;">{{ $t('campaigns.no_interactions') || 'No interactions yet.' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-if="interactionData?.notInteracted?.length" style="margin-top:1rem;">
+              <h4 style="color:#64748B; font-size:0.9rem;">{{ $t('campaigns.did_not_interact') || 'Did Not Interact' }} ({{ interactionData.notInteracted.length }}):</h4>
+              <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.5rem;">
+                <span v-for="phone in interactionData.notInteracted" :key="phone" class="phone-tag">{{ phone }}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="modal-actions">
@@ -216,10 +305,26 @@ const formData = ref({
   name: '',
   type: 'text',
   message: '',
-  templateId: ''
+  templateId: '',
+  buttons: [{ text: '', type: 'reply', url: '' }]
 })
 
 const hasFailedTargets = computed(() => targets.value.some(t => t.status === 'FAILED'))
+
+// Interactions
+const activeTab = ref('details')
+const interactionsLoading = ref(false)
+const interactionData = ref(null)
+
+const addButton = () => {
+  if (formData.value.buttons.length < 3) {
+    formData.value.buttons.push({ text: '', type: 'reply', url: '' })
+  }
+}
+
+const removeButton = (index) => {
+  formData.value.buttons.splice(index, 1)
+}
 
 const getMessageContent = (campaign) => {
   if (campaign.message) return campaign.message;
@@ -288,8 +393,24 @@ const submitCampaign = async () => {
   try {
     const form = new FormData()
     form.append('name', formData.value.name)
-    if (formData.value.type === 'text') form.append('message', formData.value.message)
-    else form.append('templateId', formData.value.templateId)
+    
+    if (formData.value.type === 'text') {
+      form.append('message', formData.value.message)
+      form.append('interactiveType', 'TEXT')
+    } else if (formData.value.type === 'template') {
+      form.append('templateId', formData.value.templateId)
+      form.append('interactiveType', 'TEXT')
+    } else if (formData.value.type === 'buttons') {
+      form.append('message', formData.value.message)
+      form.append('interactiveType', 'BUTTONS')
+      // Filter out empty buttons
+      const validButtons = formData.value.buttons.filter(b => b.text.trim())
+      if (validButtons.length === 0) {
+        saving.value = false
+        return alert('Please add at least one button')
+      }
+      form.append('buttons', JSON.stringify(validButtons))
+    }
     
     form.append('file', selectedFile.value)
     if (selectedImage.value) form.append('image', selectedImage.value)
@@ -305,7 +426,7 @@ const submitCampaign = async () => {
     showCreateModal.value = false
     selectedFile.value = null
     selectedImage.value = null
-    formData.value = { name: '', type: 'text', message: '', templateId: '' }
+    formData.value = { name: '', type: 'text', message: '', templateId: '', buttons: [{ text: '', type: 'reply', url: '' }] }
     
     fetchCampaigns()
     setTimeout(() => { success.value = '' }, 5000)
@@ -337,8 +458,10 @@ const startCampaign = async (id) => {
 const openTargetsModal = async (id) => {
   selectedCampaignId.value = id
   showTargetsModal.value = true
+  activeTab.value = 'details'
   targetsLoading.value = true
   targets.value = []
+  interactionData.value = null
   
   try {
     const res = await axios.get(`/api/v1/campaigns/${id}/targets`, {
@@ -349,6 +472,22 @@ const openTargetsModal = async (id) => {
     error.value = 'Failed to load campaign targets.'
   } finally {
     targetsLoading.value = false
+  }
+}
+
+const openInteractions = async () => {
+  activeTab.value = 'interactions'
+  if (interactionData.value) return // already loaded
+  interactionsLoading.value = true
+  try {
+    const res = await axios.get(`/api/v1/campaigns/${selectedCampaignId.value}/interactions`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+    interactionData.value = res.data.data
+  } catch (err) {
+    error.value = 'Failed to load interactions.'
+  } finally {
+    interactionsLoading.value = false
   }
 }
 
@@ -458,4 +597,38 @@ onUnmounted(() => {
 .targets-table th, .targets-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #E2E8F0; }
 .targets-table th { background: #F8FAFC; position: sticky; top: 0; font-size: 0.85rem; color: #64748B; text-transform: uppercase; }
 .targets-table td { font-size: 0.95rem; color: #334155; }
+
+/* Tabs */
+.tab-btn { background: none; border: none; padding: 0.6rem 1rem; font-weight: 600; cursor: pointer; font-size: 0.9rem; color: #64748B; border-bottom: 3px solid transparent; transition: all 0.2s; }
+.tab-btn.active { color: #FF6600; border-bottom-color: #FF6600; }
+.tab-btn:hover { color: #FF6600; }
+
+/* Buttons builder */
+.buttons-builder { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; }
+.button-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+.btn-danger-text { background: none; border: none; color: #DC2626; font-size: 1.2rem; cursor: pointer; padding: 0 0.25rem; font-weight: bold; }
+.btn-preview-badge { background: #E0F2FE; color: #0369A1; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; border: 1px solid #BAE6FD; }
+
+/* Interaction stats */
+.interactions-stats-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.istat-card { flex: 1; min-width: 100px; padding: 1rem; border-radius: 10px; text-align: center; }
+.istat-card.green { background: #F0FDF4; border: 1px solid #BBF7D0; }
+.istat-card.red { background: #FEF2F2; border: 1px solid #FECACA; }
+.istat-card.blue { background: #EFF6FF; border: 1px solid #BFDBFE; }
+.istat-num { font-size: 2rem; font-weight: 800; }
+.istat-card.green .istat-num { color: #15803D; }
+.istat-card.red .istat-num { color: #DC2626; }
+.istat-card.blue .istat-num { color: #1D4ED8; }
+.istat-label { font-size: 0.8rem; font-weight: 600; color: #64748B; margin-top: 0.25rem; }
+
+/* Phone tags */
+.phone-tag { background: #F1F5F9; color: #334155; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-family: monospace; }
+
+/* Campaign info grid */
+.campaign-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 1.25rem; border-radius: 8px; margin-bottom: 1rem; }
+.info-item { display: flex; flex-direction: column; gap: 0.25rem; }
+.info-item.full-width { grid-column: 1 / -1; }
+.info-item .label { font-size: 0.78rem; color: #64748B; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.message-box { background: white; border: 1px solid #E2E8F0; padding: 0.75rem; border-radius: 6px; font-size: 0.9rem; white-space: pre-wrap; max-height: 120px; overflow-y: auto; }
+
 </style>

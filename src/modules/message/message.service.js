@@ -73,6 +73,51 @@ class MessageService {
       throw error;
     }
   }
+
+  async sendButtonsMessage(tenantId, phone, text, buttons, imageBuffer) {
+    const canSend = await billingService.checkLimit(tenantId);
+    if (!canSend) throw { status: 402, message: 'Monthly message limit reached. Please upgrade your plan.' };
+    try {
+      await whatsappService.sendButtons(tenantId, phone, text, buttons, imageBuffer);
+      await prisma.messageLog.create({ data: { tenantId, phone, messageType: 'INTERACTIVE', status: 'SENT' } });
+      await billingService.incrementUsage(tenantId, 'sent');
+      return { success: true, message: 'Interactive message sent successfully' };
+    } catch (error) {
+      await prisma.messageLog.create({ data: { tenantId, phone, messageType: 'INTERACTIVE', status: 'FAILED', errorMessage: error.message || 'Failed' } });
+      await billingService.incrementUsage(tenantId, 'failed');
+      throw error;
+    }
+  }
+
+  async sendListMessage(tenantId, phone, title, body, buttonText, sections) {
+    const canSend = await billingService.checkLimit(tenantId);
+    if (!canSend) throw { status: 402, message: 'Monthly message limit reached. Please upgrade your plan.' };
+    try {
+      await whatsappService.sendList(tenantId, phone, title, body, buttonText, sections);
+      await prisma.messageLog.create({ data: { tenantId, phone, messageType: 'INTERACTIVE', status: 'SENT' } });
+      await billingService.incrementUsage(tenantId, 'sent');
+      return { success: true, message: 'List message sent successfully' };
+    } catch (error) {
+      await prisma.messageLog.create({ data: { tenantId, phone, messageType: 'INTERACTIVE', status: 'FAILED', errorMessage: error.message || 'Failed' } });
+      await billingService.incrementUsage(tenantId, 'failed');
+      throw error;
+    }
+  }
+
+  async sendLocationMessage(tenantId, phone, latitude, longitude, name, address) {
+    const canSend = await billingService.checkLimit(tenantId);
+    if (!canSend) throw { status: 402, message: 'Monthly message limit reached. Please upgrade your plan.' };
+    try {
+      await whatsappService.sendLocation(tenantId, phone, latitude, longitude, name, address);
+      await prisma.messageLog.create({ data: { tenantId, phone, messageType: 'INTERACTIVE', status: 'SENT' } });
+      await billingService.incrementUsage(tenantId, 'sent');
+      return { success: true, message: 'Location sent successfully' };
+    } catch (error) {
+      await prisma.messageLog.create({ data: { tenantId, phone, messageType: 'INTERACTIVE', status: 'FAILED', errorMessage: error.message || 'Failed' } });
+      await billingService.incrementUsage(tenantId, 'failed');
+      throw error;
+    }
+  }
 }
 
 module.exports = new MessageService();

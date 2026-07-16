@@ -3,9 +3,21 @@ const campaignService = require('./campaign.service');
 exports.createCampaign = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
-    const { name, message, templateId } = req.body;
+    const { name, message, templateId, interactiveType } = req.body;
     const file = req.files?.file?.[0];
     const image = req.files?.image?.[0];
+
+    // Parse buttons from JSON string if provided
+    let buttons;
+    if (req.body.buttons) {
+      try {
+        buttons = typeof req.body.buttons === 'string'
+          ? JSON.parse(req.body.buttons)
+          : req.body.buttons;
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid buttons format. Must be a valid JSON array.' });
+      }
+    }
 
     if (!file) {
       return res.status(400).json({ error: 'Excel or CSV file is required' });
@@ -20,7 +32,9 @@ exports.createCampaign = async (req, res, next) => {
       message,
       templateId,
       file,
-      image
+      image,
+      buttons,
+      interactiveType: interactiveType || 'TEXT'
     });
 
     res.status(201).json(result);
@@ -78,6 +92,17 @@ exports.getCampaignStats = async (req, res, next) => {
     const { id } = req.params;
     const stats = await campaignService.getCampaignStats(tenantId, id);
     res.status(200).json({ success: true, data: stats });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getInteractions = async (req, res, next) => {
+  try {
+    const tenantId = req.tenant.id;
+    const { id } = req.params;
+    const result = await campaignService.getInteractions(tenantId, id);
+    res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);
   }

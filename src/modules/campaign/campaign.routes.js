@@ -38,7 +38,8 @@ router.post('/', upload.fields([{ name: 'file', maxCount: 1 }, { name: 'image', 
 router.post('/:id/start', campaignController.startCampaign);
 router.post('/:id/retry', campaignController.retryFailed);
 router.get('/:id/targets', campaignController.getTargets);
-router.get('/', campaignController.getCampaigns);
 router.get('/:id/stats', campaignController.getCampaignStats);
+router.get('/:id/interactions', campaignController.getInteractions);
+router.get('/', campaignController.getCampaigns);
 
 module.exports = router;

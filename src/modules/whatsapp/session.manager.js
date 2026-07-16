@@ -46,6 +46,91 @@ class SessionManager {
 
     sock.ev.on('creds.update', saveCreds);
 
+    // Listen for incoming messages (button replies, list replies, etc.)
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      if (type !== 'notify') return;
+      for (const msg of messages) {
+        if (!msg.message || msg.key.fromMe) continue;
+        const senderPhone = msg.key.remoteJid?.replace('@s.whatsapp.net', '') || '';
+
+        // Button Reply
+        const btnReply = msg.message?.buttonsResponseMessage;
+        if (btnReply) {
+          logger.info(`[Button Reply] Tenant ${tenantId} | Phone: ${senderPhone} | Button: ${btnReply.selectedDisplayText}`);
+          try {
+            // Find matching campaign target
+            const target = await prisma.campaignTarget.findFirst({
+              where: { phone: senderPhone, campaign: { tenantId } },
+              include: { campaign: true },
+              orderBy: { campaign: { createdAt: 'desc' } }
+            });
+            if (target) {
+              await prisma.buttonInteraction.create({
+                data: {
+                  campaignId: target.campaignId,
+                  campaignTargetId: target.id,
+                  tenantId,
+                  phone: senderPhone,
+                  buttonId: btnReply.selectedButtonId || '',
+                  buttonText: btnReply.selectedDisplayText || '',
+                  interactionType: 'BUTTON'
+                }
+              });
+              // Emit to dashboard via Socket.IO
+              if (this.io) {
+                this.io.to(`tenant_${tenantId}`).emit('button_interaction', {
+                  campaignId: target.campaignId,
+                  phone: senderPhone,
+                  buttonText: btnReply.selectedDisplayText,
+                  buttonId: btnReply.selectedButtonId,
+                  type: 'BUTTON'
+                });
+              }
+            }
+          } catch (err) {
+            logger.error(`[Button Reply] Error saving interaction: ${err.message}`);
+          }
+        }
+
+        // List Reply
+        const listReply = msg.message?.listResponseMessage;
+        if (listReply) {
+          logger.info(`[List Reply] Tenant ${tenantId} | Phone: ${senderPhone} | Item: ${listReply.title}`);
+          try {
+            const target = await prisma.campaignTarget.findFirst({
+              where: { phone: senderPhone, campaign: { tenantId } },
+              include: { campaign: true },
+              orderBy: { campaign: { createdAt: 'desc' } }
+            });
+            if (target) {
+              await prisma.buttonInteraction.create({
+                data: {
+                  campaignId: target.campaignId,
+                  campaignTargetId: target.id,
+                  tenantId,
+                  phone: senderPhone,
+                  buttonId: listReply.singleSelectReply?.selectedRowId || '',
+                  buttonText: listReply.title || '',
+                  interactionType: 'LIST'
+                }
+              });
+              if (this.io) {
+                this.io.to(`tenant_${tenantId}`).emit('button_interaction', {
+                  campaignId: target.campaignId,
+                  phone: senderPhone,
+                  buttonText: listReply.title,
+                  buttonId: listReply.singleSelectReply?.selectedRowId,
+                  type: 'LIST'
+                });
+              }
+            }
+          } catch (err) {
+            logger.error(`[List Reply] Error saving interaction: ${err.message}`);
+          }
+        }
+      }
+    });
+
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 

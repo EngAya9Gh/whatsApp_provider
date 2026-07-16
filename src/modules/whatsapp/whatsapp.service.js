@@ -89,6 +89,105 @@ class WhatsAppService {
       throw { status: 500, message: `Failed to send media via WhatsApp: ${error.message || error}` };
     }
   }
+  async sendButtons(tenantId, phone, text, buttons, imageBuffer) {
+    const sock = sessionManager.getSession(tenantId);
+    if (!sock) throw { status: 400, message: 'WhatsApp session is not connected' };
+
+    const formattedPhone = phone.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+
+    try {
+      await sock.presenceSubscribe(formattedPhone);
+      await sock.sendPresenceUpdate('composing', formattedPhone);
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      await sock.sendPresenceUpdate('paused', formattedPhone);
+
+      // Build buttons array for Baileys
+      const baileysButtons = buttons.map((btn, i) => {
+        if (btn.type === 'url') {
+          return { buttonId: btn.id || `btn_${i}`, buttonText: { displayText: btn.text }, type: 4, nativeFlowInfo: { name: 'open_url', paramsJson: JSON.stringify({ url: btn.url }) } };
+        }
+        return { buttonId: btn.id || `btn_${i}`, buttonText: { displayText: btn.text }, type: 1 };
+      });
+
+      let payload;
+      if (imageBuffer) {
+        payload = {
+          image: imageBuffer,
+          caption: text,
+          buttons: baileysButtons,
+          headerType: 4
+        };
+      } else {
+        payload = {
+          text,
+          buttons: baileysButtons,
+          headerType: 1
+        };
+      }
+
+      const result = await sock.sendMessage(formattedPhone, payload);
+      return result;
+    } catch (error) {
+      logger.error(`Failed to send buttons message for tenant ${tenantId}: ${error.message}`);
+      throw { status: 500, message: `Failed to send buttons message: ${error.message}` };
+    }
+  }
+
+  async sendList(tenantId, phone, title, body, buttonText, sections) {
+    const sock = sessionManager.getSession(tenantId);
+    if (!sock) throw { status: 400, message: 'WhatsApp session is not connected' };
+
+    const formattedPhone = phone.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+
+    try {
+      await sock.presenceSubscribe(formattedPhone);
+      await sock.sendPresenceUpdate('composing', formattedPhone);
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      await sock.sendPresenceUpdate('paused', formattedPhone);
+
+      const result = await sock.sendMessage(formattedPhone, {
+        listMessage: {
+          title,
+          text: body,
+          footerText: '',
+          buttonText,
+          listType: 1,
+          sections
+        }
+      });
+      return result;
+    } catch (error) {
+      logger.error(`Failed to send list message for tenant ${tenantId}: ${error.message}`);
+      throw { status: 500, message: `Failed to send list message: ${error.message}` };
+    }
+  }
+
+  async sendLocation(tenantId, phone, latitude, longitude, name, address) {
+    const sock = sessionManager.getSession(tenantId);
+    if (!sock) throw { status: 400, message: 'WhatsApp session is not connected' };
+
+    const formattedPhone = phone.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+
+    try {
+      await sock.presenceSubscribe(formattedPhone);
+      await sock.sendPresenceUpdate('composing', formattedPhone);
+      await new Promise(resolve => setTimeout(resolve, 800));
+      await sock.sendPresenceUpdate('paused', formattedPhone);
+
+      const result = await sock.sendMessage(formattedPhone, {
+        location: {
+          degreesLatitude: parseFloat(latitude),
+          degreesLongitude: parseFloat(longitude),
+          name: name || '',
+          address: address || ''
+        }
+      });
+      return result;
+    } catch (error) {
+      logger.error(`Failed to send location for tenant ${tenantId}: ${error.message}`);
+      throw { status: 500, message: `Failed to send location: ${error.message}` };
+    }
+  }
 }
 
 module.exports = new WhatsAppService();

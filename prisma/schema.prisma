@@ -103,6 +103,7 @@ enum SessionStatus {
 enum MessageType {
   OTP
   CUSTOM
+  INTERACTIVE
 }
 
 enum MessageStatus {
@@ -126,18 +127,21 @@ model MessageTemplate {
 }
 
 model Campaign {
-  id        String   @id @default(uuid())
-  tenantId  String   @map("tenant_id")
-  name      String
-  message   String?  @db.Text
-  templateId String? @map("template_id")
-  mediaPath String?  @map("media_path")
-  mediaMime String?  @map("media_mime")
-  status    String   @default("PENDING") // PENDING, RUNNING, COMPLETED
-  createdAt DateTime @default(now()) @map("created_at")
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  name            String
+  message         String?  @db.Text
+  templateId      String?  @map("template_id")
+  mediaPath       String?  @map("media_path")
+  mediaMime       String?  @map("media_mime")
+  buttons         String?  @db.Text @map("buttons") // JSON array of buttons
+  interactiveType String?  @map("interactive_type") // TEXT, BUTTONS, LIST, LOCATION
+  status          String   @default("PENDING") // PENDING, RUNNING, COMPLETED
+  createdAt       DateTime @default(now()) @map("created_at")
   
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  targets   CampaignTarget[]
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  targets      CampaignTarget[]
+  interactions ButtonInteraction[]
 
   @@map("campaigns")
 }
@@ -149,9 +153,27 @@ model CampaignTarget {
   status     String   @default("PENDING") // PENDING, SENT, FAILED
   error      String?  @db.Text
   
-  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign     Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  interactions ButtonInteraction[]
 
   @@map("campaign_targets")
+}
+
+model ButtonInteraction {
+  id               String   @id @default(uuid())
+  campaignId       String   @map("campaign_id")
+  campaignTargetId String?  @map("campaign_target_id")
+  tenantId         String   @map("tenant_id")
+  phone            String
+  buttonId         String   @map("button_id")
+  buttonText       String   @map("button_text") @db.Text
+  interactionType  String   @default("BUTTON") @map("interaction_type") // BUTTON, LIST
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  campaign       Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignTarget CampaignTarget? @relation(fields: [campaignTargetId], references: [id])
+
+  @@map("button_interactions")
 }
 
 model Invoice {

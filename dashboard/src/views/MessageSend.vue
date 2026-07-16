@@ -11,7 +11,7 @@
         <form @submit.prevent="handleSend">
           <div class="form-group">
             <label>{{ $t('send_message.type') || 'Message Type' }}</label>
-            <div class="radio-group">
+            <div class="radio-group" style="display:flex; flex-wrap:wrap; gap:1rem;">
               <label class="radio-label">
                 <input type="radio" v-model="messageType" value="text" /> {{ $t('send_message.type_text') || 'Text' }}
               </label>
@@ -23,6 +23,15 @@
               </label>
               <label class="radio-label">
                 <input type="radio" v-model="messageType" value="template" /> {{ $t('send_message.type_template') || 'Template' }}
+              </label>
+              <label class="radio-label" style="color:#FF6600; font-weight:600;">
+                <input type="radio" v-model="messageType" value="buttons" /> 🔘 Buttons
+              </label>
+              <label class="radio-label" style="color:#10B981; font-weight:600;">
+                <input type="radio" v-model="messageType" value="list" /> 📋 List
+              </label>
+              <label class="radio-label" style="color:#3B82F6; font-weight:600;">
+                <input type="radio" v-model="messageType" value="location" /> 📍 Location
               </label>
             </div>
           </div>
@@ -60,6 +69,79 @@
             </select>
           </div>
 
+          <!-- Buttons Inputs -->
+          <div v-if="messageType === 'buttons'" class="form-group interactive-box">
+            <label>Message Content</label>
+            <textarea v-model="textContent" rows="3" placeholder="Message text..." required class="form-input"></textarea>
+            
+            <div style="margin-top: 1rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
+              <label>Buttons (Max 3)</label>
+              <button type="button" @click="addSendButton" class="btn-text" style="color:#10B981" :disabled="buttonsList.length >= 3">+ Add Button</button>
+            </div>
+            <div v-for="(btn, i) in buttonsList" :key="i" style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
+              <input v-model="btn.text" placeholder="Button Text" class="form-input" style="flex:1" maxlength="20" required />
+              <select v-model="btn.type" class="form-input" style="width:100px;">
+                <option value="reply">Reply</option>
+                <option value="url">URL</option>
+              </select>
+              <input v-if="btn.type === 'url'" v-model="btn.url" placeholder="https://" class="form-input" style="flex:1" required />
+              <button type="button" @click="removeSendButton(i)" class="btn-text" style="color:#DC2626">✕</button>
+            </div>
+            
+            <label style="margin-top:1rem;">Optional Image Attachment</label>
+            <input type="file" @change="handleFileChange" accept="image/*" class="form-input" />
+          </div>
+
+          <!-- List Inputs -->
+          <div v-if="messageType === 'list'" class="form-group interactive-box">
+            <label>List Title</label>
+            <input v-model="listTitle" placeholder="Awesome Options" required class="form-input" style="margin-bottom:0.5rem;" maxlength="60" />
+            <label>List Body (Message)</label>
+            <textarea v-model="listBody" rows="2" placeholder="Please select an option" required class="form-input" style="margin-bottom:0.5rem;" maxlength="1024"></textarea>
+            <label>Main Button Text (To open list)</label>
+            <input v-model="listButtonText" placeholder="View Options" required class="form-input" style="margin-bottom:1rem;" maxlength="20" />
+
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <label>Sections (Min 1)</label>
+              <button type="button" @click="addSection" class="btn-text" style="color:#10B981">+ Add Section</button>
+            </div>
+            <div v-for="(section, sIdx) in listSections" :key="sIdx" class="section-box">
+              <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
+                <input v-model="section.title" placeholder="Section Title" required class="form-input" maxlength="24" />
+                <button type="button" @click="removeSection(sIdx)" class="btn-text" style="color:#DC2626" :disabled="listSections.length <= 1">✕</button>
+              </div>
+              <div class="rows-box">
+                <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+                  <label style="font-size:0.8rem; margin:0;">Rows</label>
+                  <button type="button" @click="addRow(sIdx)" class="btn-text" style="font-size:0.8rem; color:#3B82F6">+ Add Row</button>
+                </div>
+                <div v-for="(row, rIdx) in section.rows" :key="rIdx" style="display:flex; gap:0.5rem; margin-bottom:0.5rem; align-items:center;">
+                  <input v-model="row.title" placeholder="Row Title" required class="form-input" style="flex:1" maxlength="24" />
+                  <input v-model="row.description" placeholder="Description (Optional)" class="form-input" style="flex:1.5" maxlength="72" />
+                  <button type="button" @click="removeRow(sIdx, rIdx)" class="btn-text" style="color:#DC2626" :disabled="section.rows.length <= 1">✕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Location Inputs -->
+          <div v-if="messageType === 'location'" class="form-group interactive-box">
+            <div style="display:flex; gap:1rem; margin-bottom:1rem;">
+              <div style="flex:1;">
+                <label>Latitude</label>
+                <input type="number" step="any" v-model="locationLat" placeholder="24.7136" required class="form-input" />
+              </div>
+              <div style="flex:1;">
+                <label>Longitude</label>
+                <input type="number" step="any" v-model="locationLng" placeholder="46.6753" required class="form-input" />
+              </div>
+            </div>
+            <label>Location Name (Optional)</label>
+            <input v-model="locationName" placeholder="Kingdom Centre" class="form-input" style="margin-bottom:1rem;" maxlength="100" />
+            <label>Address (Optional)</label>
+            <input v-model="locationAddress" placeholder="Riyadh, Saudi Arabia" class="form-input" maxlength="200" />
+          </div>
+
           <!-- Dynamic Template Variables -->
           <div v-if="messageType === 'template' && templateVariables.length > 0" class="variables-box">
             <h4>{{ $t('send_message.fill_variables') || 'Fill in Variables:' }}</h4>
@@ -91,7 +173,13 @@
         <p class="info-text">
           {{ $t('send_message.info_text') || 'This tool uses your own API to send messages. When you click send, the dashboard makes a request to:' }}
         </p>
-        <code class="endpoint-code">POST /api/v1/{{ messageType === 'template' ? 'templates/send' : (messageType === 'text' ? 'message/send' : 'message/upload-media') }}</code>
+        <code class="endpoint-code">POST /api/v1/{{ 
+          messageType === 'template' ? 'templates/send' : 
+          (messageType === 'buttons' ? 'message/send-buttons' :
+          (messageType === 'list' ? 'message/send-list' :
+          (messageType === 'location' ? 'message/send-location' :
+          (messageType === 'text' ? 'message/send' : 'message/upload-media')))) 
+        }}</code>
         
         <div class="tips-box">
           <h4>{{ $t('send_message.pro_tips') || '💡 Pro Tips' }}</h4>
@@ -117,6 +205,30 @@ const textContent = ref('')
 const selectedFile = ref(null)
 const caption = ref('')
 const apiKey = ref('')
+
+// Interactive message refs
+const buttonsList = ref([{ text: '', type: 'reply', url: '' }])
+const listTitle = ref('')
+const listBody = ref('')
+const listButtonText = ref('')
+const listSections = ref([{
+  title: 'Section 1',
+  rows: [{ rowId: 'row_1', title: 'Option 1', description: '' }]
+}])
+const locationLat = ref('')
+const locationLng = ref('')
+const locationName = ref('')
+const locationAddress = ref('')
+
+// Methods for buttons
+const addSendButton = () => { if (buttonsList.value.length < 3) buttonsList.value.push({ text: '', type: 'reply', url: '' }) }
+const removeSendButton = (idx) => { buttonsList.value.splice(idx, 1) }
+
+// Methods for list
+const addSection = () => { listSections.value.push({ title: `Section ${listSections.value.length + 1}`, rows: [{ rowId: `row_${Date.now()}`, title: 'New Option', description: '' }] }) }
+const removeSection = (idx) => { listSections.value.splice(idx, 1) }
+const addRow = (sIdx) => { listSections.value[sIdx].rows.push({ rowId: `row_${Date.now()}`, title: 'New Option', description: '' }) }
+const removeRow = (sIdx, rIdx) => { listSections.value[sIdx].rows.splice(rIdx, 1) }
 
 // Template specific refs
 const templates = ref([])
@@ -187,6 +299,41 @@ const handleSend = async () => {
       }, {
         headers: { Authorization: `Bearer ${apiKey.value}` }
       })
+    } else if (messageType.value === 'buttons') {
+      const validButtons = buttonsList.value.filter(b => b.text.trim())
+      if (validButtons.length === 0) throw new Error('Add at least one button')
+      
+      let formData = new FormData()
+      formData.append('phone', phone.value)
+      formData.append('text', textContent.value)
+      formData.append('buttons', JSON.stringify(validButtons))
+      if (selectedFile.value) {
+        formData.append('image', selectedFile.value)
+      }
+      
+      res = await axios.post('/api/v1/message/send-buttons', formData, {
+        headers: { Authorization: `Bearer ${apiKey.value}`, 'Content-Type': 'multipart/form-data' }
+      })
+    } else if (messageType.value === 'list') {
+      res = await axios.post('/api/v1/message/send-list', {
+        phone: phone.value,
+        title: listTitle.value,
+        body: listBody.value,
+        buttonText: listButtonText.value,
+        sections: listSections.value
+      }, {
+        headers: { Authorization: `Bearer ${apiKey.value}` }
+      })
+    } else if (messageType.value === 'location') {
+      res = await axios.post('/api/v1/message/send-location', {
+        phone: phone.value,
+        latitude: parseFloat(locationLat.value),
+        longitude: parseFloat(locationLng.value),
+        name: locationName.value,
+        address: locationAddress.value
+      }, {
+        headers: { Authorization: `Bearer ${apiKey.value}` }
+      })
     } else if (messageType.value === 'template') {
       if (!selectedTemplateId.value) throw new Error('Please select a template');
       res = await axios.post('/api/v1/templates/send', {
@@ -218,9 +365,10 @@ const handleSend = async () => {
     success.value = res.data.message || 'Message sent successfully!'
     
     // Clear form on success
-    if (messageType.value === 'text') textContent.value = ''
+    if (messageType.value === 'text' || messageType.value === 'buttons') textContent.value = ''
     selectedFile.value = null
     caption.value = ''
+    buttonsList.value = [{ text: '', type: 'reply', url: '' }]
     if (messageType.value === 'template') {
       extractVariables(); // Reset variable values
     }
@@ -273,4 +421,8 @@ label { display: block; font-size: 0.875rem; font-weight: 600; color: #334155; m
 
 .spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.interactive-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; }
+.section-box { background: white; border: 1px solid #E2E8F0; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.rows-box { margin-left: 1rem; padding-left: 1rem; border-left: 2px solid #CBD5E1; margin-top: 0.5rem; }
 </style>

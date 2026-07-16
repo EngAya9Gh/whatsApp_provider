@@ -19,7 +19,7 @@ const campaignQueue = new Queue('campaign-queue', { connection });
 
 // Initialize Worker
 const campaignWorker = new Worker('campaign-queue', async (job) => {
-  const { tenantId, phone, message, templateId, mediaPath, mediaMime, targetId } = job.data;
+  const { tenantId, phone, message, templateId, mediaPath, mediaMime, buttons, interactiveType, targetId } = job.data;
   
   try {
     let finalMessage = message;
@@ -32,13 +32,19 @@ const campaignWorker = new Worker('campaign-queue', async (job) => {
       if (template) finalMessage = template.content;
     }
 
-    // 2. Send Media or Text
-    if (mediaPath && fs.existsSync(mediaPath)) {
-      // Pass the file path directly instead of reading it into a Buffer.
-      // Baileys handles stream uploads better and avoids "Media upload failed on all hosts" errors.
+    // 2. Send based on interactiveType
+    if (interactiveType === 'BUTTONS' && buttons) {
+      // Parse buttons JSON
+      const parsedButtons = typeof buttons === 'string' ? JSON.parse(buttons) : buttons;
+      // Load image if mediaPath exists
+      let imageBuffer;
+      if (mediaPath && fs.existsSync(mediaPath)) {
+        imageBuffer = fs.readFileSync(mediaPath);
+      }
+      await messageService.sendButtonsMessage(tenantId, phone, finalMessage || '', parsedButtons, imageBuffer);
+    } else if (mediaPath && fs.existsSync(mediaPath)) {
       let type = 'image';
       if (mediaMime && mediaMime.includes('pdf')) type = 'pdf';
-      
       await messageService.sendMediaMessage(tenantId, phone, type, mediaPath, finalMessage || '', mediaMime, 'campaign-media');
     } else {
       if (!finalMessage) throw new Error('No message content found');

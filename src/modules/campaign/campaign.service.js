@@ -49,7 +49,7 @@ class CampaignService {
     return Array.from(phones);
   }
 
-  async createCampaign({ tenantId, name, message, templateId, file, image }) {
+  async createCampaign({ tenantId, name, message, templateId, file, image, buttons, interactiveType }) {
     // 1. Parse phones from file
     const phones = await this.parseFile(file);
     if (phones.length === 0) {
@@ -65,6 +65,8 @@ class CampaignService {
         templateId: templateId || null,
         mediaPath: image ? image.path : null,
         mediaMime: image ? image.mimetype : null,
+        buttons: buttons ? JSON.stringify(buttons) : null,
+        interactiveType: interactiveType || 'TEXT',
         status: 'PENDING'
       }
     });
@@ -76,9 +78,7 @@ class CampaignService {
       status: 'PENDING'
     }));
     
-    await prisma.campaignTarget.createMany({
-      data: targetData
-    });
+    await prisma.campaignTarget.createMany({ data: targetData });
 
     return {
       success: true,
@@ -111,6 +111,8 @@ class CampaignService {
         templateId: campaign.templateId,
         mediaPath: campaign.mediaPath,
         mediaMime: campaign.mediaMime,
+        buttons: campaign.buttons,
+        interactiveType: campaign.interactiveType || 'TEXT',
         targetId: target.id
       },
       opts: {
@@ -228,6 +230,41 @@ class CampaignService {
     });
 
     return { success: true, message: 'Failed messages are being retried.' };
+  }
+  async getInteractions(tenantId, campaignId) {
+    const campaign = await prisma.campaign.findUnique({ where: { id: campaignId, tenantId } });
+    if (!campaign) throw { status: 404, message: 'Campaign not found' };
+
+    const interactions = await prisma.buttonInteraction.findMany({
+      where: { campaignId, tenantId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Get all targets to find who did NOT interact
+    const targets = await prisma.campaignTarget.findMany({
+      where: { campaignId, status: 'SENT' }
+    });
+
+    const interactedPhones = new Set(interactions.map(i => i.phone));
+    const notInteracted = targets.filter(t => !interactedPhones.has(t.phone)).map(t => t.phone);
+
+    // Button stats
+    const buttonStats = {};
+    for (const interaction of interactions) {
+      const key = interaction.buttonText;
+      buttonStats[key] = (buttonStats[key] || 0) + 1;
+    }
+
+    return {
+      interactions,
+      notInteracted,
+      stats: {
+        total: targets.length,
+        interacted: interactedPhones.size,
+        notInteracted: notInteracted.length,
+        buttonBreakdown: buttonStats
+      }
+    };
   }
 }
 
