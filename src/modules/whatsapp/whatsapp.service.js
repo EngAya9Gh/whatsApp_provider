@@ -123,14 +123,19 @@ class WhatsAppService {
       });
 
       const messageContent = {
-        interactiveMessage: proto.Message.InteractiveMessage.create({
-          body: proto.Message.InteractiveMessage.Body.create({ text: text || ' ' }),
-          footer: proto.Message.InteractiveMessage.Footer.create({ text: ' ' }),
-          header: proto.Message.InteractiveMessage.Header.create({ title: ' ', subtitle: ' ', hasMediaAttachment: !!imageBuffer }),
-          nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-            buttons: interactiveButtons
-          })
-        })
+        viewOnceMessage: {
+          message: {
+            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
+            interactiveMessage: proto.Message.InteractiveMessage.create({
+              body: proto.Message.InteractiveMessage.Body.create({ text: text || ' ' }),
+              footer: proto.Message.InteractiveMessage.Footer.create({ text: ' ' }),
+              header: proto.Message.InteractiveMessage.Header.create({ title: ' ', subtitle: ' ', hasMediaAttachment: !!imageBuffer }),
+              nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                buttons: interactiveButtons
+              })
+            })
+          }
+        }
       };
 
       if (imageBuffer) {
@@ -139,8 +144,8 @@ class WhatsAppService {
         // but for now, we just skip media in interactive native flow unless pre-uploaded.
         // As a workaround, we send media first, then buttons.
         await sock.sendMessage(formattedPhone, { image: imageBuffer, caption: text });
-        messageContent.interactiveMessage.body.text = "Please choose an option:";
-        messageContent.interactiveMessage.header.hasMediaAttachment = false;
+        messageContent.viewOnceMessage.message.interactiveMessage.body.text = "Please choose an option:";
+        messageContent.viewOnceMessage.message.interactiveMessage.header.hasMediaAttachment = false;
       }
 
       const waMsg = generateWAMessageFromContent(formattedPhone, messageContent, { userJid: sock.user.id });
@@ -175,22 +180,27 @@ class WhatsAppService {
       }));
 
       const messageContent = {
-        interactiveMessage: proto.Message.InteractiveMessage.create({
-          body: proto.Message.InteractiveMessage.Body.create({ text: body || ' ' }),
-          footer: proto.Message.InteractiveMessage.Footer.create({ text: ' ' }),
-          header: proto.Message.InteractiveMessage.Header.create({ title: title || ' ', subtitle: ' ', hasMediaAttachment: false }),
-          nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-            buttons: [
-              {
-                name: "single_select",
-                buttonParamsJson: JSON.stringify({
-                  title: buttonText || "Options",
-                  sections: listSections
-                })
-              }
-            ]
-          })
-        })
+        viewOnceMessage: {
+          message: {
+            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
+            interactiveMessage: proto.Message.InteractiveMessage.create({
+              body: proto.Message.InteractiveMessage.Body.create({ text: body || ' ' }),
+              footer: proto.Message.InteractiveMessage.Footer.create({ text: ' ' }),
+              header: proto.Message.InteractiveMessage.Header.create({ title: title || ' ', subtitle: ' ', hasMediaAttachment: false }),
+              nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                buttons: [
+                  {
+                    name: "single_select",
+                    buttonParamsJson: JSON.stringify({
+                      title: buttonText || "Options",
+                      sections: listSections
+                    })
+                  }
+                ]
+              })
+            })
+          }
+        }
       };
 
       const waMsg = generateWAMessageFromContent(formattedPhone, messageContent, { userJid: sock.user.id });
