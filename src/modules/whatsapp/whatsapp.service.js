@@ -1,6 +1,7 @@
 const sessionManager = require('./session.manager');
 const logger = require('../../utils/logger');
 const { PrismaClient } = require('@prisma/client');
+const { generateWAMessageFromContent, proto } = require('@whiskeysockets/baileys');
 
 const prisma = new PrismaClient();
 
@@ -101,31 +102,55 @@ class WhatsAppService {
       await new Promise(resolve => setTimeout(resolve, 1200));
       await sock.sendPresenceUpdate('paused', formattedPhone);
 
-      // Build buttons array for Baileys
-      const baileysButtons = buttons.map((btn, i) => {
+      const interactiveButtons = buttons.map((btn, i) => {
         if (btn.type === 'url') {
-          return { buttonId: btn.id || `btn_${i}`, buttonText: { displayText: btn.text }, type: 4, nativeFlowInfo: { name: 'open_url', paramsJson: JSON.stringify({ url: btn.url }) } };
+          return {
+            name: "cta_url",
+            buttonParamsJson: JSON.stringify({
+              display_text: btn.text,
+              url: btn.url,
+              merchant_url: btn.url
+            })
+          };
         }
-        return { buttonId: btn.id || `btn_${i}`, buttonText: { displayText: btn.text }, type: 1 };
+        return {
+          name: "quick_reply",
+          buttonParamsJson: JSON.stringify({
+            display_text: btn.text,
+            id: btn.id || `btn_${i}`
+          })
+        };
       });
 
-      let payload;
+      const messageContent = {
+        viewOnceMessage: {
+          message: {
+            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
+            interactiveMessage: proto.Message.InteractiveMessage.create({
+              body: proto.Message.InteractiveMessage.Body.create({ text: text || ' ' }),
+              footer: proto.Message.InteractiveMessage.Footer.create({ text: '' }),
+              header: proto.Message.InteractiveMessage.Header.create({ title: '', hasMediaAttachment: !!imageBuffer }),
+              nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                buttons: interactiveButtons
+              })
+            })
+          }
+        }
+      };
+
       if (imageBuffer) {
-        payload = {
-          image: imageBuffer,
-          caption: text,
-          buttons: baileysButtons,
-          headerType: 4
-        };
-      } else {
-        payload = {
-          text,
-          buttons: baileysButtons,
-          headerType: 1
-        };
+        // Since uploading inside interactiveMessage without upload function is complex,
+        // we'll fallback to a normal message if we can't do it easily,
+        // but for now, we just skip media in interactive native flow unless pre-uploaded.
+        // As a workaround, we send media first, then buttons.
+        await sock.sendMessage(formattedPhone, { image: imageBuffer, caption: text });
+        messageContent.viewOnceMessage.message.interactiveMessage.body.text = "Please choose an option:";
+        messageContent.viewOnceMessage.message.interactiveMessage.header.hasMediaAttachment = false;
       }
 
-      const result = await sock.sendMessage(formattedPhone, payload);
+      const waMsg = generateWAMessageFromContent(formattedPhone, messageContent, { userJid: sock.user.id });
+      const result = await sock.relayMessage(formattedPhone, waMsg.message, { messageId: waMsg.key.id });
+
       return result;
     } catch (error) {
       logger.error(`Failed to send buttons message for tenant ${tenantId}: ${error.message}`);
@@ -145,12 +170,42 @@ class WhatsAppService {
       await new Promise(resolve => setTimeout(resolve, 1200));
       await sock.sendPresenceUpdate('paused', formattedPhone);
 
-      const result = await sock.sendMessage(formattedPhone, {
-        text: body,
-        title,
-        buttonText,
-        sections
-      });
+      const listSections = sections.map((sec) => ({
+        title: sec.title,
+        rows: sec.rows.map(r => ({
+          id: r.rowId || r.id || `row_${Date.now()}_${Math.random()}`,
+          title: r.title,
+          description: r.description || ''
+        }))
+      }));
+
+      const messageContent = {
+        viewOnceMessage: {
+          message: {
+            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
+            interactiveMessage: proto.Message.InteractiveMessage.create({
+              body: proto.Message.InteractiveMessage.Body.create({ text: body || ' ' }),
+              footer: proto.Message.InteractiveMessage.Footer.create({ text: '' }),
+              header: proto.Message.InteractiveMessage.Header.create({ title: title || '', hasMediaAttachment: false }),
+              nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                buttons: [
+                  {
+                    name: "single_select",
+                    buttonParamsJson: JSON.stringify({
+                      title: buttonText || "Options",
+                      sections: listSections
+                    })
+                  }
+                ]
+              })
+            })
+          }
+        }
+      };
+
+      const waMsg = generateWAMessageFromContent(formattedPhone, messageContent, { userJid: sock.user.id });
+      const result = await sock.relayMessage(formattedPhone, waMsg.message, { messageId: waMsg.key.id });
+
       return result;
     } catch (error) {
       logger.error(`Failed to send list message for tenant ${tenantId}: ${error.message}`);
