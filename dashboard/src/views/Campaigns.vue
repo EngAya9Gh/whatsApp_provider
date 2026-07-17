@@ -50,6 +50,7 @@
         <div class="card-footer">
           <small>{{ $t('campaigns.created') || 'Created' }}: {{ new Date(campaign.createdAt).toLocaleDateString() }}</small>
           <div style="display: flex; gap: 0.5rem;">
+            <button v-if="campaign.status === 'PENDING'" @click="editCampaign(campaign)" class="btn-text" style="color: #F59E0B;">✏️ Edit</button>
             <button v-if="campaign.status === 'PENDING'" @click="startCampaign(campaign.id)" class="btn-start" :disabled="startingId === campaign.id">
               {{ startingId === campaign.id ? 'Starting...' : '▶ Start' }}
             </button>
@@ -63,7 +64,7 @@
     <!-- Create Campaign Modal -->
     <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
       <div class="modal">
-        <h2>{{ $t('campaigns.create_title') || 'Create New Campaign' }}</h2>
+        <h2>{{ editingCampaign ? 'Edit Campaign' : ($t('campaigns.create_title') || 'Create New Campaign') }}</h2>
         
         <form @submit.prevent="submitCampaign">
           <div class="form-group">
@@ -71,7 +72,7 @@
             <input type="text" v-model="formData.name" placeholder="e.g. Summer Sale Offer" required class="form-input" />
           </div>
 
-          <div class="form-group">
+          <div class="form-group" v-if="!editingCampaign">
             <label>{{ $t('campaigns.upload_csv') || 'Upload Contacts (Excel / CSV)' }}</label>
             <input type="file" @change="handleFileChange" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" required class="form-input" />
             <small class="hint">{{ $t('campaigns.csv_help') || 'The system will automatically find the column containing phone numbers.' }}</small>
@@ -134,9 +135,9 @@
 
 
           <div class="modal-actions">
-            <button type="button" @click="showCreateModal = false" class="btn-secondary">{{ $t('campaigns.cancel') || 'Cancel' }}</button>
+            <button type="button" @click="closeCreateModal" class="btn-secondary">{{ $t('campaigns.cancel') || 'Cancel' }}</button>
             <button type="submit" class="btn-primary" :disabled="saving">
-              {{ saving ? ($t('campaigns.creating') || 'Creating...') : ($t('campaigns.create') || 'Create Campaign') }}
+              {{ saving ? '...' : (editingCampaign ? 'Save Changes' : ($t('campaigns.create') || 'Create Campaign')) }}
             </button>
           </div>
         </form>
@@ -300,6 +301,7 @@ const targets = ref([])
 const targetsLoading = ref(false)
 const selectedCampaignId = ref(null)
 const selectedCampaign = computed(() => campaigns.value.find(c => c.id === selectedCampaignId.value))
+const editingCampaign = ref(null)
 
 const formData = ref({
   name: '',
@@ -384,7 +386,7 @@ const handleImageChange = (e) => {
 }
 
 const submitCampaign = async () => {
-  if (!selectedFile.value) return alert('Please upload an Excel/CSV file')
+  if (!editingCampaign.value && !selectedFile.value) return alert('Please upload an Excel/CSV file')
   
   saving.value = true
   error.value = ''
@@ -412,21 +414,30 @@ const submitCampaign = async () => {
       form.append('buttons', JSON.stringify(validButtons))
     }
     
-    form.append('file', selectedFile.value)
+    if (!editingCampaign.value) {
+      form.append('file', selectedFile.value)
+    }
     if (selectedImage.value) form.append('image', selectedImage.value)
 
-    const res = await axios.post('/api/v1/campaigns', form, {
-      headers: { 
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    let res;
+    if (editingCampaign.value) {
+      res = await axios.put(`/api/v1/campaigns/${editingCampaign.value.id}`, form, {
+        headers: { 
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+    } else {
+      res = await axios.post('/api/v1/campaigns', form, {
+        headers: { 
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+    }
     
-    success.value = res.data.message || 'Campaign Created!'
-    showCreateModal.value = false
-    selectedFile.value = null
-    selectedImage.value = null
-    formData.value = { name: '', type: 'text', message: '', templateId: '', buttons: [{ text: '', type: 'reply', url: '' }] }
+    success.value = res.data.message || (editingCampaign.value ? 'Campaign Updated!' : 'Campaign Created!')
+    closeCreateModal()
     
     fetchCampaigns()
     setTimeout(() => { success.value = '' }, 5000)
@@ -435,6 +446,35 @@ const submitCampaign = async () => {
   } finally {
     saving.value = false
   }
+}
+
+const closeCreateModal = () => {
+  showCreateModal.value = false
+  editingCampaign.value = null
+  selectedFile.value = null
+  selectedImage.value = null
+  formData.value = { name: '', type: 'text', message: '', templateId: '', buttons: [{ text: '', type: 'reply', url: '' }] }
+}
+
+const editCampaign = (campaign) => {
+  editingCampaign.value = campaign
+  formData.value.name = campaign.name
+  
+  if (campaign.interactiveType === 'TEXT' && campaign.templateId) {
+    formData.value.type = 'template'
+    formData.value.templateId = campaign.templateId
+  } else if (campaign.interactiveType === 'BUTTONS') {
+    formData.value.type = 'buttons'
+    formData.value.message = campaign.message
+    try {
+      formData.value.buttons = JSON.parse(campaign.buttons)
+    } catch(e) {}
+  } else {
+    formData.value.type = 'text'
+    formData.value.message = campaign.message
+  }
+  
+  showCreateModal.value = true
 }
 
 const startCampaign = async (id) => {

@@ -120,6 +120,8 @@ model MessageTemplate {
   tenantId  String   @map("tenant_id")
   name      String
   content   String   @db.Text
+  mediaPath String?  @map("media_path")
+  mediaMime String?  @map("media_mime")
   createdAt DateTime @default(now()) @map("created_at")
 
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)

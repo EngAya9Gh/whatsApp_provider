@@ -33,6 +33,9 @@
           <button @click="copyId(template.id)" class="copy-btn" :title="$t('templates.id_copy') || 'Copy ID'">📋</button>
         </div>
         <div class="template-content">
+          <div v-if="template.mediaPath" class="template-media">
+            <img :src="'/api/' + template.mediaPath" alt="Template Media" style="max-width: 100%; max-height: 150px; border-radius: 8px; margin-bottom: 0.5rem;" />
+          </div>
           <p>{{ template.content }}</p>
         </div>
         <div class="card-footer">
@@ -60,6 +63,12 @@
             <label>{{ $t('templates.content') || 'Message Content' }}</label>
             <textarea v-model="formData.content" rows="6" :placeholder="$t('templates.placeholder') || 'Hello {{name}}, your order {{order_id}} is ready!'" required class="form-input"></textarea>
             <small class="hint" v-html="$t('templates.hint') || 'Use double curly braces for variables, e.g., <code>{{variable_name}}</code>.'"></small>
+          </div>
+
+          <div class="form-group">
+            <label>{{ $t('templates.image') || 'Optional Image' }}</label>
+            <input type="file" @change="handleFileUpload" accept="image/*" class="form-input" />
+            <small v-if="editingTemplate?.mediaPath" style="display:block; margin-top:5px; color:#64748B;">Current image will be kept if no new image is selected.</small>
           </div>
 
           <div class="modal-actions">
@@ -90,8 +99,13 @@ const editingTemplate = ref(null)
 
 const formData = ref({
   name: '',
-  content: ''
+  content: '',
+  file: null
 })
+
+const handleFileUpload = (e) => {
+  formData.value.file = e.target.files[0]
+}
 
 const fetchTemplates = async () => {
   loading.value = true
@@ -114,14 +128,28 @@ const saveTemplate = async () => {
   
   try {
     const token = localStorage.getItem('token')
+    
+    const payload = new FormData()
+    payload.append('name', formData.value.name)
+    payload.append('content', formData.value.content)
+    if (formData.value.file) {
+      payload.append('media', formData.value.file)
+    }
+
     if (editingTemplate.value) {
-      await axios.put(`/api/v1/templates/${editingTemplate.value.id}`, formData.value, {
-        headers: { Authorization: `Bearer ${token}` }
+      await axios.put(`/api/v1/templates/${editingTemplate.value.id}`, payload, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       })
       success.value = 'Template updated successfully!'
     } else {
-      await axios.post('/api/v1/templates', formData.value, {
-        headers: { Authorization: `Bearer ${token}` }
+      await axios.post('/api/v1/templates', payload, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       })
       success.value = 'Template created successfully!'
     }
@@ -139,7 +167,7 @@ const saveTemplate = async () => {
 
 const editTemplate = (template) => {
   editingTemplate.value = template
-  formData.value = { name: template.name, content: template.content }
+  formData.value = { name: template.name, content: template.content, file: null }
   showCreateModal.value = true
 }
 
@@ -160,7 +188,7 @@ const deleteTemplate = async (id) => {
 const closeModal = () => {
   showCreateModal.value = false
   editingTemplate.value = null
-  formData.value = { name: '', content: '' }
+  formData.value = { name: '', content: '', file: null }
 }
 
 const copyId = (id) => {

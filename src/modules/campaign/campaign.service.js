@@ -88,6 +88,44 @@ class CampaignService {
     };
   }
 
+  async updateCampaign({ tenantId, id, name, message, templateId, image, buttons, interactiveType }) {
+    const campaign = await prisma.campaign.findUnique({
+      where: { id, tenantId }
+    });
+
+    if (!campaign) {
+      throw { status: 404, message: 'Campaign not found' };
+    }
+
+    if (campaign.status !== 'PENDING') {
+      throw { status: 400, message: 'Can only edit campaigns that are in PENDING status' };
+    }
+
+    const data = {
+      name,
+      message: message || null,
+      templateId: templateId || null,
+      buttons: buttons ? JSON.stringify(buttons) : null,
+      interactiveType: interactiveType || 'TEXT'
+    };
+
+    if (image) {
+      data.mediaPath = image.path;
+      data.mediaMime = image.mimetype;
+    }
+
+    const updated = await prisma.campaign.update({
+      where: { id },
+      data
+    });
+
+    return {
+      success: true,
+      data: updated,
+      message: 'Campaign updated successfully.'
+    };
+  }
+
   async startCampaign(tenantId, campaignId) {
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId, tenantId },
@@ -102,24 +140,29 @@ class CampaignService {
     }
 
     // Add Jobs to BullMQ
-    const jobs = campaign.targets.map(target => ({
-      name: 'send-campaign-msg',
-      data: {
-        tenantId,
-        phone: target.phone,
-        message: campaign.message,
-        templateId: campaign.templateId,
-        mediaPath: campaign.mediaPath,
-        mediaMime: campaign.mediaMime,
-        buttons: campaign.buttons,
-        interactiveType: campaign.interactiveType || 'TEXT',
-        targetId: target.id
-      },
-      opts: {
-        removeOnComplete: true,
-        removeOnFail: false
-      }
-    }));
+    const jobs = campaign.targets.map((target, index) => {
+      // Add a randomized delay between 5s and 15s for each message to avoid WhatsApp rate limiting
+      const randomDelay = Math.floor(Math.random() * (15000 - 5000 + 1) + 5000);
+      return {
+        name: 'send-campaign-message',
+        data: {
+          tenantId,
+          phone: target.phone,
+          message: campaign.message,
+          templateId: campaign.templateId,
+          mediaPath: campaign.mediaPath,
+          mediaMime: campaign.mediaMime,
+          buttons: campaign.buttons,
+          interactiveType: campaign.interactiveType || 'TEXT',
+          targetId: target.id
+        },
+        opts: {
+          removeOnComplete: true,
+          removeOnFail: false,
+          delay: index * randomDelay
+        }
+      };
+    });
     
     if (jobs.length > 0) {
       await campaignQueue.addBulk(jobs);

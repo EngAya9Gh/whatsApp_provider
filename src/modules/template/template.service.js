@@ -10,16 +10,20 @@ class TemplateService {
     });
   }
 
-  async createTemplate(tenantId, name, content) {
+  async createTemplate(tenantId, name, content, mediaPath, mediaMime) {
     return await prisma.messageTemplate.create({
-      data: { tenantId, name, content }
+      data: { tenantId, name, content, mediaPath, mediaMime }
     });
   }
 
-  async updateTemplate(tenantId, id, name, content) {
+  async updateTemplate(tenantId, id, name, content, mediaPath, mediaMime) {
+    const data = { name, content };
+    if (mediaPath !== undefined) data.mediaPath = mediaPath;
+    if (mediaMime !== undefined) data.mediaMime = mediaMime;
+
     return await prisma.messageTemplate.update({
       where: { id, tenantId }, // tenantId ensures they own it
-      data: { name, content }
+      data
     });
   }
 

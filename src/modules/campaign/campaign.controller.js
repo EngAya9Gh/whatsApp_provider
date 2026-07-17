@@ -42,6 +42,45 @@ exports.createCampaign = async (req, res, next) => {
     next(error);
   }
 };
+exports.updateCampaign = async (req, res, next) => {
+  try {
+    const tenantId = req.tenant.id;
+    const { id } = req.params;
+    const { name, message, templateId, interactiveType } = req.body;
+    const image = req.files?.image?.[0];
+
+    // Parse buttons from JSON string if provided
+    let buttons;
+    if (req.body.buttons) {
+      try {
+        buttons = typeof req.body.buttons === 'string'
+          ? JSON.parse(req.body.buttons)
+          : req.body.buttons;
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid buttons format. Must be a valid JSON array.' });
+      }
+    }
+
+    if (!name || (!message && !templateId)) {
+      return res.status(400).json({ error: 'Campaign name and either message or template are required' });
+    }
+
+    const result = await campaignService.updateCampaign({
+      tenantId,
+      id,
+      name,
+      message,
+      templateId,
+      image,
+      buttons,
+      interactiveType: interactiveType || 'TEXT'
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
 
 exports.startCampaign = async (req, res, next) => {
   try {

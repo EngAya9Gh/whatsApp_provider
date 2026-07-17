@@ -35,6 +35,7 @@ const upload = multer({ storage: storage, limits: { fileSize: 10 * 1024 * 1024 }
 router.use(authMiddleware);
 
 router.post('/', upload.fields([{ name: 'file', maxCount: 1 }, { name: 'image', maxCount: 1 }]), campaignController.createCampaign);
+router.put('/:id', upload.fields([{ name: 'image', maxCount: 1 }]), campaignController.updateCampaign);
 router.post('/:id/start', campaignController.startCampaign);
 router.post('/:id/retry', campaignController.retryFailed);
 router.get('/:id/targets', campaignController.getTargets);
