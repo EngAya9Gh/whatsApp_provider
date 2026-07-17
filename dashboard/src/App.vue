@@ -27,6 +27,10 @@
           <span class="nav-icon">📋</span>
           <span class="nav-label">{{ $t('sidebar.templates') }}</span>
         </router-link>
+        <router-link to="/chatbot" class="nav-item" active-class="active">
+          <span class="nav-icon">🤖</span>
+          <span class="nav-label">Auto Responder</span>
+        </router-link>
         <router-link to="/keys" class="nav-item" active-class="active">
           <span class="nav-icon">🔑</span>
           <span class="nav-label">{{ $t('sidebar.api_keys') }}</span>

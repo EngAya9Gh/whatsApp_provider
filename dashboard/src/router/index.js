@@ -7,6 +7,7 @@ import ApiKeys from '../views/ApiKeys.vue'
 import Logs from '../views/Logs.vue'
 import Billing from '../views/Billing.vue'
 import Settings from '../views/Settings.vue'
+import Chatbot from '../views/Chatbot.vue'
 
 import Landing from '../views/Landing.vue'
 import InvoiceView from '../views/InvoiceView.vue'
@@ -23,6 +24,7 @@ const routes = [
   { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/connect', component: Connect, meta: { requiresAuth: true } },
   { path: '/send-message', component: MessageSend, meta: { requiresAuth: true } },
+  { path: '/chatbot', component: Chatbot, meta: { requiresAuth: true } },
   { path: '/templates', component: Templates, meta: { requiresAuth: true } },
   { path: '/campaigns', component: Campaigns, meta: { requiresAuth: true } },
   { path: '/keys', component: ApiKeys, meta: { requiresAuth: true } },

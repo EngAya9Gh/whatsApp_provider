@@ -128,6 +128,65 @@ class SessionManager {
             logger.error(`[List Reply] Error saving interaction: ${err.message}`);
           }
         }
+        
+        // Auto Responder (Chatbot) Logic
+        try {
+          const incomingText = msg.message?.conversation || 
+                               msg.message?.extendedTextMessage?.text || 
+                               btnReply?.selectedDisplayText || 
+                               listReply?.title || '';
+
+          if (incomingText) {
+            const rules = await prisma.autoResponder.findMany({
+              where: { tenantId, isActive: true }
+            });
+
+            for (const rule of rules) {
+              const textLower = incomingText.trim().toLowerCase();
+              const keywordLower = rule.keyword.trim().toLowerCase();
+              let isMatch = false;
+
+              if (rule.matchType === 'EXACT' && textLower === keywordLower) {
+                isMatch = true;
+              } else if (rule.matchType === 'CONTAINS' && textLower.includes(keywordLower)) {
+                isMatch = true;
+              }
+
+              if (isMatch) {
+                logger.info(`[AutoResponder] Matched rule ${rule.id} for ${senderPhone}`);
+                
+                const payload = {};
+                if (rule.responseType === 'TEXT') {
+                  payload.text = rule.message || '';
+                } else if (rule.responseType === 'IMAGE' || rule.responseType === 'PDF') {
+                  const type = rule.responseType === 'IMAGE' ? 'image' : 'document';
+                  const fs = require('fs');
+                  if (rule.mediaPath && fs.existsSync(rule.mediaPath)) {
+                    payload[type] = { url: rule.mediaPath };
+                    if (rule.message) payload.caption = rule.message;
+                    if (type === 'document') payload.mimetype = rule.mediaMime || 'application/pdf';
+                  } else {
+                    payload.text = rule.message || 'Media file is missing';
+                  }
+                } else if (rule.responseType === 'LOCATION') {
+                  payload.location = {
+                    degreesLatitude: rule.lat || 0,
+                    degreesLongitude: rule.lng || 0,
+                    name: rule.locationName || '',
+                    address: rule.locationAddress || ''
+                  };
+                }
+                
+                if (Object.keys(payload).length > 0) {
+                  await sock.sendMessage(msg.key.remoteJid, payload);
+                }
+                break; // Stop after first match
+              }
+            }
+          }
+        } catch (err) {
+          logger.error(`[AutoResponder] Error: ${err.message}`);
+        }
       }
     });
 

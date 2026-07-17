@@ -40,6 +40,7 @@ model Tenant {
   messageTemplates MessageTemplate[]
   campaigns        Campaign[]
   invoices         Invoice[]
+  autoResponders   AutoResponder[]
 
   @@map("tenants")
 }
@@ -182,12 +183,38 @@ model Invoice {
   amount       String
   description  String   @db.Text
   billingCycle String   @default("Monthly") @map("billing_cycle")
-  status       String   @default("PENDING") // PENDING, PAID
+  status       String   @default("UNPAID") // UNPAID, PAID, CANCELLED
+  dueDate      DateTime @default(now()) @map("due_date")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("invoices")
+}
+
+model AutoResponder {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  keyword      String   @db.Text
+  matchType    String   @default("EXACT") @map("match_type") // EXACT, CONTAINS
+  responseType String   @default("TEXT") @map("response_type") // TEXT, IMAGE, PDF, LOCATION
+  message      String?  @db.Text
+  mediaPath    String?  @db.Text @map("media_path")
+  mediaMime    String?  @map("media_mime")
+  
+  // Location fields
+  lat              Float?
+  lng              Float?
+  locationName     String?  @map("location_name")
+  locationAddress  String?  @map("location_address")
+  
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("auto_responders")
 }
 
 model PlanSetting {
