@@ -47,6 +47,10 @@
         <h2>{{ editingTemplate ? ($t('templates.edit_title') || 'Edit Template') : ($t('templates.create_title') || 'Create Template') }}</h2>
         
         <form @submit.prevent="saveTemplate">
+          <!-- Error/Success inside modal -->
+          <div v-if="error" class="error-msg" style="margin-bottom: 1rem;">{{ error }}</div>
+          <div v-if="success" class="success-msg" style="margin-bottom: 1rem;">{{ success }}</div>
+
           <div class="form-group">
             <label>{{ $t('templates.name') || 'Template Name' }}</label>
             <input type="text" v-model="formData.name" placeholder="e.g. Welcome Message" required class="form-input" />
