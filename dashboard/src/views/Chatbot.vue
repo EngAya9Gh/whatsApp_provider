@@ -118,6 +118,17 @@
             </div>
           </div>
 
+          <div class="form-group" style="display:flex; gap: 1rem;">
+            <div style="flex:1;">
+              <label>Start Date (تاريخ التفعيل) - Optional</label>
+              <input type="datetime-local" v-model="form.startDate" class="form-input" />
+            </div>
+            <div style="flex:1;">
+              <label>End Date (تاريخ الانتهاء) - Optional</label>
+              <input type="datetime-local" v-model="form.endDate" class="form-input" />
+            </div>
+          </div>
+
           <div class="modal-footer">
             <button type="button" @click="closeModal" class="btn-secondary">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="submitting">
@@ -149,7 +160,9 @@ const form = ref({
   lat: '',
   lng: '',
   locationName: '',
-  locationAddress: ''
+  locationAddress: '',
+  startDate: '',
+  endDate: ''
 })
 const selectedFile = ref(null)
 
@@ -174,7 +187,7 @@ const handleFileUpload = (e) => {
 
 const closeModal = () => {
   showModal.value = false
-  form.value = { keyword: '', matchType: 'EXACT', responseType: 'TEXT', message: '', lat: '', lng: '', locationName: '', locationAddress: '' }
+  form.value = { keyword: '', matchType: 'EXACT', responseType: 'TEXT', message: '', lat: '', lng: '', locationName: '', locationAddress: '', startDate: '', endDate: '' }
   selectedFile.value = null
   error.value = ''
 }
@@ -198,6 +211,9 @@ const submitRule = async () => {
       formData.append('locationName', form.value.locationName)
       formData.append('locationAddress', form.value.locationAddress)
     }
+    
+    if (form.value.startDate) formData.append('startDate', form.value.startDate)
+    if (form.value.endDate) formData.append('endDate', form.value.endDate)
     
     if (selectedFile.value) {
       formData.append('media', selectedFile.value)

@@ -17,7 +17,7 @@ class ChatbotController {
   async createRule(req, res, next) {
     try {
       const tenantId = req.tenant.id;
-      const { keyword, matchType, responseType, message, lat, lng, locationName, locationAddress } = req.body;
+      const { keyword, matchType, responseType, message, lat, lng, locationName, locationAddress, startDate, endDate } = req.body;
       
       let mediaPath = null;
       let mediaMime = null;
@@ -38,7 +38,9 @@ class ChatbotController {
         lat: lat ? parseFloat(lat) : null,
         lng: lng ? parseFloat(lng) : null,
         locationName: locationName || null,
-        locationAddress: locationAddress || null
+        locationAddress: locationAddress || null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null
       });
 
       res.status(201).json({ success: true, data: newRule });
@@ -54,9 +56,13 @@ class ChatbotController {
     try {
       const tenantId = req.tenant.id;
       const { id } = req.params;
-      const { keyword, matchType, responseType, message, isActive, lat, lng, locationName, locationAddress } = req.body;
+      const { keyword, matchType, responseType, message, isActive, lat, lng, locationName, locationAddress, startDate, endDate } = req.body;
       
       const updateData = { keyword, matchType, responseType, message };
+      
+      // Update dates, handling explicit empty strings to unset them
+      updateData.startDate = startDate ? new Date(startDate) : null;
+      updateData.endDate = endDate ? new Date(endDate) : null;
       
       if (responseType === 'LOCATION') {
         updateData.lat = lat ? parseFloat(lat) : null;

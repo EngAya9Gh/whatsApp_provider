@@ -146,6 +146,15 @@ class SessionManager {
               const keywordLower = rule.keyword.trim().toLowerCase();
               let isMatch = false;
 
+              // Validate expiration dates
+              const now = new Date();
+              if (rule.startDate && now < new Date(rule.startDate)) {
+                continue; // Not started yet
+              }
+              if (rule.endDate && now > new Date(rule.endDate)) {
+                continue; // Expired
+              }
+
               if (rule.matchType === 'EXACT' && textLower === keywordLower) {
                 isMatch = true;
               } else if (rule.matchType === 'CONTAINS' && textLower.includes(keywordLower)) {
