@@ -102,24 +102,11 @@ class WhatsAppService {
       await new Promise(resolve => setTimeout(resolve, 1200));
       await sock.sendPresenceUpdate('paused', formattedPhone);
 
-      const interactiveButtons = buttons.map((btn, i) => {
-        if (btn.type === 'url') {
-          return {
-            name: "cta_url",
-            buttonParamsJson: JSON.stringify({
-              display_text: btn.text,
-              url: btn.url,
-              merchant_url: btn.url
-            })
-          };
+      const templateButtons = buttons.map((btn, i) => {
+        if (btn.type === 'url' || btn.url) {
+          return { index: i + 1, urlButton: { displayText: btn.text, url: btn.url } };
         }
-        return {
-          name: "quick_reply",
-          buttonParamsJson: JSON.stringify({
-            display_text: btn.text,
-            id: btn.id || `btn_${i}`
-          })
-        };
+        return { index: i + 1, quickReplyButton: { displayText: btn.text, id: btn.id || `btn_${i}` } };
       });
 
       let imageMessage;
@@ -128,23 +115,23 @@ class WhatsAppService {
         imageMessage = media.imageMessage;
       }
 
+      const templateMessage = {
+        hydratedTemplate: {
+          hydratedContentText: text || ' ',
+          hydratedFooterText: ' ',
+          hydratedButtons: templateButtons
+        }
+      };
+      
+      if (imageMessage) {
+        templateMessage.hydratedTemplate.imageMessage = imageMessage;
+      }
+
       const messageContent = {
         viewOnceMessage: {
           message: {
             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-            interactiveMessage: proto.Message.InteractiveMessage.create({
-              body: proto.Message.InteractiveMessage.Body.create({ text: text || ' ' }),
-              footer: proto.Message.InteractiveMessage.Footer.create({ text: ' ' }),
-              header: proto.Message.InteractiveMessage.Header.create({ 
-                title: ' ', 
-                subtitle: ' ', 
-                hasMediaAttachment: !!imageBuffer,
-                ...(imageMessage ? { imageMessage } : {})
-              }),
-              nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-                buttons: interactiveButtons
-              })
-            })
+            templateMessage
           }
         }
       };
