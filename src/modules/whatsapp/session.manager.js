@@ -212,11 +212,20 @@ class SessionManager {
           // Logged out
           logger.info(`Tenant ${tenantId} logged out.`);
           this.sessions.delete(tenantId);
-          setTimeout(() => {
-            if (fs.existsSync(sessionPath)) {
-              try { fs.rmSync(sessionPath, { recursive: true, force: true }); } catch (e) {}
+          
+          if (fs.existsSync(sessionPath)) {
+            const trashPath = `${sessionPath}_trash_${Date.now()}`;
+            try {
+              fs.renameSync(sessionPath, trashPath);
+              setTimeout(() => {
+                if (fs.existsSync(trashPath)) {
+                  try { fs.rmSync(trashPath, { recursive: true, force: true }); } catch (e) {}
+                }
+              }, 2000);
+            } catch (err) {
+              logger.error(`Failed to move session to trash: ${err.message}`);
             }
-          }, 1500);
+          }
           await prisma.tenant.update({
             where: { id: tenantId },
             data: { sessionStatus: 'DISCONNECTED', whatsappPhone: null }
@@ -261,14 +270,23 @@ class SessionManager {
     }
     
     const sessionPath = path.join(SESSIONS_DIR, tenantId);
-    // Delay deletion slightly to allow Baileys to finish any background writes
-    setTimeout(() => {
-      if (fs.existsSync(sessionPath)) {
-        try {
-          fs.rmSync(sessionPath, { recursive: true, force: true });
-        } catch (e) {}
+    
+    // To prevent race conditions if the user immediately reconnects,
+    // we rename the folder to a trash folder and delete the trash folder later.
+    if (fs.existsSync(sessionPath)) {
+      const trashPath = `${sessionPath}_trash_manual_${Date.now()}`;
+      try {
+        fs.renameSync(sessionPath, trashPath);
+        setTimeout(() => {
+          if (fs.existsSync(trashPath)) {
+            try { fs.rmSync(trashPath, { recursive: true, force: true }); } catch (e) {}
+          }
+        }, 2000);
+      } catch (err) {
+        // Fallback to direct deletion if rename fails
+        try { fs.rmSync(sessionPath, { recursive: true, force: true }); } catch (e) {}
       }
-    }, 1500);
+    }
 
     await prisma.tenant.update({
       where: { id: tenantId },

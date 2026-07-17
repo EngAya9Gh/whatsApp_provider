@@ -1,7 +1,7 @@
 const sessionManager = require('./session.manager');
 const logger = require('../../utils/logger');
 const { PrismaClient } = require('@prisma/client');
-const { generateWAMessageFromContent, proto } = require('@whiskeysockets/baileys');
+const { generateWAMessageFromContent, proto, prepareWAMessageMedia } = require('@whiskeysockets/baileys');
 
 const prisma = new PrismaClient();
 
@@ -122,6 +122,12 @@ class WhatsAppService {
         };
       });
 
+      let imageMessage;
+      if (imageBuffer) {
+        const media = await prepareWAMessageMedia({ image: imageBuffer }, { upload: sock.waUploadToServer });
+        imageMessage = media.imageMessage;
+      }
+
       const messageContent = {
         viewOnceMessage: {
           message: {
@@ -129,7 +135,12 @@ class WhatsAppService {
             interactiveMessage: proto.Message.InteractiveMessage.create({
               body: proto.Message.InteractiveMessage.Body.create({ text: text || ' ' }),
               footer: proto.Message.InteractiveMessage.Footer.create({ text: ' ' }),
-              header: proto.Message.InteractiveMessage.Header.create({ title: ' ', subtitle: ' ', hasMediaAttachment: !!imageBuffer }),
+              header: proto.Message.InteractiveMessage.Header.create({ 
+                title: ' ', 
+                subtitle: ' ', 
+                hasMediaAttachment: !!imageBuffer,
+                ...(imageMessage ? { imageMessage } : {})
+              }),
               nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
                 buttons: interactiveButtons
               })
@@ -137,16 +148,6 @@ class WhatsAppService {
           }
         }
       };
-
-      if (imageBuffer) {
-        // Since uploading inside interactiveMessage without upload function is complex,
-        // we'll fallback to a normal message if we can't do it easily,
-        // but for now, we just skip media in interactive native flow unless pre-uploaded.
-        // As a workaround, we send media first, then buttons.
-        await sock.sendMessage(formattedPhone, { image: imageBuffer, caption: text });
-        messageContent.viewOnceMessage.message.interactiveMessage.body.text = "Please choose an option:";
-        messageContent.viewOnceMessage.message.interactiveMessage.header.hasMediaAttachment = false;
-      }
 
       const waMsg = generateWAMessageFromContent(formattedPhone, messageContent, { userJid: sock.user.id });
       const result = await sock.relayMessage(formattedPhone, waMsg.message, { messageId: waMsg.key.id });
