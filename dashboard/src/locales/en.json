@@ -75,7 +75,7 @@
     "delete": "Delete",
     "no_templates": "No templates found. Create your first template to get started!",
     "id_copy": "Copy ID",
-    "hint": "Use double curly braces for variables, e.g., {{variable_name}}."
+    "hint": "Use double curly braces for variables, e.g., &#123;&#123;variable_name&#125;&#125;."
   },
   "send_message": {
     "title": "Send Message",
