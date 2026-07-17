@@ -128,12 +128,7 @@ class WhatsAppService {
       }
 
       const messageContent = {
-        viewOnceMessage: {
-          message: {
-            messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
-            templateMessage
-          }
-        }
+        templateMessage
       };
 
       const waMsg = generateWAMessageFromContent(formattedPhone, messageContent, { userJid: sock.user.id });
