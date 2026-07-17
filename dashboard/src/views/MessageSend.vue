@@ -165,12 +165,6 @@
           <div v-if="error" class="error-msg">{{ error }}</div>
           <div v-if="success" class="success-msg">{{ success }}</div>
 
-          <div class="form-group">
-            <label>{{ $t('send_message.api_key') || 'Your API Key' }}</label>
-            <input type="password" v-model="apiKey" placeholder="sk_..." required class="form-input api-key-input" />
-            <small class="hint">{{ $t('send_message.api_hint') || 'Paste an active API key to authorize the request.' }}</small>
-          </div>
-
           <button type="submit" class="btn-submit" :disabled="loading">
             <span v-if="loading" class="spinner"></span>
             {{ loading ? ($t('send_message.sending') || 'Sending...') : ($t('send_message.send') || 'Send Message') }}
@@ -215,7 +209,6 @@ const phone = ref('')
 const textContent = ref('')
 const selectedFile = ref(null)
 const caption = ref('')
-const apiKey = ref('')
 
 // Interactive message refs
 const buttonsList = ref([{ text: '', type: 'reply', url: '' }])
@@ -292,8 +285,9 @@ const extractVariables = () => {
 }
 
 const handleSend = async () => {
-  if (!apiKey.value.startsWith('sk_')) {
-    error.value = 'Please enter a valid API Key starting with sk_'
+  const tokenToUse = localStorage.getItem('token')
+  if (!tokenToUse) {
+    error.value = 'No authentication token found. Please login again.'
     return
   }
 
@@ -308,7 +302,7 @@ const handleSend = async () => {
         phone: phone.value,
         message: textContent.value
       }, {
-        headers: { Authorization: `Bearer ${apiKey.value}` }
+        headers: { Authorization: `Bearer ${tokenToUse}` }
       })
     } else if (messageType.value === 'buttons') {
       const validButtons = buttonsList.value.filter(b => b.text.trim())
@@ -323,7 +317,7 @@ const handleSend = async () => {
       }
       
       res = await axios.post('/api/v1/message/send-buttons', formData, {
-        headers: { Authorization: `Bearer ${apiKey.value}`, 'Content-Type': 'multipart/form-data' }
+        headers: { Authorization: `Bearer ${tokenToUse}`, 'Content-Type': 'multipart/form-data' }
       })
     } else if (messageType.value === 'list') {
       res = await axios.post('/api/v1/message/send-list', {
@@ -333,7 +327,7 @@ const handleSend = async () => {
         buttonText: listButtonText.value,
         sections: listSections.value
       }, {
-        headers: { Authorization: `Bearer ${apiKey.value}` }
+        headers: { Authorization: `Bearer ${tokenToUse}` }
       })
     } else if (messageType.value === 'location') {
       res = await axios.post('/api/v1/message/send-location', {
@@ -343,7 +337,7 @@ const handleSend = async () => {
         name: locationName.value,
         address: locationAddress.value
       }, {
-        headers: { Authorization: `Bearer ${apiKey.value}` }
+        headers: { Authorization: `Bearer ${tokenToUse}` }
       })
     } else if (messageType.value === 'template') {
       if (!selectedTemplateId.value) throw new Error('Please select a template');
@@ -352,7 +346,7 @@ const handleSend = async () => {
         templateId: selectedTemplateId.value,
         variables: variableValues.value
       }, {
-        headers: { Authorization: `Bearer ${apiKey.value}` }
+        headers: { Authorization: `Bearer ${tokenToUse}` }
       })
     } else {
       if (!selectedFile.value) {
@@ -367,7 +361,7 @@ const handleSend = async () => {
 
       res = await axios.post('/api/v1/message/upload-media', formData, {
         headers: { 
-          Authorization: `Bearer ${apiKey.value}`,
+          Authorization: `Bearer ${tokenToUse}`,
           'Content-Type': 'multipart/form-data'
         }
       })

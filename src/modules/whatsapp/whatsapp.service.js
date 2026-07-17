@@ -128,8 +128,8 @@ class WhatsAppService {
             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
             interactiveMessage: proto.Message.InteractiveMessage.create({
               body: proto.Message.InteractiveMessage.Body.create({ text: text || ' ' }),
-              footer: proto.Message.InteractiveMessage.Footer.create({ text: '' }),
-              header: proto.Message.InteractiveMessage.Header.create({ title: '', hasMediaAttachment: !!imageBuffer }),
+              footer: proto.Message.InteractiveMessage.Footer.create({ text: ' ' }),
+              header: proto.Message.InteractiveMessage.Header.create({ title: ' ', subtitle: ' ', hasMediaAttachment: !!imageBuffer }),
               nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
                 buttons: interactiveButtons
               })
@@ -185,8 +185,8 @@ class WhatsAppService {
             messageContextInfo: { deviceListMetadata: {}, deviceListMetadataVersion: 2 },
             interactiveMessage: proto.Message.InteractiveMessage.create({
               body: proto.Message.InteractiveMessage.Body.create({ text: body || ' ' }),
-              footer: proto.Message.InteractiveMessage.Footer.create({ text: '' }),
-              header: proto.Message.InteractiveMessage.Header.create({ title: title || '', hasMediaAttachment: false }),
+              footer: proto.Message.InteractiveMessage.Footer.create({ text: ' ' }),
+              header: proto.Message.InteractiveMessage.Header.create({ title: title || ' ', subtitle: ' ', hasMediaAttachment: false }),
               nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
                 buttons: [
                   {

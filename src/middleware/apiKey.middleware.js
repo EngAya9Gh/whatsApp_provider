@@ -8,11 +8,33 @@ const prisma = new PrismaClient();
 const apiKeyMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer sk_')) {
-      return res.status(401).json({ error: 'Unauthorized: Invalid API Key format. Use Bearer sk_...' });
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized: No token provided' });
     }
 
-    const rawKey = authHeader.split(' ')[1].replace('sk_', '');
+    const token = authHeader.split(' ')[1];
+
+    if (!token.startsWith('sk_')) {
+      // It might be a dashboard JWT token
+      const jwt = require('jsonwebtoken');
+      const config = require('../config/env');
+      try {
+        const decoded = jwt.verify(token, config.jwt.secret);
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: decoded.tenantId },
+          select: { id: true, name: true, email: true, isActive: true, sessionStatus: true }
+        });
+        if (!tenant || !tenant.isActive) return res.status(401).json({ error: 'Unauthorized' });
+        req.tenantId = tenant.id;
+        req.tenant = tenant;
+        return next();
+      } catch (e) {
+        console.error('JWT fallback verification failed:', e);
+        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+      }
+    }
+
+    const rawKey = token.replace('sk_', '');
     const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
 
     const apiKey = await prisma.apiKey.findFirst({

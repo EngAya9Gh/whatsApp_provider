@@ -9,8 +9,11 @@ axios.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      router.push('/login')
+      const authHeader = error.config?.headers?.Authorization || '';
+      if (!authHeader.startsWith('Bearer sk_')) {
+        localStorage.removeItem('token')
+        router.push('/login')
+      }
     }
     return Promise.reject(error)
   }
