@@ -49,7 +49,7 @@ class CampaignService {
     return Array.from(phones);
   }
 
-  async createCampaign({ tenantId, name, message, templateId, file, image, buttons, interactiveType }) {
+  async createCampaign({ tenantId, name, message, templateId, file, image, buttons, interactiveType, startDate, endDate }) {
     // 1. Parse phones from file
     const phones = await this.parseFile(file);
     if (phones.length === 0) {
@@ -67,6 +67,8 @@ class CampaignService {
         mediaMime: image ? image.mimetype : null,
         buttons: buttons ? JSON.stringify(buttons) : null,
         interactiveType: interactiveType || 'TEXT',
+        startDate: startDate || null,
+        endDate: endDate || null,
         status: 'PENDING'
       }
     });
@@ -88,7 +90,7 @@ class CampaignService {
     };
   }
 
-  async updateCampaign({ tenantId, id, name, message, templateId, image, buttons, interactiveType }) {
+  async updateCampaign({ tenantId, id, name, message, templateId, image, buttons, interactiveType, startDate, endDate }) {
     const campaign = await prisma.campaign.findUnique({
       where: { id, tenantId }
     });
@@ -106,7 +108,9 @@ class CampaignService {
       message: message || null,
       templateId: templateId || null,
       buttons: buttons ? JSON.stringify(buttons) : null,
-      interactiveType: interactiveType || 'TEXT'
+      interactiveType: interactiveType || 'TEXT',
+      startDate: startDate || null,
+      endDate: endDate || null
     };
 
     if (image) {

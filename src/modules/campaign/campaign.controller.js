@@ -3,7 +3,7 @@ const campaignService = require('./campaign.service');
 exports.createCampaign = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
-    const { name, message, templateId, interactiveType } = req.body;
+    const { name, message, templateId, interactiveType, startDate, endDate } = req.body;
     const file = req.files?.file?.[0];
     const image = req.files?.image?.[0];
 
@@ -34,7 +34,9 @@ exports.createCampaign = async (req, res, next) => {
       file,
       image,
       buttons,
-      interactiveType: interactiveType || 'TEXT'
+      interactiveType: interactiveType || 'TEXT',
+      startDate: startDate ? new Date(startDate) : null,
+      endDate: endDate ? new Date(endDate) : null
     });
 
     res.status(201).json(result);
@@ -46,7 +48,7 @@ exports.updateCampaign = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
-    const { name, message, templateId, interactiveType } = req.body;
+    const { name, message, templateId, interactiveType, startDate, endDate } = req.body;
     const image = req.files?.image?.[0];
 
     // Parse buttons from JSON string if provided
@@ -66,14 +68,16 @@ exports.updateCampaign = async (req, res, next) => {
     }
 
     const result = await campaignService.updateCampaign({
-      tenantId,
       id,
+      tenantId,
       name,
       message,
       templateId,
       image,
       buttons,
-      interactiveType: interactiveType || 'TEXT'
+      interactiveType: interactiveType || 'TEXT',
+      startDate: startDate ? new Date(startDate) : null,
+      endDate: endDate ? new Date(endDate) : null
     });
 
     res.status(200).json(result);

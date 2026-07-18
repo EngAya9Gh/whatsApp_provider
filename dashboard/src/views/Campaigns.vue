@@ -128,6 +128,18 @@
             <input type="file" @change="handleImageChange" accept="image/*" class="form-input" />
           </div>
 
+          <div class="form-group" style="display:flex; gap: 1rem;">
+            <div style="flex:1;">
+              <label>Start Date (تاريخ تفعيل التتبع) - Optional</label>
+              <input type="datetime-local" v-model="formData.startDate" class="form-input" />
+            </div>
+            <div style="flex:1;">
+              <label>End Date (تاريخ انتهاء التتبع) - Optional</label>
+              <input type="datetime-local" v-model="formData.endDate" class="form-input" />
+            </div>
+          </div>
+          <small class="hint" style="display:block; margin-bottom:1rem;">If you set these dates, any text replies received from users during this period will be recorded in the Campaign Interactions.</small>
+
           <div class="warning-box">
             <h4>⚠️ Anti-Ban Notice</h4>
             <p>Messages will be sent gradually (1 message every 5 seconds). The campaign will be saved as PENDING, and you can start it manually.</p>
@@ -308,7 +320,9 @@ const formData = ref({
   type: 'text',
   message: '',
   templateId: '',
-  buttons: [{ text: '', type: 'reply', url: '' }]
+  buttons: [{ text: '', type: 'reply', url: '' }],
+  startDate: '',
+  endDate: ''
 })
 
 const hasFailedTargets = computed(() => targets.value.some(t => t.status === 'FAILED'))
@@ -418,6 +432,12 @@ const submitCampaign = async () => {
       form.append('file', selectedFile.value)
     }
     if (selectedImage.value) form.append('image', selectedImage.value)
+    if (formData.value.startDate) {
+      form.append('startDate', new Date(formData.value.startDate).toISOString())
+    }
+    if (formData.value.endDate) {
+      form.append('endDate', new Date(formData.value.endDate).toISOString())
+    }
 
     let res;
     if (editingCampaign.value) {
@@ -453,7 +473,14 @@ const closeCreateModal = () => {
   editingCampaign.value = null
   selectedFile.value = null
   selectedImage.value = null
-  formData.value = { name: '', type: 'text', message: '', templateId: '', buttons: [{ text: '', type: 'reply', url: '' }] }
+  formData.value = { name: '', type: 'text', message: '', templateId: '', buttons: [{ text: '', type: 'reply', url: '' }], startDate: '', endDate: '' }
+}
+
+const toLocalString = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+  return date.toISOString().slice(0,16)
 }
 
 const editCampaign = (campaign) => {
@@ -473,6 +500,9 @@ const editCampaign = (campaign) => {
     formData.value.type = 'text'
     formData.value.message = campaign.message
   }
+  
+  formData.value.startDate = toLocalString(campaign.startDate)
+  formData.value.endDate = toLocalString(campaign.endDate)
   
   showCreateModal.value = true
 }

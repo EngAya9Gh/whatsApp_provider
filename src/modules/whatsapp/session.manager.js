@@ -137,6 +137,63 @@ class SessionManager {
                                listReply?.title || '';
 
           if (incomingText) {
+            
+            // --- Campaign Text Reply Tracking ---
+            try {
+              // Find the most recent SENT campaign target for this phone
+              const target = await prisma.campaignTarget.findFirst({
+                where: { 
+                  phone: senderPhone, 
+                  status: 'SENT',
+                  campaign: { tenantId } 
+                },
+                include: { campaign: true },
+                orderBy: { campaign: { createdAt: 'desc' } }
+              });
+
+              if (target && target.campaign) {
+                const campaign = target.campaign;
+                const now = new Date();
+                let isActiveCampaign = true;
+
+                if (campaign.startDate && now < new Date(campaign.startDate)) {
+                  isActiveCampaign = false;
+                }
+                if (campaign.endDate && now > new Date(campaign.endDate)) {
+                  isActiveCampaign = false;
+                }
+
+                if (isActiveCampaign) {
+                  // Ensure we don't log the exact same text reply twice for the same campaign to avoid spam
+                  const existingInteraction = await prisma.buttonInteraction.findFirst({
+                    where: {
+                      campaignId: target.campaignId,
+                      phone: senderPhone,
+                      buttonText: incomingText,
+                      interactionType: 'TEXT_REPLY'
+                    }
+                  });
+
+                  if (!existingInteraction) {
+                    await prisma.buttonInteraction.create({
+                      data: {
+                        campaignId: target.campaignId,
+                        campaignTargetId: target.id,
+                        tenantId,
+                        phone: senderPhone,
+                        buttonId: 'TEXT',
+                        buttonText: incomingText,
+                        interactionType: 'TEXT_REPLY'
+                      }
+                    });
+                  }
+                }
+              }
+            } catch (trackErr) {
+              logger.error(`[Text Reply Tracking] Error: ${trackErr.message}`);
+            }
+            // --- End Campaign Text Reply Tracking ---
+
             const rules = await prisma.autoResponder.findMany({
               where: { tenantId, isActive: true }
             });
