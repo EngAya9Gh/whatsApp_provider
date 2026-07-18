@@ -19,7 +19,8 @@ const campaignQueue = new Queue('campaign-queue', { connection });
 
 // Initialize Worker
 const campaignWorker = new Worker('campaign-queue', async (job) => {
-  const { tenantId, phone, message, templateId, mediaPath, mediaMime, buttons, interactiveType, targetId } = job.data;
+  const { tenantId, phone, message, templateId, buttons, interactiveType, targetId } = job.data;
+  let { mediaPath, mediaMime } = job.data;
   
   try {
     let finalMessage = message;
@@ -29,7 +30,15 @@ const campaignWorker = new Worker('campaign-queue', async (job) => {
       const template = await prisma.messageTemplate.findUnique({
         where: { id: templateId, tenantId }
       });
-      if (template) finalMessage = template.content;
+      if (template) {
+        finalMessage = template.content;
+        if (!mediaPath && template.mediaPath) {
+          job.data.mediaPath = template.mediaPath;
+          job.data.mediaMime = template.mediaMime;
+          mediaPath = template.mediaPath;
+          mediaMime = template.mediaMime;
+        }
+      }
     }
 
     // 2. Send based on interactiveType

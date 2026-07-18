@@ -53,7 +53,13 @@ class TemplateService {
     }
 
     // Call message service to actually send it (handles billing & logs)
-    return await messageService.sendCustomMessage(tenantId, phone, finalMessage);
+    if (template.mediaPath) {
+      let type = 'image';
+      if (template.mediaMime && template.mediaMime.includes('pdf')) type = 'pdf';
+      return await messageService.sendMediaMessage(tenantId, phone, type, template.mediaPath, finalMessage, template.mediaMime, 'template-media');
+    } else {
+      return await messageService.sendCustomMessage(tenantId, phone, finalMessage);
+    }
   }
 }
 
