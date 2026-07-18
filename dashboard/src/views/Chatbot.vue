@@ -251,8 +251,12 @@ const submitRule = async () => {
       formData.append('locationAddress', form.value.locationAddress)
     }
     
-    if (form.value.startDate) formData.append('startDate', form.value.startDate)
-    if (form.value.endDate) formData.append('endDate', form.value.endDate)
+    if (form.value.startDate) {
+      formData.append('startDate', new Date(form.value.startDate).toISOString())
+    }
+    if (form.value.endDate) {
+      formData.append('endDate', new Date(form.value.endDate).toISOString())
+    }
     
     if (selectedFile.value) {
       formData.append('media', selectedFile.value)
