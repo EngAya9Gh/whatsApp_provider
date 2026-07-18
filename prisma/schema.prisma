@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -20,71 +17,186 @@ model Admin {
 }
 
 model Tenant {
-  id             String         @id @default(uuid())
-  name           String
-  email          String         @unique
-  passwordHash   String         @map("password_hash")
-  companyName    String?        @map("company_name")
-  plan           Plan           @default(FREE)
-  isActive       Boolean        @default(true) @map("is_active")
-  whatsappPhone  String?        @map("whatsapp_phone")
-  sessionStatus  SessionStatus  @default(DISCONNECTED) @map("session_status")
-  webhookUrl     String?        @db.Text @map("webhook_url")
-  monthlyLimit   Int            @default(20) @map("monthly_limit")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-
+  id               String            @id @default(uuid())
+  name             String
+  email            String            @unique
+  passwordHash     String            @map("password_hash")
+  companyName      String?           @map("company_name")
+  plan             Plan              @default(FREE)
+  isActive         Boolean           @default(true) @map("is_active")
+  whatsappPhone    String?           @map("whatsapp_phone")
+  sessionStatus    SessionStatus     @default(DISCONNECTED) @map("session_status")
+  webhookUrl       String?           @map("webhook_url") @db.Text
+  monthlyLimit     Int               @default(20) @map("monthly_limit")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
   apiKeys          ApiKey[]
-  messageLogs      MessageLog[]
-  usageRecords     UsageRecord[]
-  messageTemplates MessageTemplate[]
+  autoResponders   AutoResponder[]
   campaigns        Campaign[]
   invoices         Invoice[]
-  autoResponders   AutoResponder[]
+  messageLogs      MessageLog[]
+  messageTemplates MessageTemplate[]
+  usageRecords     UsageRecord[]
 
   @@map("tenants")
 }
 
 model ApiKey {
-  id          String    @id @default(uuid())
-  tenantId    String    @map("tenant_id")
-  keyHash     String    @map("key_hash")
-  keyPrefix   String    @map("key_prefix")
-  label       String?
-  isActive    Boolean   @default(true) @map("is_active")
-  lastUsedAt  DateTime? @map("last_used_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id         String    @id @default(uuid())
+  tenantId   String    @map("tenant_id")
+  keyHash    String    @map("key_hash")
+  keyPrefix  String    @map("key_prefix")
+  label      String?
+  isActive   Boolean   @default(true) @map("is_active")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
+  @@index([tenantId], map: "api_keys_tenant_id_fkey")
   @@map("api_keys")
 }
 
 model MessageLog {
-  id           String      @id @default(uuid())
-  tenantId     String      @map("tenant_id")
+  id           String        @id @default(uuid())
+  tenantId     String        @map("tenant_id")
   phone        String
-  messageType  MessageType @default(OTP) @map("message_type")
+  messageType  MessageType   @default(OTP) @map("message_type")
   status       MessageStatus @default(QUEUED)
-  errorMessage String?     @db.Text @map("error_message")
-  createdAt    DateTime    @default(now()) @map("created_at")
+  errorMessage String?       @map("error_message") @db.Text
+  createdAt    DateTime      @default(now()) @map("created_at")
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
+  @@index([tenantId], map: "message_logs_tenant_id_fkey")
   @@map("message_logs")
 }
 
 model UsageRecord {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  month           DateTime @db.Date
-  messagesSent    Int      @default(0) @map("messages_sent")
-  messagesFailed  Int      @default(0) @map("messages_failed")
-
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  month          DateTime @db.Date
+  messagesSent   Int      @default(0) @map("messages_sent")
+  messagesFailed Int      @default(0) @map("messages_failed")
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, month])
   @@map("usage_records")
+}
+
+model MessageTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  mediaMime String?  @map("media_mime")
+  mediaPath String?  @map("media_path")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "message_templates_tenant_id_fkey")
+  @@map("message_templates")
+}
+
+model Campaign {
+  id              String              @id @default(uuid())
+  tenantId        String              @map("tenant_id")
+  name            String
+  message         String?             @db.Text
+  status          String              @default("PENDING")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  mediaMime       String?             @map("media_mime")
+  mediaPath       String?             @map("media_path")
+  templateId      String?             @map("template_id")
+  buttons         String?             @map("buttons") @db.Text
+  interactiveType String?             @map("interactive_type")
+  interactions    ButtonInteraction[]
+  targets         CampaignTarget[]
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "campaigns_tenant_id_fkey")
+  @@map("campaigns")
+}
+
+model CampaignTarget {
+  id           String              @id @default(uuid())
+  campaignId   String              @map("campaign_id")
+  phone        String
+  status       String              @default("PENDING")
+  error        String?             @db.Text
+  interactions ButtonInteraction[]
+  campaign     Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId], map: "campaign_targets_campaign_id_fkey")
+  @@map("campaign_targets")
+}
+
+model ButtonInteraction {
+  id               String          @id @default(uuid())
+  campaignId       String          @map("campaign_id")
+  campaignTargetId String?         @map("campaign_target_id")
+  tenantId         String          @map("tenant_id")
+  phone            String
+  buttonId         String          @map("button_id")
+  buttonText       String          @map("button_text") @db.Text
+  interactionType  String          @default("BUTTON") @map("interaction_type")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  campaign         Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignTarget   CampaignTarget? @relation(fields: [campaignTargetId], references: [id])
+
+  @@index([campaignId], map: "button_interactions_campaign_id_fkey")
+  @@index([campaignTargetId], map: "button_interactions_campaign_target_id_fkey")
+  @@map("button_interactions")
+}
+
+model Invoice {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  amount       String
+  description  String   @db.Text
+  status       String   @default("UNPAID")
+  createdAt    DateTime @default(now()) @map("created_at")
+  billingCycle String   @default("Monthly") @map("billing_cycle")
+  dueDate      DateTime @default(now()) @map("due_date")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "invoices_tenant_id_fkey")
+  @@map("invoices")
+}
+
+model AutoResponder {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  keyword         String    @db.Text
+  matchType       String    @default("EXACT") @map("match_type")
+  responseType    String    @default("TEXT") @map("response_type")
+  message         String?   @db.Text
+  mediaPath       String?   @map("media_path") @db.Text
+  mediaMime       String?   @map("media_mime")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  lat             Float?
+  lng             Float?
+  locationAddress String?   @map("location_address")
+  locationName    String?   @map("location_name")
+  endDate         DateTime? @map("end_date")
+  startDate       DateTime? @map("start_date")
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "auto_responders_tenant_id_fkey")
+  @@map("auto_responders")
+}
+
+model PlanSetting {
+  id        String   @id @default(uuid())
+  planCode  Plan     @unique @map("plan_code")
+  name      String
+  price     Float
+  limit     Int
+  features  String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("plan_settings")
 }
 
 enum Plan {
@@ -113,125 +225,4 @@ enum MessageStatus {
   DELIVERED
   READ
   FAILED
-}
-
-model MessageTemplate {
-  id        String   @id @default(uuid())
-  tenantId  String   @map("tenant_id")
-  name      String
-  content   String   @db.Text
-  mediaPath String?  @map("media_path")
-  mediaMime String?  @map("media_mime")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("message_templates")
-}
-
-model Campaign {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  name            String
-  message         String?  @db.Text
-  templateId      String?  @map("template_id")
-  mediaPath       String?  @map("media_path")
-  mediaMime       String?  @map("media_mime")
-  buttons         String?  @db.Text @map("buttons") // JSON array of buttons
-  interactiveType String?  @map("interactive_type") // TEXT, BUTTONS, LIST, LOCATION
-  status          String   @default("PENDING") // PENDING, RUNNING, COMPLETED
-  createdAt       DateTime @default(now()) @map("created_at")
-  
-  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  targets      CampaignTarget[]
-  interactions ButtonInteraction[]
-
-  @@map("campaigns")
-}
-
-model CampaignTarget {
-  id         String   @id @default(uuid())
-  campaignId String   @map("campaign_id")
-  phone      String
-  status     String   @default("PENDING") // PENDING, SENT, FAILED
-  error      String?  @db.Text
-  
-  campaign     Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  interactions ButtonInteraction[]
-
-  @@map("campaign_targets")
-}
-
-model ButtonInteraction {
-  id               String   @id @default(uuid())
-  campaignId       String   @map("campaign_id")
-  campaignTargetId String?  @map("campaign_target_id")
-  tenantId         String   @map("tenant_id")
-  phone            String
-  buttonId         String   @map("button_id")
-  buttonText       String   @map("button_text") @db.Text
-  interactionType  String   @default("BUTTON") @map("interaction_type") // BUTTON, LIST
-  createdAt        DateTime @default(now()) @map("created_at")
-
-  campaign       Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignTarget CampaignTarget? @relation(fields: [campaignTargetId], references: [id])
-
-  @@map("button_interactions")
-}
-
-model Invoice {
-  id           String   @id @default(uuid())
-  tenantId     String   @map("tenant_id")
-  amount       String
-  description  String   @db.Text
-  billingCycle String   @default("Monthly") @map("billing_cycle")
-  status       String   @default("UNPAID") // UNPAID, PAID, CANCELLED
-  dueDate      DateTime @default(now()) @map("due_date")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("invoices")
-}
-
-model AutoResponder {
-  id           String   @id @default(uuid())
-  tenantId     String   @map("tenant_id")
-  keyword      String   @db.Text
-  matchType    String   @default("EXACT") @map("match_type") // EXACT, CONTAINS
-  responseType String   @default("TEXT") @map("response_type") // TEXT, IMAGE, PDF, LOCATION
-  message      String?  @db.Text
-  mediaPath    String?  @db.Text @map("media_path")
-  mediaMime    String?  @map("media_mime")
-  
-  // Location fields
-  lat              Float?
-  lng              Float?
-  locationName     String?  @map("location_name")
-  locationAddress  String?  @map("location_address")
-  
-  // Expiration fields
-  startDate        DateTime? @map("start_date")
-  endDate          DateTime? @map("end_date")
-  
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("auto_responders")
-}
-
-model PlanSetting {
-  id        String   @id @default(uuid())
-  planCode  Plan     @unique @map("plan_code")
-  name      String
-  price     Float
-  limit     Int
-  features  String   @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("plan_settings")
 }

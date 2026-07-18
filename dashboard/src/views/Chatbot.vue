@@ -23,6 +23,7 @@
             <th>Match Type</th>
             <th>Response Type</th>
             <th>Status</th>
+            <th>Validity Period</th>
             <th>Created At</th>
             <th>Actions</th>
           </tr>
@@ -46,9 +47,19 @@
                 {{ rule.isActive ? 'Active' : 'Inactive' }}
               </button>
             </td>
+            <td>
+              <div v-if="rule.startDate || rule.endDate" style="font-size: 0.85rem; color: #64748B;">
+                <div v-if="rule.startDate">From: {{ new Date(rule.startDate).toLocaleString() }}</div>
+                <div v-if="rule.endDate">To: {{ new Date(rule.endDate).toLocaleString() }}</div>
+              </div>
+              <span v-else class="text-gray" style="font-size: 0.85rem;">Always Active</span>
+            </td>
             <td>{{ new Date(rule.createdAt).toLocaleDateString() }}</td>
             <td>
-              <button @click="deleteRule(rule.id)" class="btn-danger btn-small">Delete</button>
+              <div style="display: flex; gap: 0.5rem;">
+                <button @click="editRule(rule)" class="btn-secondary btn-small">Edit</button>
+                <button @click="deleteRule(rule.id)" class="btn-danger btn-small">Delete</button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -59,7 +70,7 @@
     <div v-if="showModal" class="modal-backdrop">
       <div class="modal-content">
         <div class="modal-header">
-          <h2>Create Auto Responder Rule</h2>
+          <h2>{{ editingRule ? 'Edit' : 'Create' }} Auto Responder Rule</h2>
           <button @click="closeModal" class="btn-close">✕</button>
         </div>
         <form @submit.prevent="submitRule" class="modal-body">
@@ -149,6 +160,7 @@ const rules = ref([])
 const loading = ref(true)
 const submitting = ref(false)
 const showModal = ref(false)
+const editingRule = ref(null)
 const error = ref('')
 const success = ref('')
 
@@ -187,9 +199,36 @@ const handleFileUpload = (e) => {
 
 const closeModal = () => {
   showModal.value = false
+  editingRule.value = null
   form.value = { keyword: '', matchType: 'EXACT', responseType: 'TEXT', message: '', lat: '', lng: '', locationName: '', locationAddress: '', startDate: '', endDate: '' }
   selectedFile.value = null
   error.value = ''
+}
+
+const editRule = (rule) => {
+  editingRule.value = rule
+  
+  const toLocalString = (dateString) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+    return date.toISOString().slice(0,16)
+  }
+
+  form.value = {
+    keyword: rule.keyword,
+    matchType: rule.matchType,
+    responseType: rule.responseType,
+    message: rule.message || '',
+    lat: rule.lat || '',
+    lng: rule.lng || '',
+    locationName: rule.locationName || '',
+    locationAddress: rule.locationAddress || '',
+    startDate: toLocalString(rule.startDate),
+    endDate: toLocalString(rule.endDate)
+  }
+  selectedFile.value = null
+  showModal.value = true
 }
 
 const submitRule = async () => {
@@ -220,14 +259,25 @@ const submitRule = async () => {
     }
 
     const token = localStorage.getItem('token')
-    await axios.post('/api/v1/chatbot', formData, {
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data' 
-      }
-    })
     
-    success.value = 'Rule created successfully!'
+    if (editingRule.value) {
+      await axios.put(`/api/v1/chatbot/${editingRule.value.id}`, formData, {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data' 
+        }
+      })
+      success.value = 'Rule updated successfully!'
+    } else {
+      await axios.post('/api/v1/chatbot', formData, {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data' 
+        }
+      })
+      success.value = 'Rule created successfully!'
+    }
+    
     closeModal()
     fetchRules()
   } catch (err) {
