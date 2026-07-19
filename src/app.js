@@ -55,6 +55,23 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// PM2 Logs endpoint (For easy debugging from browser)
+app.get('/api/health/logs', (req, res) => {
+  const path = require('path');
+  const os = require('os');
+  const { exec } = require('child_process');
+  
+  const logPath = path.join(os.homedir(), '.pm2', 'logs', 'whatsapp-api-out.log');
+  
+  exec(`tail -n 500 "${logPath}"`, (err, stdout, stderr) => {
+    if (err) {
+      return res.status(500).send(`Error reading log file at ${logPath}\n${err.message}`);
+    }
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(stdout || "Log is empty.");
+  });
+});
+
 // Error handling middleware (should be last)
 app.use((err, req, res, next) => {
   logger.error(err.stack);
