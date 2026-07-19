@@ -35,6 +35,7 @@ const campaignRoutes = require('./modules/campaign/campaign.routes');
 const invoiceRoutes = require('./modules/invoice/invoice.routes');
 const planRoutes = require('./modules/plan/plan.routes');
 const chatbotRoutes = require('./modules/chatbot/chatbot.routes');
+const metaRoutes = require('./modules/meta/meta.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/keys', apiKeyRoutes);
@@ -49,6 +50,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/plans', planRoutes);
 app.use('/api/v1/chatbot', chatbotRoutes);
+app.use('/api/v1/meta', metaRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

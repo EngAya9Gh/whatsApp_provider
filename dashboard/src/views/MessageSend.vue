@@ -42,6 +42,17 @@
             <small class="hint">{{ $t('send_message.phone_hint') || 'Include country code without + or 00.' }}</small>
           </div>
 
+          <div class="form-group">
+            <label>Sending Channel</label>
+            <select v-model="channelId" class="form-input">
+              <option value="">Default Web QR Connection</option>
+              <option v-for="ch in channels" :key="ch.id" :value="ch.id">
+                +{{ ch.phoneNumber }} (Meta Cloud)
+              </option>
+            </select>
+            <small class="hint">Recommended: Select a Meta channel for Buttons and Lists.</small>
+          </div>
+
           <!-- Text Input -->
           <div v-if="messageType === 'text'" class="form-group">
             <label>{{ $t('send_message.message') || 'Message Content' }}</label>
@@ -204,8 +215,9 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
-const messageType = ref('text')
 const phone = ref('')
+const channelId = ref('')
+const messageType = ref('text')
 const textContent = ref('')
 const selectedFile = ref(null)
 const caption = ref('')
@@ -243,6 +255,7 @@ const variableValues = ref({})
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
+const channels = ref([])
 
 const handleFileChange = (e) => {
   if (e.target.files && e.target.files[0]) {
@@ -250,8 +263,7 @@ const handleFileChange = (e) => {
   }
 }
 
-// Fetch templates when component mounts
-onMounted(async () => {
+const fetchTemplates = async () => {
   try {
     const res = await axios.get('/api/v1/templates', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -260,6 +272,22 @@ onMounted(async () => {
   } catch (err) {
     console.error('Failed to load templates', err)
   }
+}
+
+const fetchChannels = async () => {
+  try {
+    const res = await axios.get('/api/v1/meta/channels', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+    channels.value = res.data.data
+  } catch (err) {
+    console.error('Failed to load channels', err)
+  }
+}
+
+onMounted(() => {
+  fetchTemplates()
+  fetchChannels()
 })
 
 // Extract variables like {{name}} from selected template
@@ -295,15 +323,16 @@ const handleSend = async () => {
   error.value = ''
   success.value = ''
 
+  const config = { headers: { Authorization: `Bearer ${tokenToUse}` } }
+
   try {
     let res;
     if (messageType.value === 'text') {
       res = await axios.post('/api/v1/message/send', {
         phone: phone.value,
-        message: textContent.value
-      }, {
-        headers: { Authorization: `Bearer ${tokenToUse}` }
-      })
+        message: textContent.value,
+        channel_id: channelId.value
+      }, config)
     } else if (messageType.value === 'buttons') {
       const validButtons = buttonsList.value.filter(b => b.text.trim())
       if (validButtons.length === 0) throw new Error('Add at least one button')
@@ -312,6 +341,7 @@ const handleSend = async () => {
       formData.append('phone', phone.value)
       formData.append('text', textContent.value)
       formData.append('buttons', JSON.stringify(validButtons))
+      if (channelId.value) formData.append('channel_id', channelId.value)
       if (selectedFile.value) {
         formData.append('image', selectedFile.value)
       }
@@ -325,29 +355,26 @@ const handleSend = async () => {
         title: listTitle.value,
         body: listBody.value,
         buttonText: listButtonText.value,
-        sections: listSections.value
-      }, {
-        headers: { Authorization: `Bearer ${tokenToUse}` }
-      })
+        sections: listSections.value,
+        channel_id: channelId.value
+      }, config)
     } else if (messageType.value === 'location') {
       res = await axios.post('/api/v1/message/send-location', {
         phone: phone.value,
         latitude: parseFloat(locationLat.value),
         longitude: parseFloat(locationLng.value),
         name: locationName.value,
-        address: locationAddress.value
-      }, {
-        headers: { Authorization: `Bearer ${tokenToUse}` }
-      })
+        address: locationAddress.value,
+        channel_id: channelId.value
+      }, config)
     } else if (messageType.value === 'template') {
       if (!selectedTemplateId.value) throw new Error('Please select a template');
       res = await axios.post('/api/v1/templates/send', {
         phone: phone.value,
         templateId: selectedTemplateId.value,
-        variables: variableValues.value
-      }, {
-        headers: { Authorization: `Bearer ${tokenToUse}` }
-      })
+        variables: variableValues.value,
+        channel_id: channelId.value
+      }, config)
     } else {
       if (!selectedFile.value) {
         throw new Error('Please select a file to upload')
@@ -358,6 +385,7 @@ const handleSend = async () => {
       formData.append('type', messageType.value)
       formData.append('caption', caption.value)
       formData.append('file', selectedFile.value)
+      if (channelId.value) formData.append('channel_id', channelId.value)
 
       res = await axios.post('/api/v1/message/upload-media', formData, {
         headers: { 

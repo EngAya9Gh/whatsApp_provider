@@ -33,8 +33,8 @@
             {{ $i18n.locale === 'ar' ? 'الإصدار الجديد متاح الآن' : 'New Version Available' }}
           </div>
           <h1 class="hero-title">
-            <template v-if="$i18n.locale === 'ar'">تواصل مع عملائك عبر <span class="text-gradient">الواتساب</span> كالمحترفين</template>
-            <template v-else>Connect with customers on <span class="text-gradient">WhatsApp</span> like a pro</template>
+            <template v-if="$i18n.locale === 'ar'">ارتقِ بتجربة عملائك عبر <span class="text-gradient">الواتساب</span> بذكاء واحترافية</template>
+            <template v-else>Elevate your customer experience on <span class="text-gradient">WhatsApp</span></template>
           </h1>
           <p class="hero-subtitle">
             {{ $i18n.locale === 'ar' ? 'المنصة الأسرع والأكثر موثوقية لإرسال رسائل التحقق (OTP) والحملات التسويقية. اربط نظامك في ثوانٍ وانطلق.' : 'The fastest, most reliable platform for OTPs and marketing campaigns. Integrate your system in seconds and launch.' }}
@@ -243,11 +243,14 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
+import { setLanguage } from '../i18n'
+
 const { locale } = useI18n()
 const pricingPlans = ref([])
 
 const toggleLanguage = () => {
-  locale.value = locale.value === 'en' ? 'ar' : 'en'
+  const newLang = locale.value === 'en' ? 'ar' : 'en'
+  setLanguage(newLang)
 }
 
 onMounted(async () => {
@@ -332,8 +335,8 @@ onMounted(async () => {
 /* Hero Text */
 .badge-pill { display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.05); padding: 6px 16px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 1.5rem; }
 .badge-dot { width: 8px; height: 8px; background: #10B981; border-radius: 50%; box-shadow: 0 0 10px #10B981; }
-.hero-title { font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 950; line-height: 1.15; margin-bottom: 1.5rem; letter-spacing: -1px; }
-.text-gradient { background: linear-gradient(135deg, #FF6600 0%, #FF9900 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hero-title { font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 950; line-height: 1.4; margin-bottom: 1.5rem; letter-spacing: -1px; }
+.text-gradient { background: linear-gradient(135deg, #FF6600 0%, #FF9900 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; padding: 0.1em 0; }
 .hero-subtitle { font-size: 1.25rem; color: #94A3B8; margin-bottom: 2.5rem; max-width: 90%; }
 .hero-cta-group { display: flex; gap: 1rem; flex-wrap: wrap; }
 

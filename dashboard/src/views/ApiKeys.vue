@@ -43,6 +43,35 @@
       </table>
     </div>
 
+    <!-- Available Channels -->
+    <div class="card doc-card" style="margin-top: 2rem;">
+      <h2 class="card-title">Available Channels</h2>
+      <p class="doc-text">Use these Channel IDs (<code>channel_id</code>) in your API requests to route messages through specific numbers (Meta or Web QR). If omitted, the default Web QR connection is used.</p>
+      
+      <div v-if="channels.length === 0" class="empty-state">
+        No Meta Channels found. (Default Web QR will be used).
+      </div>
+      <table class="data-table" v-else>
+        <thead>
+          <tr>
+            <th>Phone Number</th>
+            <th>Provider</th>
+            <th>Channel ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="ch in channels" :key="ch.id">
+            <td>+{{ ch.phoneNumber }}</td>
+            <td><span class="badge" :class="ch.providerType === 'META_CLOUD' ? 'bg-primary' : 'bg-gray'">{{ ch.providerType }}</span></td>
+            <td class="key-cell">
+              <code>{{ ch.id }}</code>
+              <button @click="copyKey(ch.id)" class="btn-small" style="margin-inline-start: 0.5rem;" title="Copy">📋</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <!-- API Documentation -->
     <div class="card doc-card">
       <h2 class="card-title">API Documentation</h2>
@@ -64,7 +93,8 @@
         <pre class="code-block">
 {
   "phone": "966500000000",
-  "message": "Hello, this is a custom message!"
+  "message": "Hello, this is a custom message!",
+  "channel_id": "optional-channel-id-here"
 }
         </pre>
       </div>
@@ -78,6 +108,7 @@ Form Data:
 - phone: "966500000000"
 - type: "image" (or "pdf")
 - caption: "Optional caption"
+- channel_id: "optional-channel-id-here"
 - file: (Attach File Binary)
         </pre>
       </div>
@@ -89,6 +120,7 @@ Form Data:
 {
   "phone": "966500000000",
   "templateId": "your-template-id",
+  "channel_id": "optional-channel-id-here",
   "variables": {
     "name": "Ahmed",
     "order_id": "12345"
@@ -105,6 +137,7 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
 const keys = ref([])
+const channels = ref([])
 const loading = ref(false)
 const newlyGeneratedKey = ref(null)
 const baseUrl = ref(window.location.origin)
@@ -121,7 +154,22 @@ const fetchKeys = async () => {
   }
 }
 
-onMounted(fetchKeys)
+const fetchChannels = async () => {
+  const token = localStorage.getItem('token')
+  try {
+    const res = await axios.get('/api/v1/meta/channels', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    channels.value = res.data.data
+  } catch (err) {
+    console.error('Failed to fetch channels', err)
+  }
+}
+
+onMounted(() => {
+  fetchKeys()
+  fetchChannels()
+})
 
 const generateKey = async () => {
   loading.value = true
@@ -163,6 +211,9 @@ const copyKey = (text) => {
 
 <style scoped>
 .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+.badge { padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+.bg-primary { background: #dbeafe; color: #1e40af; }
+.bg-gray { background: #f3f4f6; color: #374151; }
 .btn-primary { background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; }
 .btn-small { padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; border-radius: 4px; cursor: pointer; background: #e5e7eb; color: #1E293B; margin-left: 0.5rem; }
 .btn-danger { background: #ef4444; color: white; }

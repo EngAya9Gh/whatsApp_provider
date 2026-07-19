@@ -2,9 +2,10 @@ const messageService = require('./message.service');
 
 exports.sendMessage = async (req, res, next) => {
   try {
-    const { phone, message } = req.body;
+    const { phone, message, channelId, channel_id } = req.body;
     const tenantId = req.tenant.id;
-    const result = await messageService.sendCustomMessage(tenantId, phone, message);
+    const resolvedChannelId = channelId || channel_id;
+    const result = await messageService.sendCustomMessage(tenantId, phone, message, resolvedChannelId);
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -13,9 +14,10 @@ exports.sendMessage = async (req, res, next) => {
 
 exports.sendMedia = async (req, res, next) => {
   try {
-    const { phone, type, url, caption } = req.body;
+    const { phone, type, url, caption, channelId, channel_id } = req.body;
     const tenantId = req.tenant.id;
-    const result = await messageService.sendMediaMessage(tenantId, phone, type, url, caption);
+    const resolvedChannelId = channelId || channel_id;
+    const result = await messageService.sendMediaMessage(tenantId, phone, type, url, caption, null, null, resolvedChannelId);
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -24,11 +26,12 @@ exports.sendMedia = async (req, res, next) => {
 
 exports.uploadMedia = async (req, res, next) => {
   try {
-    const { phone, type, caption } = req.body;
+    const { phone, type, caption, channelId, channel_id } = req.body;
     const file = req.file;
     const tenantId = req.tenant.id;
+    const resolvedChannelId = channelId || channel_id;
     if (!file) return res.status(400).json({ error: 'File is required' });
-    const result = await messageService.sendMediaMessage(tenantId, phone, type, file.buffer, caption, file.mimetype, file.originalname);
+    const result = await messageService.sendMediaMessage(tenantId, phone, type, file.buffer, caption, file.mimetype, file.originalname, resolvedChannelId);
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -47,8 +50,10 @@ exports.sendButtons = async (req, res, next) => {
       }
     }
     const tenantId = req.tenant.id;
+    const { channelId, channel_id } = req.body;
+    const resolvedChannelId = channelId || channel_id;
     const imageBuffer = req.file ? req.file.buffer : undefined;
-    const result = await messageService.sendButtonsMessage(tenantId, phone, text, parsedButtons, imageBuffer);
+    const result = await messageService.sendButtonsMessage(tenantId, phone, text, parsedButtons, imageBuffer, resolvedChannelId);
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -67,7 +72,9 @@ exports.sendList = async (req, res, next) => {
       }
     }
     const tenantId = req.tenant.id;
-    const result = await messageService.sendListMessage(tenantId, phone, title, body, buttonText, parsedSections);
+    const { channelId, channel_id } = req.body;
+    const resolvedChannelId = channelId || channel_id;
+    const result = await messageService.sendListMessage(tenantId, phone, title, body, buttonText, parsedSections, resolvedChannelId);
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -76,9 +83,10 @@ exports.sendList = async (req, res, next) => {
 
 exports.sendLocation = async (req, res, next) => {
   try {
-    const { phone, latitude, longitude, name, address } = req.body;
+    const { phone, latitude, longitude, name, address, channelId, channel_id } = req.body;
     const tenantId = req.tenant.id;
-    const result = await messageService.sendLocationMessage(tenantId, phone, latitude, longitude, name, address);
+    const resolvedChannelId = channelId || channel_id;
+    const result = await messageService.sendLocationMessage(tenantId, phone, latitude, longitude, name, address, resolvedChannelId);
     res.status(200).json(result);
   } catch (error) {
     next(error);

@@ -37,8 +37,32 @@ model Tenant {
   messageLogs      MessageLog[]
   messageTemplates MessageTemplate[]
   usageRecords     UsageRecord[]
+  channels         WhatsAppChannel[]
 
   @@map("tenants")
+}
+
+model WhatsAppChannel {
+  id                String   @id @default(uuid())
+  tenantId          String   @map("tenant_id")
+  providerType      String   @default("BAILEYS") @map("provider_type") // BAILEYS or META_CLOUD
+  phoneNumber       String?  @map("phone_number")
+  status            String   @default("DISCONNECTED")
+  
+  // Meta Specific fields
+  metaPhoneNumberId String?  @map("meta_phone_number_id")
+  metaWabaId        String?  @map("meta_waba_id")
+  metaAccessToken   String?  @map("meta_access_token") @db.Text
+  
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaigns         Campaign[]
+  messageLogs       MessageLog[]
+
+  @@index([tenantId], map: "whatsapp_channels_tenant_id_fkey")
+  @@map("whatsapp_channels")
 }
 
 model ApiKey {
@@ -59,14 +83,17 @@ model ApiKey {
 model MessageLog {
   id           String        @id @default(uuid())
   tenantId     String        @map("tenant_id")
+  channelId    String?       @map("channel_id")
   phone        String
   messageType  MessageType   @default(OTP) @map("message_type")
   status       MessageStatus @default(QUEUED)
   errorMessage String?       @map("error_message") @db.Text
   createdAt    DateTime      @default(now()) @map("created_at")
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel      WhatsAppChannel? @relation(fields: [channelId], references: [id])
 
   @@index([tenantId], map: "message_logs_tenant_id_fkey")
+  @@index([channelId], map: "message_logs_channel_id_fkey")
   @@map("message_logs")
 }
 
@@ -99,6 +126,7 @@ model MessageTemplate {
 model Campaign {
   id              String              @id @default(uuid())
   tenantId        String              @map("tenant_id")
+  channelId       String?             @map("channel_id")
   name            String
   message         String?             @db.Text
   status          String              @default("PENDING")
@@ -113,8 +141,10 @@ model Campaign {
   interactions    ButtonInteraction[]
   targets         CampaignTarget[]
   tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel         WhatsAppChannel?    @relation(fields: [channelId], references: [id])
 
   @@index([tenantId], map: "campaigns_tenant_id_fkey")
+  @@index([channelId], map: "campaigns_channel_id_fkey")
   @@map("campaigns")
 }
 

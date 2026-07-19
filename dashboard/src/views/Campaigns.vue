@@ -114,8 +114,19 @@
         
         <form @submit.prevent="submitCampaign">
           <div class="form-group">
-            <label>{{ $t('campaigns.campaign_name') || 'Campaign Name' }}</label>
+            <label>Campaign Name</label>
             <input type="text" v-model="formData.name" placeholder="e.g. Summer Sale Offer" required class="form-input" />
+          </div>
+
+          <div class="form-group">
+            <label>Sending Channel (WhatsApp Number)</label>
+            <select v-model="formData.channelId" class="form-input">
+              <option value="">Default Web QR Connection</option>
+              <option v-for="ch in channels" :key="ch.id" :value="ch.id">
+                +{{ ch.phoneNumber }} (Meta Cloud API)
+              </option>
+            </select>
+            <small class="hint">Select the number to send from. Meta Channels are recommended for interactive buttons.</small>
           </div>
 
           <div class="form-group" v-if="!editingCampaign">
@@ -125,40 +136,40 @@
           </div>
 
           <div class="form-group">
-            <label>{{ $t('campaigns.message_type') || 'Message Type' }}</label>
+            <label>Message Type</label>
             <div class="radio-group" style="display:flex; gap:1rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
-              <label><input type="radio" v-model="formData.type" value="text" /> {{ $t('campaigns.type_text') || 'Text Message' }}</label>
-              <label><input type="radio" v-model="formData.type" value="template" /> {{ $t('campaigns.type_template') || 'Template' }}</label>
-              <label><input type="radio" v-model="formData.type" value="buttons" /> 🔘 {{ $t('campaigns.type_buttons') || 'With Buttons' }}</label>
+              <label><input type="radio" v-model="formData.type" value="text" /> Text Message</label>
+              <label><input type="radio" v-model="formData.type" value="template" /> Template</label>
+              <label><input type="radio" v-model="formData.type" value="buttons" /> 🔘 With Buttons</label>
             </div>
           </div>
 
           <div class="form-group" v-if="formData.type === 'text'">
-            <label>{{ $t('campaigns.message_content') || 'Message Content' }}</label>
-            <textarea v-model="formData.message" rows="5" :placeholder="$t('campaigns.message_placeholder') || 'Write your marketing message here...'" required class="form-input"></textarea>
+            <label>Message Content</label>
+            <textarea v-model="formData.message" rows="5" placeholder="Write your marketing message here..." required class="form-input"></textarea>
           </div>
 
           <div class="form-group" v-if="formData.type === 'template'">
-            <label>{{ $t('campaigns.select_template') || 'Select Template' }}</label>
+            <label>Select Template</label>
             <select v-model="formData.templateId" required class="form-input">
-              <option value="" disabled>{{ $t('campaigns.select_template') || 'Choose a template...' }}</option>
+              <option value="" disabled>Choose a template...</option>
               <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
             </select>
           </div>
 
           <!-- Buttons section -->
           <div class="form-group" v-if="formData.type === 'buttons'">
-            <label>{{ $t('campaigns.message_content') || 'Message Content' }}</label>
+            <label>Message Content</label>
             <textarea v-model="formData.message" rows="4" placeholder="Write your message here..." required class="form-input"></textarea>
           </div>
 
           <div v-if="formData.type === 'buttons'" class="buttons-builder">
             <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-              <label style="font-weight:600;">🔘 {{ $t('campaigns.buttons') || 'Buttons' }} ({{ $t('campaigns.max_3') || 'max 3' }})</label>
-              <button type="button" @click="addButton" class="btn-text" style="color: #10B981;" :disabled="formData.buttons.length >= 3">+ {{ $t('campaigns.add_button') || 'Add Button' }}</button>
+              <label style="font-weight:600;">🔘 Buttons (Max 3)</label>
+              <button type="button" @click="addButton" class="btn-text" style="color: #10B981;" :disabled="formData.buttons.length >= 3">+ Add Button</button>
             </div>
             <div v-for="(btn, i) in formData.buttons" :key="i" class="button-row">
-              <input v-model="btn.text" :placeholder="$t('campaigns.button_text') || 'Button text'" class="form-input" style="flex:1;" maxlength="20" required />
+              <input v-model="btn.text" placeholder="Button text" class="form-input" style="flex:1;" maxlength="20" required />
               <select v-model="btn.type" class="form-input" style="width:120px;">
                 <option value="reply">Quick Reply</option>
                 <option value="url">URL Link</option>
@@ -166,7 +177,7 @@
               <input v-if="btn.type === 'url'" v-model="btn.url" placeholder="https://..." class="form-input" style="flex:1;" />
               <button type="button" @click="removeButton(i)" class="btn-danger-text">✕</button>
             </div>
-            <small class="hint">{{ $t('campaigns.buttons_hint') || 'When a user taps a button, their response will be tracked in the Interactions tab.' }}</small>
+            <small class="hint">When a user taps a button, their response will be tracked in the Interactions tab.</small>
           </div>
 
           <div class="form-group">
@@ -211,6 +222,7 @@ import axios from 'axios'
 
 const campaigns = ref([])
 const templates = ref([])
+const channels = ref([])
 const loading = ref(true)
 const error = ref('')
 const success = ref('')
@@ -228,6 +240,7 @@ const editingCampaign = ref(null)
 
 const formData = ref({
   name: '',
+  channelId: '',
   type: 'text',
   message: '',
   templateId: '',
@@ -252,6 +265,15 @@ const fetchTemplates = async () => {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     templates.value = res.data.data
+  } catch (err) {}
+}
+
+const fetchChannels = async () => {
+  try {
+    const res = await axios.get('/api/v1/meta/channels', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+    channels.value = res.data.data
   } catch (err) {}
 }
 
@@ -304,6 +326,9 @@ const submitCampaign = async () => {
   try {
     const form = new FormData()
     form.append('name', formData.value.name)
+    if (formData.value.channelId) {
+      form.append('channelId', formData.value.channelId)
+    }
     
     if (formData.value.type === 'text') {
       form.append('message', formData.value.message)
@@ -368,7 +393,7 @@ const closeCreateModal = () => {
   editingCampaign.value = null
   selectedFile.value = null
   selectedImage.value = null
-  formData.value = { name: '', type: 'text', message: '', templateId: '', buttons: [{ text: '', type: 'reply', url: '' }], startDate: '', endDate: '' }
+  formData.value = { name: '', channelId: '', type: 'text', message: '', templateId: '', buttons: [{ text: '', type: 'reply', url: '' }], startDate: '', endDate: '' }
 }
 
 const toLocalString = (dateString) => {
@@ -398,6 +423,7 @@ const editCampaign = (campaign) => {
   
   formData.value.startDate = toLocalString(campaign.startDate)
   formData.value.endDate = toLocalString(campaign.endDate)
+  formData.value.channelId = campaign.channelId || ''
   
   showCreateModal.value = true
 }
@@ -442,6 +468,7 @@ const retryFailed = async (id) => {
 onMounted(() => {
   fetchCampaigns()
   fetchTemplates()
+  fetchChannels()
   pollInterval = setInterval(() => {
     campaigns.value.filter(c => c.status === 'RUNNING').forEach(c => {
       loadStats(c.id)
