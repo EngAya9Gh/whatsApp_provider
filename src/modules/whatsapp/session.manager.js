@@ -140,11 +140,10 @@ class SessionManager {
             
             // --- Campaign Text Reply Tracking ---
             try {
-              // Find the most recent SENT campaign target for this phone
+              // Find the most recent campaign target for this phone
               const target = await prisma.campaignTarget.findFirst({
                 where: { 
-                  phone: senderPhone, 
-                  status: 'SENT',
+                  phone: senderPhone,
                   campaign: { tenantId } 
                 },
                 include: { campaign: true },
