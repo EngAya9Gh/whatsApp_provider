@@ -22,40 +22,86 @@
     <div v-else class="campaigns-grid">
       <div v-for="campaign in campaigns" :key="campaign.id" class="campaign-card">
         <div class="card-header">
-          <h3 class="campaign-name">{{ campaign.name }}</h3>
-          <span :class="['status-badge', campaign.status.toLowerCase()]">{{ campaign.status }}</span>
+          <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <h3 class="campaign-name">{{ campaign.name }}</h3>
+            <span class="campaign-date">📅 {{ new Date(campaign.createdAt).toLocaleDateString() }}</span>
+          </div>
+          <span :class="['status-badge', campaign.status.toLowerCase()]">
+            <span class="status-dot"></span>
+            {{ campaign.status }}
+          </span>
         </div>
         
         <div class="campaign-content">
+          <svg class="quote-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
           <p class="truncate">{{ campaign.message || 'Template Message' }}</p>
         </div>
         
-        <div class="campaign-stats" v-if="activeStats[campaign.id] && campaign.status !== 'PENDING'">
-          <div class="stat-row">
-            <span>Progress:</span>
-            <strong>{{ activeStats[campaign.id].sent }} / {{ activeStats[campaign.id].total }}</strong>
+        <div class="campaign-stats-modern" v-if="activeStats[campaign.id] && campaign.status !== 'PENDING'">
+          <div class="progress-container">
+            <div class="progress-header">
+              <span class="progress-title">Sending Progress</span>
+              <span class="progress-percentage">
+                {{ Math.round((activeStats[campaign.id].sent / (activeStats[campaign.id].total || 1)) * 100) }}%
+              </span>
+            </div>
+            <div class="progress-bar-modern">
+              <div class="progress-fill-modern" :style="{ width: (activeStats[campaign.id].sent / (activeStats[campaign.id].total || 1) * 100) + '%' }"></div>
+            </div>
           </div>
-          <div class="progress-bar">
-            <div class="progress-fill" :style="{ width: (activeStats[campaign.id].sent / activeStats[campaign.id].total * 100) + '%' }"></div>
-          </div>
-          <div class="stat-row" style="margin-top: 0.5rem; font-size: 0.8rem; color: #64748B;">
-            <span>Pending: {{ activeStats[campaign.id].pending }}</span>
-            <span style="color: #DC2626;">Failed: {{ activeStats[campaign.id].failed }}</span>
+
+          <div class="stats-mini-grid">
+            <div class="stat-pill">
+              <span class="stat-pill-label">Total</span>
+              <span class="stat-pill-value font-mono">{{ activeStats[campaign.id].total }}</span>
+            </div>
+            <div class="stat-pill success">
+              <span class="stat-pill-label">Sent</span>
+              <span class="stat-pill-value font-mono">{{ activeStats[campaign.id].sent }}</span>
+            </div>
+            <div class="stat-pill warning">
+              <span class="stat-pill-label">Pending</span>
+              <span class="stat-pill-value font-mono">{{ activeStats[campaign.id].pending }}</span>
+            </div>
+            <div class="stat-pill danger">
+              <span class="stat-pill-label">Failed</span>
+              <span class="stat-pill-value font-mono">{{ activeStats[campaign.id].failed }}</span>
+            </div>
           </div>
         </div>
         <div v-else-if="campaign.status === 'PENDING'" class="campaign-pending-state">
-          Campaign is ready. Click start to begin sending.
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <div>
+            <strong>Campaign Ready!</strong>
+            <p>Click start to begin processing targets.</p>
+          </div>
         </div>
 
         <div class="card-footer">
-          <small>{{ $t('campaigns.created') || 'Created' }}: {{ new Date(campaign.createdAt).toLocaleDateString() }}</small>
-          <div style="display: flex; gap: 0.5rem;">
-            <button v-if="campaign.status === 'PENDING'" @click="editCampaign(campaign)" class="btn-text" style="color: #F59E0B;">✏️ Edit</button>
-            <button v-if="campaign.status === 'PENDING'" @click="startCampaign(campaign.id)" class="btn-start" :disabled="startingId === campaign.id">
-              {{ startingId === campaign.id ? 'Starting...' : '▶ Start' }}
+          <div class="footer-actions-left">
+            <button v-if="campaign.status === 'PENDING'" @click="editCampaign(campaign)" class="btn-icon-soft amber" title="Edit Campaign">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="16 3 21 8 8 21 3 21 3 16 16 3"></polygon></svg>
             </button>
-            <button v-else @click="loadStats(campaign.id)" class="btn-text">Refresh Stats</button>
-            <router-link :to="`/campaigns/${campaign.id}`" class="btn-text" style="color: #3B82F6;">ℹ️ {{ $t('campaigns.details') || 'Details' }}</router-link>
+            <button v-if="campaign.status !== 'PENDING'" @click="loadStats(campaign.id)" class="btn-icon-soft blue refresh-btn" title="Refresh Statistics">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </button>
+          </div>
+          
+          <div class="footer-actions-right">
+            <button v-if="campaign.status === 'PENDING'" @click="startCampaign(campaign.id)" class="btn-start-modern" :disabled="startingId === campaign.id">
+              <svg v-if="startingId !== campaign.id" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              <svg v-else class="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+              {{ startingId === campaign.id ? 'Starting...' : 'Start Now' }}
+            </button>
+            <button v-if="activeStats[campaign.id] && activeStats[campaign.id].failed > 0" @click="retryFailed(campaign.id)" class="btn-retry-modern" :disabled="retryingId === campaign.id">
+              <svg v-if="retryingId !== campaign.id" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
+              <svg v-else class="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+              Retry Failed
+            </button>
+            <router-link :to="`/campaigns/${campaign.id}`" class="btn-details-modern">
+              Details
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </router-link>
           </div>
         </div>
       </div>
@@ -176,6 +222,7 @@ const saving = ref(false)
 const selectedFile = ref(null)
 const selectedImage = ref(null)
 const startingId = ref(null)
+const retryingId = ref(null)
 
 const editingCampaign = ref(null)
 
@@ -373,6 +420,24 @@ const startCampaign = async (id) => {
   }
 }
 
+const retryFailed = async (id) => {
+  retryingId.value = id
+  error.value = ''
+  success.value = ''
+  try {
+    const res = await axios.post(`/api/v1/campaigns/${id}/retry`, {}, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+    success.value = res.data.message || 'Retrying failed numbers...'
+    loadStats(id)
+    setTimeout(() => { success.value = '' }, 5000)
+  } catch (err) {
+    error.value = err.response?.data?.error || err.response?.data?.message || 'Failed to retry campaign.'
+  } finally {
+    retryingId.value = null
+  }
+}
+
 
 onMounted(() => {
   fetchCampaigns()
@@ -406,29 +471,81 @@ onUnmounted(() => {
 .btn-start:hover { background: #059669; }
 .btn-start:disabled { opacity: 0.7; cursor: not-allowed; }
 
-.campaigns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; }
+.campaigns-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1.5rem; }
 
-.campaign-card { background: white; border-radius: 12px; padding: 1.5rem; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.campaign-name { font-size: 1.1rem; font-weight: 700; color: #1E293B; margin: 0; }
+.campaign-card { background: white; border-radius: 16px; padding: 1.5rem; border: 1px solid rgba(226, 232, 240, 0.8); box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; flex-direction: column; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.campaign-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
 
-.status-badge { padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-.status-badge.running { background: #DBEAFE; color: #1D4ED8; }
-.status-badge.completed { background: #DCFCE7; color: #15803D; }
-.status-badge.pending { background: #F1F5F9; color: #475569; }
-.status-badge.failed { background: #FEE2E2; color: #DC2626; }
-.status-badge.sent { background: #DCFCE7; color: #166534; }
+.card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; }
+.campaign-name { font-size: 1.15rem; font-weight: 800; color: #0F172A; margin: 0; line-height: 1.2; }
+.campaign-date { font-size: 0.75rem; color: #94A3B8; margin-top: 0.25rem; font-weight: 500; }
 
-.campaign-content { flex: 1; background: #F8FAFC; padding: 1rem; border-radius: 8px; font-size: 0.9rem; color: #475569; margin-bottom: 1rem; }
-.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
+.status-badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; }
+.status-badge.running { background: #EFF6FF; color: #1D4ED8; }
+.status-badge.running .status-dot { background: #3B82F6; }
+.status-badge.completed { background: #F0FDF4; color: #15803D; }
+.status-badge.completed .status-dot { background: #10B981; }
+.status-badge.pending { background: #F8FAFC; color: #475569; }
+.status-badge.pending .status-dot { background: #94A3B8; }
+.status-badge.failed { background: #FEF2F2; color: #DC2626; }
+.status-badge.failed .status-dot { background: #EF4444; }
+.status-badge.sent { background: #ECFDF5; color: #047857; }
+.status-badge.sent .status-dot { background: #10B981; }
 
-.campaign-stats { background: #FFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-.campaign-pending-state { text-align: center; background: #FFFBEB; padding: 1rem; border-radius: 8px; border: 1px dashed #FDE68A; color: #B45309; font-size: 0.9rem; margin-bottom: 1rem; }
-.stat-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; margin-bottom: 0.5rem; }
-.progress-bar { width: 100%; height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden; }
-.progress-fill { height: 100%; background: #FF6600; transition: width 0.5s ease; }
+.campaign-content { flex: 1; display: flex; gap: 0.75rem; background: #F8FAFC; padding: 1rem; border-radius: 10px; font-size: 0.9rem; color: #475569; margin-bottom: 1.5rem; border: 1px solid #F1F5F9; }
+.quote-icon { color: #CBD5E1; flex-shrink: 0; margin-top: 2px; }
+.truncate { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; line-height: 1.5; font-style: italic; }
 
-.card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #F1F5F9; padding-top: 1rem; color: #94A3B8; }
+.campaign-stats-modern { background: white; margin-bottom: 1.5rem; }
+.progress-container { margin-bottom: 1rem; }
+.progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.progress-title { font-size: 0.8rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; }
+.progress-percentage { font-size: 0.85rem; font-weight: 700; color: #0F172A; }
+.progress-bar-modern { width: 100%; height: 8px; background: #F1F5F9; border-radius: 999px; overflow: hidden; }
+.progress-fill-modern { height: 100%; background: linear-gradient(90deg, #FF6600 0%, #F97316 100%); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 999px; }
+
+.stats-mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+.stat-pill { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 0.6rem 0.4rem; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
+.stat-pill.success { background: #F0FDF4; border-color: #DCFCE7; }
+.stat-pill.warning { background: #FFFBEB; border-color: #FEF3C7; }
+.stat-pill.danger { background: #FEF2F2; border-color: #FEE2E2; }
+.stat-pill-label { font-size: 0.65rem; font-weight: 700; color: #64748B; text-transform: uppercase; }
+.stat-pill.success .stat-pill-label { color: #166534; }
+.stat-pill.warning .stat-pill-label { color: #B45309; }
+.stat-pill.danger .stat-pill-label { color: #991B1B; }
+.stat-pill-value { font-size: 0.9rem; font-weight: 800; color: #0F172A; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+
+.campaign-pending-state { display: flex; align-items: center; gap: 1rem; background: #FFFBEB; padding: 1.25rem; border-radius: 12px; border: 1px dashed #FCD34D; color: #B45309; margin-bottom: 1.5rem; }
+.campaign-pending-state svg { color: #F59E0B; flex-shrink: 0; }
+.campaign-pending-state strong { display: block; font-size: 0.95rem; margin-bottom: 0.25rem; }
+.campaign-pending-state p { margin: 0; font-size: 0.85rem; color: #92400E; }
+
+.card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #F1F5F9; padding-top: 1.25rem; }
+.footer-actions-left { display: flex; gap: 0.5rem; }
+.footer-actions-right { display: flex; gap: 0.75rem; align-items: center; }
+
+.btn-icon-soft { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
+.btn-icon-soft.amber { background: #FEF3C7; color: #D97706; }
+.btn-icon-soft.amber:hover { background: #FDE68A; color: #B45309; }
+.btn-icon-soft.blue { background: #F1F5F9; color: #64748B; }
+.btn-icon-soft.blue:hover { background: #E2E8F0; color: #334155; }
+.refresh-btn:active svg { transform: rotate(180deg); transition: transform 0.3s; }
+
+.btn-start-modern { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; border: none; padding: 0.6rem 1.25rem; border-radius: 8px; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(16,185,129,0.2); }
+.btn-start-modern:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(16,185,129,0.3); }
+.btn-start-modern:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.btn-retry-modern { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: white; border: none; padding: 0.6rem 1.25rem; border-radius: 8px; font-size: 0.9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(245,158,11,0.2); }
+.btn-retry-modern:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(245,158,11,0.3); }
+.btn-retry-modern:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.btn-details-modern { background: linear-gradient(135deg, #FF6600 0%, #E65C00 100%); color: white; text-decoration: none; padding: 0.6rem 1.25rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(255,102,0,0.2); }
+.btn-details-modern:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(255,102,0,0.3); }
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
+.spin-icon { animation: spin 1s linear infinite; }
 
 .empty-state { text-align: center; padding: 4rem; background: white; border-radius: 12px; color: #64748B; border: 1px dashed #CBD5E1; }
 .loading-state { text-align: center; padding: 2rem; color: #64748B; }

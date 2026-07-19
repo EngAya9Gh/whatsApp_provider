@@ -1,58 +1,79 @@
 <template>
-  <div class="view-header">
-    <h2>Campaign Details</h2>
-    <div style="display: flex; gap: 1rem;">
-      <button @click="$router.push('/campaigns')" class="btn-secondary">← Back to Campaigns</button>
-    </div>
-  </div>
+  <div class="campaign-details-page">
+    <div class="page-header">
+      <button @click="$router.push('/campaigns')" class="btn-back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        {{ $te('campaigns.back') ? $t('campaigns.back') : ($i18n.locale === 'ar' ? 'العودة للحملات' : 'Back to Campaigns') }}
+      </button>
 
-  <div class="content-card" v-if="loading">
-    <div class="loading-state">Loading campaign data...</div>
-  </div>
-
-  <div v-else-if="campaign" class="content-card">
-    <div style="display: flex; justify-content: space-between; margin-bottom: 2rem;">
-      <div>
-        <h3>{{ campaign.name }}</h3>
-        <p style="color: #64748B;">{{ campaign.message || 'Template Message' }}</p>
+      <div class="header-content" v-if="campaign">
+        <div class="header-left">
+          <h1 class="campaign-title">{{ campaign.name }}</h1>
+          <p class="campaign-subtitle">{{ campaign.message || 'Template Message' }}</p>
+        </div>
+        <div class="header-right">
+          <span :class="['status-badge', campaign.status.toLowerCase()]">
+            <span class="status-dot"></span>
+            {{ campaign.status }}
+          </span>
+        </div>
       </div>
-      <div>
-        <span :class="['status-badge', campaign.status.toLowerCase()]">{{ campaign.status }}</span>
+      <div v-else class="loading-pulse">
+        <div class="pulse-line title"></div>
+        <div class="pulse-line subtitle"></div>
       </div>
     </div>
 
     <!-- TABS -->
-    <div class="modal-tabs" style="margin-bottom: 1.5rem;">
-      <button :class="{ active: activeTab === 'targets' }" @click="activeTab = 'targets'; fetchTargets();">
-        Targets & Numbers
-      </button>
-      <button :class="{ active: activeTab === 'interactions' }" @click="activeTab = 'interactions'; fetchInteractions();">
-        Interactions & Replies
-      </button>
+    <div class="tabs-wrapper">
+      <div class="tabs-container">
+        <button :class="['tab-btn', { active: activeTab === 'targets' }]" @click="activeTab = 'targets'; fetchTargets();">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          Targets & Numbers
+        </button>
+        <button :class="['tab-btn', { active: activeTab === 'interactions' }]" @click="activeTab = 'interactions'; fetchInteractions();">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          Interactions & Replies
+        </button>
+      </div>
     </div>
 
     <!-- TARGETS TAB -->
-    <div v-if="activeTab === 'targets'">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap;">
-        <div style="display: flex; gap: 1rem; flex: 1;">
-          <input v-model="targetSearch" @keyup.enter="fetchTargets" type="text" placeholder="Search phone number..." class="form-input" style="max-width: 300px;" />
-          <select v-model="targetStatus" @change="fetchTargets" class="form-input" style="max-width: 150px;">
-            <option value="ALL">All Status</option>
-            <option value="PENDING">Pending</option>
-            <option value="SENT">Sent</option>
-            <option value="FAILED">Failed</option>
-          </select>
-          <button @click="fetchTargets" class="btn-secondary">Search</button>
-        </div>
-        <div>
-          <button @click="exportData('targets')" class="btn-primary" style="background: #10B981; border-color: #10B981;">
-            ↓ Export Targets CSV
+    <div v-if="activeTab === 'targets'" class="tab-content fade-in">
+      <div class="filters-bar">
+        <div class="quick-filters">
+          <button 
+            v-for="status in ['ALL', 'PENDING', 'SENT', 'FAILED']" 
+            :key="status"
+            :class="['filter-pill', status.toLowerCase(), { active: targetStatus === status }]"
+            @click="targetStatus = status; targetPage = 1; fetchTargets()"
+          >
+            <span class="filter-dot"></span>
+            {{ status === 'ALL' ? 'All Numbers' : status }}
           </button>
+        </div>
+
+        <div class="actions-group">
+          <div class="search-box">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input v-model="targetSearch" @keyup.enter="fetchTargets" type="text" placeholder="Search phone number..." class="form-input" />
+          </div>
+          <div style="display: flex; gap: 0.75rem;">
+            <button v-if="targets.some(t => t.status === 'FAILED')" @click="retryFailed" class="btn-retry" :disabled="retrying">
+              <svg v-if="!retrying" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
+              <svg v-else class="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+              {{ retrying ? 'Retrying...' : 'Retry Failed' }}
+            </button>
+            <button @click="exportData('targets')" class="btn-export">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export CSV
+            </button>
+          </div>
         </div>
       </div>
 
-      <div class="targets-container">
-        <table class="targets-table">
+      <div class="table-card">
+        <table class="data-table">
           <thead>
             <tr>
               <th>Phone Number</th>
@@ -62,97 +83,129 @@
           </thead>
           <tbody>
             <tr v-for="target in targets" :key="target.id">
-              <td>{{ target.phone }}</td>
-              <td><span :class="['status-badge', target.status.toLowerCase()]">{{ target.status }}</span></td>
-              <td style="color: #DC2626; font-size: 0.85rem;">{{ target.error || '-' }}</td>
+              <td class="font-mono">{{ target.phone }}</td>
+              <td>
+                <span :class="['status-chip', target.status.toLowerCase()]">
+                  {{ target.status }}
+                </span>
+              </td>
+              <td class="error-text">{{ target.error || '-' }}</td>
             </tr>
             <tr v-if="targets.length === 0">
-              <td colspan="3" style="text-align: center; color: #94A3B8; padding: 2rem;">No targets found.</td>
+              <td colspan="3" class="empty-state">
+                <div class="empty-content">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                  <p>No targets found matching your criteria.</p>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
       
-      <!-- Pagination Controls -->
-      <div v-if="targetTotalPages > 1" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
-        <button :disabled="targetPage === 1" @click="targetPage--; fetchTargets()" class="btn-secondary">Previous</button>
-        <span>Page {{ targetPage }} of {{ targetTotalPages }}</span>
-        <button :disabled="targetPage === targetTotalPages" @click="targetPage++; fetchTargets()" class="btn-secondary">Next</button>
+      <!-- Pagination -->
+      <div v-if="targetTotalPages > 1" class="pagination">
+        <button :disabled="targetPage === 1" @click="targetPage--; fetchTargets()" class="page-btn">← Prev</button>
+        <span class="page-info">Page <strong>{{ targetPage }}</strong> of <strong>{{ targetTotalPages }}</strong></span>
+        <button :disabled="targetPage === targetTotalPages" @click="targetPage++; fetchTargets()" class="page-btn">Next →</button>
       </div>
     </div>
 
     <!-- INTERACTIONS TAB -->
-    <div v-if="activeTab === 'interactions'">
-      <div v-if="interactionStats" class="interactions-stats-row" style="margin-bottom: 2rem;">
-        <div class="istat-card green">
-          <div class="istat-num">{{ interactionStats.interacted }}</div>
-          <div class="istat-label">Interacted</div>
+    <div v-if="activeTab === 'interactions'" class="tab-content fade-in">
+      <div v-if="interactionStats" class="stats-grid">
+        <div class="stat-card interacted">
+          <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ interactionStats.interacted }}</div>
+            <div class="stat-label">Interacted</div>
+          </div>
         </div>
-        <div class="istat-card red">
-          <div class="istat-num">{{ interactionStats.notInteracted }}</div>
-          <div class="istat-label">No Response</div>
+        <div class="stat-card no-response">
+          <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ interactionStats.notInteracted }}</div>
+            <div class="stat-label">No Response</div>
+          </div>
         </div>
-        <div class="istat-card blue" v-for="(count, btnText) in interactionStats.buttonBreakdown" :key="btnText">
-          <div class="istat-num">{{ count }}</div>
-          <div class="istat-label">{{ btnText }}</div>
+        <div class="stat-card button-stat" v-for="(count, btnText) in interactionStats.buttonBreakdown" :key="btnText">
+          <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ count }}</div>
+            <div class="stat-label">"{{ btnText }}"</div>
+          </div>
         </div>
       </div>
 
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap;">
-        <div style="display: flex; gap: 1rem; flex: 1;">
-          <input v-model="interactionSearch" @keyup.enter="fetchInteractions" type="text" placeholder="Search phone number..." class="form-input" style="max-width: 300px;" />
-          <button @click="fetchInteractions" class="btn-secondary">Search</button>
-        </div>
-        <div>
-          <button @click="exportData('interactions')" class="btn-primary" style="background: #10B981; border-color: #10B981;">
-            ↓ Export Interactions CSV
+      <div class="filters-bar" style="margin-top: 2rem;">
+        <div class="actions-group" style="width: 100%; justify-content: space-between;">
+          <div class="search-box">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input v-model="interactionSearch" @keyup.enter="fetchInteractions" type="text" placeholder="Search phone number..." class="form-input" />
+          </div>
+          <button @click="exportData('interactions')" class="btn-export">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Export CSV
           </button>
         </div>
       </div>
 
-      <div class="targets-container">
-        <table class="targets-table">
+      <div class="table-card">
+        <table class="data-table">
           <thead>
             <tr>
-              <th>📱 Phone</th>
-              <th>🔘 Response / Button</th>
-              <th>🕑 Time</th>
+              <th>Phone Number</th>
+              <th>Response / Button</th>
+              <th>Time</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="interaction in interactions" :key="interaction.id">
-              <td>{{ interaction.phone }}</td>
-              <td><span class="status-badge completed">{{ interaction.buttonText }}</span></td>
-              <td style="font-size:0.8rem; color:#64748B;">{{ new Date(interaction.createdAt).toLocaleString() }}</td>
+              <td class="font-mono">{{ interaction.phone }}</td>
+              <td><span class="status-chip completed">{{ interaction.buttonText }}</span></td>
+              <td class="time-text">{{ new Date(interaction.createdAt).toLocaleString() }}</td>
             </tr>
             <tr v-if="interactions.length === 0">
-              <td colspan="3" style="text-align:center; color:#94A3B8; padding:2rem;">No interactions found.</td>
+              <td colspan="3" class="empty-state">
+                <div class="empty-content">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                  <p>No interactions recorded yet.</p>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Pagination Controls -->
-      <div v-if="interactionTotalPages > 1" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
-        <button :disabled="interactionPage === 1" @click="interactionPage--; fetchInteractions()" class="btn-secondary">Previous</button>
-        <span>Page {{ interactionPage }} of {{ interactionTotalPages }}</span>
-        <button :disabled="interactionPage === interactionTotalPages" @click="interactionPage++; fetchInteractions()" class="btn-secondary">Next</button>
+      <!-- Pagination -->
+      <div v-if="interactionTotalPages > 1" class="pagination">
+        <button :disabled="interactionPage === 1" @click="interactionPage--; fetchInteractions()" class="page-btn">← Prev</button>
+        <span class="page-info">Page <strong>{{ interactionPage }}</strong> of <strong>{{ interactionTotalPages }}</strong></span>
+        <button :disabled="interactionPage === interactionTotalPages" @click="interactionPage++; fetchInteractions()" class="page-btn">Next →</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 
 const route = useRoute()
+const router = useRouter()
 const campaignId = route.params.id
 
 const loading = ref(true)
 const campaign = ref(null)
 const activeTab = ref('targets')
+const retrying = ref(false)
 
 // Targets Pagination & Filters
 const targets = ref([])
@@ -191,7 +244,7 @@ const fetchTargets = async () => {
     const res = await axios.get(`/api/v1/campaigns/${campaignId}/targets`, {
       params: {
         page: targetPage.value,
-        limit: 50,
+        limit: 20,
         status: targetStatus.value,
         search: targetSearch.value
       },
@@ -206,12 +259,31 @@ const fetchTargets = async () => {
   }
 }
 
+// Quick Search Watcher for seamless UX
+let searchTimeout;
+watch(targetSearch, () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    targetPage.value = 1;
+    fetchTargets();
+  }, 500);
+});
+
+watch(interactionSearch, () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    interactionPage.value = 1;
+    fetchInteractions();
+  }, 500);
+});
+
+
 const fetchInteractions = async () => {
   try {
     const res = await axios.get(`/api/v1/campaigns/${campaignId}/interactions`, {
       params: {
         page: interactionPage.value,
-        limit: 50,
+        limit: 20,
         search: interactionSearch.value
       },
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -225,6 +297,24 @@ const fetchInteractions = async () => {
     }
   } catch (err) {
     console.error(err)
+  }
+}
+
+const retryFailed = async () => {
+  retrying.value = true
+  try {
+    const res = await axios.post(`/api/v1/campaigns/${campaignId}/retry`, {}, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+    alert(res.data.message || 'Retrying failed numbers...')
+    setTimeout(() => {
+      fetchTargets()
+    }, 1000)
+  } catch (err) {
+    console.error('Failed to retry campaign', err)
+    alert(err.response?.data?.message || 'Failed to retry campaign.')
+  } finally {
+    retrying.value = false
   }
 }
 
@@ -254,151 +344,371 @@ const exportData = (type) => {
 </script>
 
 <style scoped>
-.modal-tabs {
-  display: flex;
-  gap: 1rem;
-  border-bottom: 2px solid #E2E8F0;
-  padding-bottom: 0.5rem;
-}
-.modal-tabs button {
-  background: none;
-  border: none;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #64748B;
-  cursor: pointer;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-.modal-tabs button.active {
-  background: #F1F5F9;
-  color: #0F172A;
-}
-.modal-tabs button:hover:not(.active) {
-  background: #F8FAFC;
-}
-
-.targets-container {
-  max-height: 600px;
-  overflow-y: auto;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-}
-.targets-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.targets-table th, .targets-table td {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  border-bottom: 1px solid #E2E8F0;
-}
-.targets-table th {
-  background: #F8FAFC;
-  font-size: 0.85rem;
-  color: #64748B;
-  position: sticky;
-  top: 0;
-}
-.status-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-.status-badge.pending { background: #FEF3C7; color: #D97706; }
-.status-badge.sent, .status-badge.completed { background: #D1FAE5; color: #059669; }
-.status-badge.failed { background: #FEE2E2; color: #DC2626; }
-.status-badge.running { background: #DBEAFE; color: #2563EB; }
-
-.interactions-stats-row {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-.istat-card {
-  flex: 1;
-  min-width: 120px;
-  padding: 1.5rem;
-  border-radius: 12px;
-  text-align: center;
-  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-}
-.istat-card.green { background: #D1FAE5; color: #065F46; }
-.istat-card.red { background: #FEE2E2; color: #991B1B; }
-.istat-card.blue { background: #DBEAFE; color: #1E40AF; }
-.istat-num {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-.istat-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-</style>
-
-.btn-primary {
-  background: #3B82F6;
-  color: white;
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: inline-block;
-  text-decoration: none;
-}
-.btn-primary:hover {
-  background: #2563EB;
-}
-
-.btn-secondary {
-  background: #E2E8F0;
+.campaign-details-page {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: 'Inter', system-ui, sans-serif;
   color: #1E293B;
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-secondary:hover {
-  background: #CBD5E1;
 }
 
+/* Animations */
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Header */
+.page-header {
+  margin-bottom: 2rem;
+}
 .btn-back {
-  background: none;
+  background: white;
   border: 1px solid #E2E8F0;
   color: #64748B;
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   margin-bottom: 1.5rem;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 .btn-back:hover {
-  background: #F1F5F9;
-  color: #334155;
+  background: #F8FAFC;
+  color: #0F172A;
+  transform: translateX(-3px);
+  border-color: #CBD5E1;
 }
 
-.form-input, .form-select {
-  padding: 0.5rem;
-  border: 1px solid #CBD5E1;
-  border-radius: 6px;
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+.campaign-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 0.5rem 0;
+}
+.campaign-subtitle {
+  color: #64748B;
+  font-size: 1rem;
+  margin: 0;
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+/* Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+.status-badge.pending { background: #FEF3C7; color: #D97706; }
+.status-badge.pending .status-dot { background: #F59E0B; }
+.status-badge.sent, .status-badge.completed { background: #ECFDF5; color: #059669; }
+.status-badge.sent .status-dot, .status-badge.completed .status-dot { background: #10B981; }
+.status-badge.failed { background: #FEF2F2; color: #DC2626; }
+.status-badge.failed .status-dot { background: #EF4444; }
+
+/* Tabs */
+.tabs-wrapper {
+  margin-bottom: 2rem;
+  border-bottom: 2px solid #F1F5F9;
+}
+.tabs-container {
+  display: flex;
+  gap: 2rem;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #64748B;
+  cursor: pointer;
+  padding: 1rem 0;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.tab-btn:hover { color: #334155; }
+.tab-btn.active {
+  color: #3B82F6;
+  border-bottom-color: #3B82F6;
+}
+
+/* Quick Filters (Pills) */
+.filters-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.quick-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.filter-pill {
+  padding: 0.5rem 1.25rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #F1F5F9;
+  color: #64748B;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.filter-pill:hover { background: #E2E8F0; color: #334155; }
+
+.filter-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94A3B8;
+  transition: background 0.2s ease;
+}
+.filter-pill.pending:not(.active) .filter-dot { background: #F59E0B; }
+.filter-pill.sent:not(.active) .filter-dot { background: #10B981; }
+.filter-pill.failed:not(.active) .filter-dot { background: #EF4444; }
+.filter-pill.all:not(.active) .filter-dot { background: #64748B; }
+
+.filter-pill.active .filter-dot { background: white; opacity: 0.8; }
+
+/* specific pill colors */
+.filter-pill.all.active { background: #1E293B; color: white; box-shadow: 0 4px 10px rgba(30, 41, 59, 0.2); }
+.filter-pill.pending.active { background: #F59E0B; color: white; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.2); }
+.filter-pill.sent.active { background: #10B981; color: white; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); }
+.filter-pill.failed.active { background: #EF4444; color: white; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2); }
+
+/* Actions Group */
+.actions-group {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-icon {
+  position: absolute;
+  left: 12px;
+  color: #94A3B8;
+}
+.form-input {
+  padding: 0.65rem 1rem 0.65rem 2.5rem;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
   font-size: 0.95rem;
   outline: none;
-  transition: border-color 0.2s;
+  min-width: 250px;
+  transition: all 0.2s ease;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05) inset;
 }
-.form-input:focus, .form-select:focus {
+.form-input:focus {
   border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
+
+.btn-export {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  color: white;
+  padding: 0.65rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+  transition: all 0.2s ease;
+}
+.btn-export:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(16, 185, 129, 0.3);
+}
+
+.btn-retry {
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  color: white;
+  padding: 0.65rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.2);
+  transition: all 0.2s ease;
+}
+.btn-retry:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(245, 158, 11, 0.3);
+}
+.btn-retry:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
+.spin-icon { animation: spin 1s linear infinite; }
+
+/* Table */
+.table-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+  border: 1px solid #E2E8F0;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.data-table th, .data-table td {
+  padding: 1.2rem 1.5rem;
+  text-align: left;
+}
+.data-table th {
+  background: #F8FAFC;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #E2E8F0;
+}
+.data-table td {
+  border-bottom: 1px solid #F1F5F9;
+  font-size: 0.95rem;
+  color: #334155;
+}
+.data-table tr:hover td {
+  background: #F8FAFC;
+}
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+.font-mono { font-family: 'JetBrains Mono', monospace, sans-serif; font-weight: 500; }
+.error-text { color: #EF4444; font-size: 0.85rem; }
+.time-text { color: #64748B; font-size: 0.85rem; }
+
+/* Status Chips (small table versions) */
+.status-chip {
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.status-chip.pending { background: #FEF3C7; color: #B45309; }
+.status-chip.sent, .status-chip.completed { background: #D1FAE5; color: #047857; }
+.status-chip.failed { background: #FEE2E2; color: #B91C1C; }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 4rem 2rem !important; }
+.empty-content { display: flex; flex-direction: column; align-items: center; gap: 1rem; color: #94A3B8; }
+.empty-content svg { opacity: 0.5; }
+.empty-content p { margin: 0; font-size: 1.05rem; font-weight: 500; }
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+.stat-card {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+  border: 1px solid #E2E8F0;
+  transition: transform 0.2s ease;
+}
+.stat-card:hover { transform: translateY(-3px); }
+.stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.stat-content { display: flex; flex-direction: column; }
+.stat-value { font-size: 2rem; font-weight: 800; color: #0F172A; line-height: 1; margin-bottom: 0.25rem; }
+.stat-label { font-size: 0.85rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Card colors */
+.stat-card.interacted .stat-icon { background: #ECFDF5; color: #10B981; }
+.stat-card.no-response .stat-icon { background: #FEF2F2; color: #EF4444; }
+.stat-card.button-stat .stat-icon { background: #EFF6FF; color: #3B82F6; }
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+.page-btn {
+  background: white;
+  border: 1px solid #E2E8F0;
+  color: #334155;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.page-btn:hover:not(:disabled) {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  transform: translateY(-1px);
+}
+.page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.page-info { color: #64748B; font-size: 0.95rem; }
+.page-info strong { color: #0F172A; }
+</style>
