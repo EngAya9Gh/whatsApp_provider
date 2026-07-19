@@ -10,6 +10,16 @@
         <div class="header-left">
           <h1 class="campaign-title">{{ campaign.name }}</h1>
           <p class="campaign-subtitle">{{ campaign.message || 'Template Message' }}</p>
+          <div class="campaign-dates" v-if="campaign.startDate || campaign.endDate">
+            <span class="date-badge" v-if="campaign.startDate" title="Tracking Starts At">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              Starts: {{ new Date(campaign.startDate).toLocaleString() }}
+            </span>
+            <span class="date-badge" v-if="campaign.endDate" title="Tracking Ends At">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              Ends: {{ new Date(campaign.endDate).toLocaleString() }}
+            </span>
+          </div>
         </div>
         <div class="header-right">
           <span :class="['status-badge', campaign.status.toLowerCase()]">
@@ -443,31 +453,15 @@ const exportData = (type) => {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
   border: 1px solid rgba(226, 232, 240, 0.8);
 }
-.campaign-title {
-  font-size: 1.75rem;
-  font-weight: 800;
-  color: #0F172A;
-  margin: 0 0 0.5rem 0;
-}
-.campaign-subtitle {
-  color: #64748B;
-  font-size: 1rem;
-  margin: 0;
-  max-width: 600px;
-  line-height: 1.5;
-}
+.campaign-title { font-size: 2rem; font-weight: 800; color: #0F172A; margin: 0 0 0.5rem 0; line-height: 1.2; }
+.campaign-subtitle { color: #64748B; font-size: 1.05rem; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* Badges */
+.campaign-dates { display: flex; gap: 1rem; margin-top: 0.75rem; }
+.date-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 600; color: #475569; background: #F1F5F9; padding: 0.3rem 0.75rem; border-radius: 6px; }
+
 .status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 1rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 999px;
+  font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
 }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; }
 
