@@ -111,7 +111,14 @@ exports.getTargets = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
-    const targets = await campaignService.getTargets(tenantId, id);
+    const { page, limit, status, search } = req.query;
+    
+    const targets = await campaignService.getTargets(tenantId, id, {
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 50,
+      status,
+      search
+    });
     res.status(200).json({ success: true, data: targets });
   } catch (error) {
     next(error);
@@ -144,9 +151,32 @@ exports.getInteractions = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
-    const result = await campaignService.getInteractions(tenantId, id);
+    const { page, limit, search } = req.query;
+    
+    const result = await campaignService.getInteractions(tenantId, id, {
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 50,
+      search
+    });
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);
   }
 };
+
+exports.exportCampaignData = async (req, res, next) => {
+  try {
+    const tenantId = req.tenant.id;
+    const { id } = req.params;
+    const { type, status } = req.query; // type can be 'targets' or 'interactions'
+    
+    const csvData = await campaignService.exportCampaignData(tenantId, id, type, status);
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=campaign_\${id}_\${type}.csv`);
+    res.status(200).send(csvData);
+  } catch (error) {
+    next(error);
+  }
+};
+

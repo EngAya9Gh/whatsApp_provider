@@ -46,7 +46,7 @@ const startServer = async () => {
       logger.info(`Server is running on port ${config.port} in ${config.env} mode`);
     });
   } catch (error) {
-    logger.error('Failed to start server:', error);
+    console.error('SERVER CRASH:', error);
     process.exit(1);
   }
 };

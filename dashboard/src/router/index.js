@@ -15,6 +15,7 @@ import InvoiceView from '../views/InvoiceView.vue'
 import MessageSend from '../views/MessageSend.vue'
 import Templates from '../views/Templates.vue'
 import Campaigns from '../views/Campaigns.vue'
+import CampaignDetails from '../views/CampaignDetails.vue'
 
 const routes = [
   { path: '/login', component: Login, meta: { guest: true } },
@@ -27,6 +28,7 @@ const routes = [
   { path: '/chatbot', component: Chatbot, meta: { requiresAuth: true } },
   { path: '/templates', component: Templates, meta: { requiresAuth: true } },
   { path: '/campaigns', component: Campaigns, meta: { requiresAuth: true } },
+  { path: '/campaigns/:id', component: CampaignDetails, meta: { requiresAuth: true } },
   { path: '/keys', component: ApiKeys, meta: { requiresAuth: true } },
   { path: '/logs', component: Logs, meta: { requiresAuth: true } },
   { path: '/billing', component: Billing, meta: { requiresAuth: true } },

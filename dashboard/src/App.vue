@@ -20,7 +20,7 @@
           <span class="nav-label">{{ $t('sidebar.send_message') }}</span>
         </router-link>
         <router-link to="/campaigns" class="nav-item" active-class="active">
-          <span class="nav-icon">🚀</span>
+          <span class="nav-icon">📢</span>
           <span class="nav-label">{{ $t('sidebar.campaigns') }}</span>
         </router-link>
         <router-link to="/templates" class="nav-item" active-class="active">

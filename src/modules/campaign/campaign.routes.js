@@ -41,6 +41,7 @@ router.post('/:id/retry', campaignController.retryFailed);
 router.get('/:id/targets', campaignController.getTargets);
 router.get('/:id/stats', campaignController.getCampaignStats);
 router.get('/:id/interactions', campaignController.getInteractions);
+router.get('/:id/export', campaignController.exportCampaignData);
 router.get('/', campaignController.getCampaigns);
 
 module.exports = router;

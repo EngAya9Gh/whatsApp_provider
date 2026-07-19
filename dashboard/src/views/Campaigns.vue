@@ -55,7 +55,7 @@
               {{ startingId === campaign.id ? 'Starting...' : '▶ Start' }}
             </button>
             <button v-else @click="loadStats(campaign.id)" class="btn-text">Refresh Stats</button>
-            <button v-if="campaign.status !== 'PENDING'" @click="openTargetsModal(campaign.id)" class="btn-text" style="color: #3B82F6;">{{ $t('campaigns.details') || 'Details' }}</button>
+            <router-link :to="`/campaigns/${campaign.id}`" class="btn-text" style="color: #3B82F6;">ℹ️ {{ $t('campaigns.details') || 'Details' }}</router-link>
           </div>
         </div>
       </div>
@@ -156,137 +156,6 @@
       </div>
     </div>
 
-    <!-- Targets/Interactions Modal -->
-    <div v-if="showTargetsModal" class="modal-overlay" @click.self="showTargetsModal = false">
-      <div class="modal targets-modal">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-          <h2 style="margin: 0;">{{ $t('campaigns.campaign_details') || 'Campaign Details' }}: {{ selectedCampaign?.name }}</h2>
-          <button v-if="hasFailedTargets" @click="retryFailed" class="btn-primary" style="padding: 0.5rem 1rem;">
-            {{ $t('campaigns.retry_failed') || 'Retry Failed Numbers' }}
-          </button>
-        </div>
-        
-        <!-- Campaign Info Section -->
-        <!-- Tabs -->
-        <div class="modal-tabs" style="display:flex; gap:0.5rem; margin-bottom:1rem; border-bottom:1px solid #E2E8F0;">
-          <button @click="activeTab = 'details'" :class="['tab-btn', { active: activeTab === 'details' }]">📋 {{ $t('campaigns.details') || 'Details' }}</button>
-          <button @click="activeTab = 'targets'" :class="['tab-btn', { active: activeTab === 'targets' }]">👥 {{ $t('campaigns.target_numbers') || 'Numbers' }}</button>
-          <button v-if="selectedCampaign?.interactiveType === 'BUTTONS'" @click="openInteractions" :class="['tab-btn', { active: activeTab === 'interactions' }]">🔘 {{ $t('campaigns.interactions') || 'Interactions' }}</button>
-        </div>
-
-        <!-- Details Tab -->
-        <div v-if="activeTab === 'details'">
-          <div class="campaign-info-grid">
-            <div class="info-item">
-              <span class="label">{{ $t('campaigns.campaign_title') || 'Campaign Title' }}:</span>
-              <strong>{{ selectedCampaign?.name }}</strong>
-            </div>
-            <div class="info-item">
-              <span class="label">{{ $t('campaigns.status') || 'Status' }}:</span>
-              <span :class="['status-badge', selectedCampaign?.status?.toLowerCase()]">{{ selectedCampaign?.status }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">{{ $t('campaigns.created') || 'Created' }}:</span>
-              <span>{{ new Date(selectedCampaign?.createdAt).toLocaleString() }}</span>
-            </div>
-            <div class="info-item" v-if="selectedCampaign?.mediaPath">
-              <span class="label">{{ $t('campaigns.media_attachment') || 'Media Attachment' }}:</span>
-              <img v-if="selectedCampaign.mediaMime?.startsWith('image/')" :src="'/api/' + selectedCampaign.mediaPath" class="media-preview-img" />
-              <a v-else :href="'/api/' + selectedCampaign.mediaPath" target="_blank" style="color: #3B82F6;">{{ $t('campaigns.view_doc') || 'View Attached Document' }}</a>
-            </div>
-            <div class="info-item full-width">
-              <span class="label">{{ $t('campaigns.message_content') || 'Message Content' }}:</span>
-              <div class="message-box">{{ getMessageContent(selectedCampaign) }}</div>
-            </div>
-            <!-- Show campaign buttons if any -->
-            <div v-if="selectedCampaign?.buttons" class="info-item full-width">
-              <span class="label">🔘 {{ $t('campaigns.buttons') || 'Buttons' }}:</span>
-              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.4rem;">
-                <span v-for="btn in JSON.parse(selectedCampaign.buttons)" :key="btn.text" class="btn-preview-badge">
-                  {{ btn.text }} <small style="color:#64748B;">({{ btn.type }})</small>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Numbers Tab -->
-        <div v-if="activeTab === 'targets'">
-          <div v-if="targetsLoading" class="loading-state">Loading numbers...</div>
-          <div v-else class="targets-container">
-            <table class="targets-table">
-              <thead>
-                <tr>
-                  <th>{{ $t('campaigns.phone_number') || 'Phone Number' }}</th>
-                  <th>{{ $t('campaigns.status') || 'Status' }}</th>
-                  <th>{{ $t('campaigns.error_reason') || 'Error Reason' }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="target in targets" :key="target.id">
-                  <td>{{ target.phone }}</td>
-                  <td><span :class="['status-badge', target.status.toLowerCase()]">{{ target.status }}</span></td>
-                  <td style="color: #DC2626; font-size: 0.85rem;">{{ target.error || '-' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Interactions Tab -->
-        <div v-if="activeTab === 'interactions'">
-          <div v-if="interactionsLoading" class="loading-state">Loading interactions...</div>
-          <div v-else>
-            <div v-if="interactionData" class="interactions-stats-row">
-              <div class="istat-card green">
-                <div class="istat-num">{{ interactionData.stats.interacted }}</div>
-                <div class="istat-label">{{ $t('campaigns.interacted') || 'Interacted' }}</div>
-              </div>
-              <div class="istat-card red">
-                <div class="istat-num">{{ interactionData.stats.notInteracted }}</div>
-                <div class="istat-label">{{ $t('campaigns.not_interacted') || 'No Response' }}</div>
-              </div>
-              <div class="istat-card blue" v-for="(count, btnText) in interactionData.stats.buttonBreakdown" :key="btnText">
-                <div class="istat-num">{{ count }}</div>
-                <div class="istat-label">{{ btnText }}</div>
-              </div>
-            </div>
-            <div class="targets-container" style="margin-top:1rem;">
-              <table class="targets-table">
-                <thead>
-                  <tr>
-                    <th>📱 Phone</th>
-                    <th>🔘 Button Pressed</th>
-                    <th>🕑 Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="interaction in interactionData?.interactions" :key="interaction.id">
-                    <td>{{ interaction.phone }}</td>
-                    <td><span class="status-badge completed">{{ interaction.buttonText }}</span></td>
-                    <td style="font-size:0.8rem; color:#64748B;">{{ new Date(interaction.createdAt).toLocaleString() }}</td>
-                  </tr>
-                  <tr v-if="!interactionData?.interactions?.length">
-                    <td colspan="3" style="text-align:center; color:#94A3B8; padding:2rem;">{{ $t('campaigns.no_interactions') || 'No interactions yet.' }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div v-if="interactionData?.notInteracted?.length" style="margin-top:1rem;">
-              <h4 style="color:#64748B; font-size:0.9rem;">{{ $t('campaigns.did_not_interact') || 'Did Not Interact' }} ({{ interactionData.notInteracted.length }}):</h4>
-              <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.5rem;">
-                <span v-for="phone in interactionData.notInteracted" :key="phone" class="phone-tag">{{ phone }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" @click="showTargetsModal = false" class="btn-secondary">{{ $t('campaigns.close') || 'Close' }}</button>
-        </div>
-      </div>
-    </div>
-
   </div>
 </template>
 
@@ -308,11 +177,6 @@ const selectedFile = ref(null)
 const selectedImage = ref(null)
 const startingId = ref(null)
 
-const showTargetsModal = ref(false)
-const targets = ref([])
-const targetsLoading = ref(false)
-const selectedCampaignId = ref(null)
-const selectedCampaign = computed(() => campaigns.value.find(c => c.id === selectedCampaignId.value))
 const editingCampaign = ref(null)
 
 const formData = ref({
@@ -325,13 +189,6 @@ const formData = ref({
   endDate: ''
 })
 
-const hasFailedTargets = computed(() => targets.value.some(t => t.status === 'FAILED'))
-
-// Interactions
-const activeTab = ref('details')
-const interactionsLoading = ref(false)
-const interactionData = ref(null)
-
 const addButton = () => {
   if (formData.value.buttons.length < 3) {
     formData.value.buttons.push({ text: '', type: 'reply', url: '' })
@@ -340,15 +197,6 @@ const addButton = () => {
 
 const removeButton = (index) => {
   formData.value.buttons.splice(index, 1)
-}
-
-const getMessageContent = (campaign) => {
-  if (campaign.message) return campaign.message;
-  if (campaign.templateId) {
-    const tpl = templates.value.find(t => t.id === campaign.templateId);
-    return tpl ? `[Template: ${tpl.name}]\n\n${tpl.content}` : 'Template Message';
-  }
-  return 'No message content';
 }
 
 const fetchTemplates = async () => {
@@ -525,58 +373,6 @@ const startCampaign = async (id) => {
   }
 }
 
-const openTargetsModal = async (id) => {
-  selectedCampaignId.value = id
-  showTargetsModal.value = true
-  activeTab.value = 'details'
-  targetsLoading.value = true
-  targets.value = []
-  interactionData.value = null
-  
-  try {
-    const res = await axios.get(`/api/v1/campaigns/${id}/targets`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    })
-    targets.value = res.data.data
-  } catch (err) {
-    error.value = 'Failed to load campaign targets.'
-  } finally {
-    targetsLoading.value = false
-  }
-}
-
-const openInteractions = async () => {
-  activeTab.value = 'interactions'
-  if (interactionData.value) return // already loaded
-  interactionsLoading.value = true
-  try {
-    const res = await axios.get(`/api/v1/campaigns/${selectedCampaignId.value}/interactions`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    })
-    interactionData.value = res.data.data
-  } catch (err) {
-    error.value = 'Failed to load interactions.'
-  } finally {
-    interactionsLoading.value = false
-  }
-}
-
-const retryFailed = async () => {
-  if (!selectedCampaignId.value) return
-  error.value = ''
-  success.value = ''
-  try {
-    const res = await axios.post(`/api/v1/campaigns/${selectedCampaignId.value}/retry`, {}, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    })
-    success.value = res.data.message || 'Retrying failed numbers...'
-    showTargetsModal.value = false
-    fetchCampaigns()
-    setTimeout(() => { success.value = '' }, 5000)
-  } catch (err) {
-    error.value = err.response?.data?.message || 'Failed to retry campaign.'
-  }
-}
 
 onMounted(() => {
   fetchCampaigns()
