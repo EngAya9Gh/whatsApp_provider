@@ -51,7 +51,8 @@ class SessionManager {
       if (type !== 'notify') return;
       for (const msg of messages) {
         if (!msg.message || msg.key.fromMe) continue;
-        const senderPhone = msg.key.remoteJid?.replace(/@.*$/, '') || '';
+        // Some users reply using @lid, their real number is in remoteJidAlt
+        const senderPhone = (msg.key.remoteJidAlt || msg.key.remoteJid || '').replace(/@.*$/, '');
 
         // Button Reply
         const btnReply = msg.message?.buttonsResponseMessage;
