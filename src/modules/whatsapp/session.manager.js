@@ -157,9 +157,11 @@ class SessionManager {
 
                 if (campaign.startDate && now < new Date(campaign.startDate)) {
                   isActiveCampaign = false;
+                  logger.info(`[Text Reply] Campaign ${campaign.id} not started yet.`);
                 }
                 if (campaign.endDate && now > new Date(campaign.endDate)) {
                   isActiveCampaign = false;
+                  logger.info(`[Text Reply] Campaign ${campaign.id} already ended.`);
                 }
 
                 if (isActiveCampaign) {
@@ -185,8 +187,13 @@ class SessionManager {
                         interactionType: 'TEXT_REPLY'
                       }
                     });
+                    logger.info(`[Text Reply] Logged text reply from ${senderPhone} for Campaign ${target.campaignId}: "${incomingText}"`);
+                  } else {
+                    logger.info(`[Text Reply] Duplicate reply from ${senderPhone} for Campaign ${target.campaignId} ignored.`);
                   }
                 }
+              } else {
+                logger.info(`[Text Reply] No campaign target found for ${senderPhone}.`);
               }
             } catch (trackErr) {
               logger.error(`[Text Reply Tracking] Error: ${trackErr.message}`);
