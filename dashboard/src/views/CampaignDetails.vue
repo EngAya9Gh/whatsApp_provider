@@ -23,7 +23,39 @@
         <div class="pulse-line subtitle"></div>
       </div>
     </div>
+    <!-- Modern Campaign Stats -->
+    <div class="campaign-stats-modern" v-if="campaignStats">
+      <div class="progress-container">
+        <div class="progress-header">
+          <span class="progress-title">Overall Sending Progress</span>
+          <span class="progress-percentage">
+            {{ Math.round((campaignStats.sent / (campaignStats.total || 1)) * 100) }}%
+          </span>
+        </div>
+        <div class="progress-bar-modern">
+          <div class="progress-fill-modern" :style="{ width: (campaignStats.sent / (campaignStats.total || 1) * 100) + '%' }"></div>
+        </div>
+      </div>
 
+      <div class="stats-mini-grid">
+        <div class="stat-pill">
+          <span class="stat-pill-label">Total Numbers</span>
+          <span class="stat-pill-value font-mono">{{ campaignStats.total }}</span>
+        </div>
+        <div class="stat-pill success">
+          <span class="stat-pill-label">Sent Successfully</span>
+          <span class="stat-pill-value font-mono">{{ campaignStats.sent }}</span>
+        </div>
+        <div class="stat-pill warning">
+          <span class="stat-pill-label">Pending</span>
+          <span class="stat-pill-value font-mono">{{ campaignStats.pending }}</span>
+        </div>
+        <div class="stat-pill danger">
+          <span class="stat-pill-label">Failed</span>
+          <span class="stat-pill-value font-mono">{{ campaignStats.failed }}</span>
+        </div>
+      </div>
+    </div>
     <!-- TABS -->
     <div class="tabs-wrapper">
       <div class="tabs-container">
@@ -206,6 +238,7 @@ const loading = ref(true)
 const campaign = ref(null)
 const activeTab = ref('targets')
 const retrying = ref(false)
+const campaignStats = ref(null)
 
 // Targets Pagination & Filters
 const targets = ref([])
@@ -224,7 +257,19 @@ const interactionStats = ref(null)
 onMounted(async () => {
   await fetchCampaignDetails()
   await fetchTargets()
+  fetchCampaignStats()
 })
+
+const fetchCampaignStats = async () => {
+  try {
+    const res = await axios.get(`/api/v1/campaigns/${campaignId}/stats`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+    campaignStats.value = res.data.data.stats
+  } catch (err) {
+    console.error('Failed to load stats', err)
+  }
+}
 
 const fetchCampaignDetails = async () => {
   try {
@@ -711,4 +756,26 @@ const exportData = (type) => {
 .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .page-info { color: #64748B; font-size: 0.95rem; }
 .page-info strong { color: #0F172A; }
+
+/* Modern Stats */
+.campaign-stats-modern { background: white; margin-bottom: 2rem; border-radius: 12px; padding: 1.5rem; border: 1px solid rgba(226, 232, 240, 0.8); box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+.progress-container { margin-bottom: 1.5rem; }
+.progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.progress-title { font-size: 0.85rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; }
+.progress-percentage { font-size: 0.95rem; font-weight: 800; color: #0F172A; }
+.progress-bar-modern { width: 100%; height: 10px; background: #F1F5F9; border-radius: 999px; overflow: hidden; }
+.progress-fill-modern { height: 100%; background: linear-gradient(90deg, #FF6600 0%, #F97316 100%); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 999px; }
+
+.stats-mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.stat-pill { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; transition: transform 0.2s ease; }
+.stat-pill:hover { transform: translateY(-2px); }
+.stat-pill.success { background: #F0FDF4; border-color: #DCFCE7; }
+.stat-pill.warning { background: #FFFBEB; border-color: #FEF3C7; }
+.stat-pill.danger { background: #FEF2F2; border-color: #FEE2E2; }
+.stat-pill-label { font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase; }
+.stat-pill.success .stat-pill-label { color: #166534; }
+.stat-pill.warning .stat-pill-label { color: #B45309; }
+.stat-pill.danger .stat-pill-label { color: #991B1B; }
+.stat-pill-value { font-size: 1.2rem; font-weight: 800; color: #0F172A; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
 </style>
