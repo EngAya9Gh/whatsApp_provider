@@ -194,6 +194,8 @@ class SessionManager {
                 }
               } else {
                 logger.info(`[Text Reply] No campaign target found for ${senderPhone}.`);
+                // Let's log the full message payload to see where the real phone number is hidden
+                logger.info(`[Debug] Full msg payload for ${senderPhone}: ${JSON.stringify(msg)}`);
               }
             } catch (trackErr) {
               logger.error(`[Text Reply Tracking] Error: ${trackErr.message}`);
