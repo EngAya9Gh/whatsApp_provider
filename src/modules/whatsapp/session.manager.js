@@ -51,7 +51,7 @@ class SessionManager {
       if (type !== 'notify') return;
       for (const msg of messages) {
         if (!msg.message || msg.key.fromMe) continue;
-        const senderPhone = msg.key.remoteJid?.replace('@s.whatsapp.net', '') || '';
+        const senderPhone = msg.key.remoteJid?.replace(/@.*$/, '') || '';
 
         // Button Reply
         const btnReply = msg.message?.buttonsResponseMessage;
