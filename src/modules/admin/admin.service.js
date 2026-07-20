@@ -123,6 +123,19 @@ class AdminService {
     });
   }
 
+  async updateSettings(id, data) {
+    const tenant = await prisma.tenant.findUnique({ where: { id } });
+    if (!tenant) throw new Error('Tenant not found');
+
+    return prisma.tenant.update({
+      where: { id },
+      data: {
+        monthlyLimit: data.monthlyLimit || tenant.monthlyLimit,
+        metaEnabled: data.metaEnabled
+      }
+    });
+  }
+
   async createInvoice(tenantId, amount, description, billingCycle = 'Monthly', status = 'PENDING') {
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new Error('Tenant not found');

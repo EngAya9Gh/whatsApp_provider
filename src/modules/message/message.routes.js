@@ -19,5 +19,6 @@ router.post('/upload-media', upload.single('file'), validate(uploadMediaSchema),
 router.post('/send-buttons', upload.single('image'), messageController.sendButtons);
 router.post('/send-list', messageController.sendList);
 router.post('/send-location', messageController.sendLocation);
+router.post('/send-meta-template', messageController.sendMetaTemplate);
 
 module.exports = router;

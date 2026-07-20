@@ -158,7 +158,8 @@ class CampaignService {
           mediaMime: campaign.mediaMime,
           buttons: campaign.buttons,
           interactiveType: campaign.interactiveType || 'TEXT',
-          targetId: target.id
+          targetId: target.id,
+          channelId: campaign.channelId
         },
         opts: {
           removeOnComplete: true,

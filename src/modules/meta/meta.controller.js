@@ -219,6 +219,28 @@ class MetaController {
       next(error);
     }
   }
+
+  async getTemplates(req, res, next) {
+    try {
+      const tenantId = req.tenant.id;
+      const { id } = req.params; // channelId
+
+      const channel = await prisma.whatsAppChannel.findFirst({
+        where: { id, tenantId, providerType: 'META_CLOUD' }
+      });
+
+      if (!channel) {
+        return res.status(404).json({ success: false, message: 'Meta channel not found' });
+      }
+
+      const metaService = require('./meta.service');
+      const templatesData = await metaService.fetchTemplates(channel);
+      
+      res.status(200).json({ success: true, data: templatesData });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new MetaController();

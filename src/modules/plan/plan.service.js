@@ -51,20 +51,31 @@ class PlanService {
 
   async getAllPlans() {
     return prisma.planSetting.findMany({
-      orderBy: { price: 'asc' }
+      orderBy: { sortOrder: 'asc' }
     });
   }
 
   async updatePlan(id, data) {
-    // Only name, price, limit, and features can be updated
+    const updateData = {
+      name: data.name,
+      price: parseFloat(data.price),
+      limit: parseInt(data.limit, 10),
+      features: typeof data.features === 'string' ? data.features : JSON.stringify(data.features),
+    };
+
+    if (data.nameAr !== undefined) updateData.nameAr = data.nameAr;
+    if (data.nameEn !== undefined) updateData.nameEn = data.nameEn;
+    if (data.featuresAr !== undefined) updateData.featuresAr = typeof data.featuresAr === 'string' ? data.featuresAr : JSON.stringify(data.featuresAr);
+    if (data.featuresEn !== undefined) updateData.featuresEn = typeof data.featuresEn === 'string' ? data.featuresEn : JSON.stringify(data.featuresEn);
+    if (data.sortOrder !== undefined) updateData.sortOrder = parseInt(data.sortOrder, 10);
+    if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
+    if (data.isPopular !== undefined) updateData.isPopular = Boolean(data.isPopular);
+    if (data.buttonTextAr !== undefined) updateData.buttonTextAr = data.buttonTextAr;
+    if (data.buttonTextEn !== undefined) updateData.buttonTextEn = data.buttonTextEn;
+
     return prisma.planSetting.update({
       where: { id },
-      data: {
-        name: data.name,
-        price: parseFloat(data.price),
-        limit: parseInt(data.limit, 10),
-        features: typeof data.features === 'string' ? data.features : JSON.stringify(data.features)
-      }
+      data: updateData
     });
   }
 }

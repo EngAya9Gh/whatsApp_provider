@@ -33,6 +33,64 @@ class MetaService {
     }
   }
 
+  async uploadMedia(channel, filePath, mimetype) {
+    try {
+      const form = new FormData();
+      form.append('file', fs.createReadStream(filePath));
+      form.append('type', mimetype);
+      form.append('messaging_product', 'whatsapp');
+
+      const uploadRes = await axios.post(
+        `https://graph.facebook.com/v19.0/${channel.metaPhoneNumberId}/media`,
+        form,
+        {
+          headers: {
+            ...form.getHeaders(),
+            'Authorization': `Bearer ${channel.metaAccessToken}`
+          }
+        }
+      );
+
+      return uploadRes.data.id;
+    } catch (error) {
+      logger.error('[Meta Service] Media Upload Error', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async fetchTemplates(channel) {
+    if (!channel || !channel.metaWabaId || channel.providerType !== 'META_CLOUD') {
+      throw new Error('Invalid Meta channel configuration for templates');
+    }
+
+    try {
+      // Limit to 100 templates for simplicity. 
+      const url = `https://graph.facebook.com/v19.0/${channel.metaWabaId}/message_templates?limit=100`;
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${channel.metaAccessToken}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      logger.error(`[Meta Service] Error fetching templates for WABA ${channel.metaWabaId}`, error.response?.data || error.message);
+      throw error.response?.data || error;
+    }
+  }
+
+  async sendTemplate(channel, phone, templateName, languageCode, components = []) {
+    return this.sendMessage(channel, phone, {
+      type: "template",
+      template: {
+        name: templateName,
+        language: {
+          code: languageCode
+        },
+        components: components
+      }
+    });
+  }
+
   async sendText(channel, phone, text) {
     return this.sendMessage(channel, phone, {
       type: "text",

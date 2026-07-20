@@ -19,7 +19,7 @@ const campaignQueue = new Queue('campaign-queue', { connection });
 
 // Initialize Worker
 const campaignWorker = new Worker('campaign-queue', async (job) => {
-  const { tenantId, phone, message, templateId, buttons, interactiveType, targetId } = job.data;
+  const { tenantId, phone, message, templateId, buttons, interactiveType, targetId, channelId } = job.data;
   let { mediaPath, mediaMime } = job.data;
   
   try {
@@ -42,7 +42,13 @@ const campaignWorker = new Worker('campaign-queue', async (job) => {
     }
 
     // 2. Send based on interactiveType
-    if (interactiveType === 'BUTTONS' && buttons) {
+    if (interactiveType === 'META_TEMPLATE') {
+      // For Meta Templates, 'message' contains the templateName, 'templateId' contains languageCode, and 'buttons' contains components JSON
+      const templateName = message;
+      const languageCode = templateId || 'en';
+      const components = buttons ? (typeof buttons === 'string' ? JSON.parse(buttons) : buttons) : [];
+      await messageService.sendMetaTemplate(tenantId, phone, templateName, languageCode, components, channelId);
+    } else if (interactiveType === 'BUTTONS' && buttons) {
       // Parse buttons JSON
       const parsedButtons = typeof buttons === 'string' ? JSON.parse(buttons) : buttons;
       // Load image if mediaPath exists
@@ -50,14 +56,14 @@ const campaignWorker = new Worker('campaign-queue', async (job) => {
       if (mediaPath && fs.existsSync(mediaPath)) {
         imageBuffer = fs.readFileSync(mediaPath);
       }
-      await messageService.sendButtonsMessage(tenantId, phone, finalMessage || '', parsedButtons, imageBuffer);
+      await messageService.sendButtonsMessage(tenantId, phone, finalMessage || '', parsedButtons, imageBuffer, channelId);
     } else if (mediaPath && fs.existsSync(mediaPath)) {
       let type = 'image';
       if (mediaMime && mediaMime.includes('pdf')) type = 'pdf';
-      await messageService.sendMediaMessage(tenantId, phone, type, mediaPath, finalMessage || '', mediaMime, 'campaign-media');
+      await messageService.sendMediaMessage(tenantId, phone, type, mediaPath, finalMessage || '', mediaMime, 'campaign-media', channelId);
     } else {
       if (!finalMessage) throw new Error('No message content found');
-      await messageService.sendCustomMessage(tenantId, phone, finalMessage);
+      await messageService.sendCustomMessage(tenantId, phone, finalMessage, channelId);
     }
     
     // Update target status

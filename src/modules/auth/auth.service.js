@@ -75,7 +75,9 @@ class AuthService {
         id: tenant.id,
         name: tenant.name,
         email: tenant.email,
-        sessionStatus: tenant.sessionStatus
+        sessionStatus: tenant.sessionStatus,
+        plan: tenant.plan,
+        metaEnabled: tenant.metaEnabled
       }
     };
   }

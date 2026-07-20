@@ -92,3 +92,15 @@ exports.sendLocation = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.sendMetaTemplate = async (req, res, next) => {
+  try {
+    const { phone, templateName, languageCode, components, channelId, channel_id } = req.body;
+    const tenantId = req.tenant.id;
+    const resolvedChannelId = channelId || channel_id;
+    const result = await messageService.sendMetaTemplate(tenantId, phone, templateName, languageCode, components, resolvedChannelId);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};

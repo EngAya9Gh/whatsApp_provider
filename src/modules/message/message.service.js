@@ -38,6 +38,32 @@ class MessageService {
     }
   }
 
+  async sendMetaTemplate(tenantId, phone, templateName, languageCode, components, channelId) {
+    const canSend = await billingService.checkLimit(tenantId);
+    if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
+
+    const channel = await this._getChannel(channelId);
+    if (!channel || channel.providerType !== 'META_CLOUD') {
+      throw { status: 400, message: 'Invalid Meta Cloud channel' };
+    }
+
+    try {
+      await metaService.sendTemplate(channel, phone, templateName, languageCode, components);
+      
+      await prisma.messageLog.create({
+        data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'SENT' }
+      });
+      await billingService.incrementUsage(tenantId, 'sent');
+      return { success: true, message: 'Template sent successfully' };
+    } catch (error) {
+      await prisma.messageLog.create({
+        data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'FAILED', errorMessage: error.message || 'Sending failed' }
+      });
+      await billingService.incrementUsage(tenantId, 'failed');
+      throw error;
+    }
+  }
+
   async sendMediaMessage(tenantId, phone, type, url, caption, mimetype, fileName, channelId = null) {
     const canSend = await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };

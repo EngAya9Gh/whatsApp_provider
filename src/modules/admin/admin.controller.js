@@ -66,6 +66,19 @@ class AdminController {
     }
   }
 
+  async updateSettings(req, res, next) {
+    try {
+      const { monthlyLimit, metaEnabled } = req.body;
+      const tenant = await adminService.updateSettings(req.params.id, {
+        monthlyLimit: parseInt(monthlyLimit),
+        metaEnabled: metaEnabled === true || metaEnabled === 'true'
+      });
+      res.json({ success: true, data: tenant });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createInvoice(req, res, next) {
     try {
       const { amount, description, billingCycle, status } = req.body;

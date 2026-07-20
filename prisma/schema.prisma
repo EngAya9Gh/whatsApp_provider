@@ -28,6 +28,7 @@ model Tenant {
   sessionStatus    SessionStatus     @default(DISCONNECTED) @map("session_status")
   webhookUrl       String?           @map("webhook_url") @db.Text
   monthlyLimit     Int               @default(20) @map("monthly_limit")
+  metaEnabled      Boolean           @default(false) @map("meta_enabled")
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
   apiKeys          ApiKey[]
@@ -220,12 +221,21 @@ model AutoResponder {
 
 model PlanSetting {
   id        String   @id @default(uuid())
-  planCode  Plan     @unique @map("plan_code")
-  name      String
-  price     Float
-  limit     Int
-  features  String   @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
+  planCode     Plan     @unique @map("plan_code")
+  name         String
+  nameAr       String?  @map("name_ar")
+  nameEn       String?  @map("name_en")
+  price        Float
+  limit        Int
+  features     String   @db.Text
+  featuresAr   String?  @map("features_ar") @db.Text
+  featuresEn   String?  @map("features_en") @db.Text
+  sortOrder    Int      @default(0) @map("sort_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  isPopular    Boolean  @default(false) @map("is_popular")
+  buttonTextAr String?  @map("button_text_ar")
+  buttonTextEn String?  @map("button_text_en")
+  createdAt    DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("plan_settings")

@@ -15,9 +15,15 @@
         </div>
 
         <form @submit.prevent="updatePlan(plan)" class="plan-form">
-          <div class="form-group">
-            <label>Public Name</label>
-            <input type="text" v-model="plan.name" required />
+          <div class="form-row">
+            <div class="form-group">
+              <label>Name (AR)</label>
+              <input type="text" v-model="plan.nameAr" required />
+            </div>
+            <div class="form-group">
+              <label>Name (EN)</label>
+              <input type="text" v-model="plan.nameEn" required />
+            </div>
           </div>
 
           <div class="form-row">
@@ -31,10 +37,40 @@
             </div>
           </div>
 
+          <div class="form-row">
+            <div class="form-group">
+              <label>Sort Order</label>
+              <input type="number" v-model="plan.sortOrder" required />
+            </div>
+            <div class="form-group" style="display:flex; flex-direction:column; gap:0.5rem; justify-content:center;">
+              <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <input type="checkbox" v-model="plan.isActive" /> Show on Landing Page
+              </label>
+              <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <input type="checkbox" v-model="plan.isPopular" /> Most Popular (Badge)
+              </label>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Button Text (AR)</label>
+              <input type="text" v-model="plan.buttonTextAr" />
+            </div>
+            <div class="form-group">
+              <label>Button Text (EN)</label>
+              <input type="text" v-model="plan.buttonTextEn" />
+            </div>
+          </div>
+
           <div class="form-group">
-            <label>Features (JSON Array)</label>
-            <textarea v-model="plan.featuresText" rows="4" placeholder='["Feature 1", "Feature 2"]' required></textarea>
-            <small>Must be a valid JSON array of strings.</small>
+            <label>Features (AR - JSON Array)</label>
+            <textarea v-model="plan.featuresArText" rows="3" required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Features (EN - JSON Array)</label>
+            <textarea v-model="plan.featuresEnText" rows="3" required></textarea>
           </div>
 
           <div class="actions">
@@ -66,7 +102,8 @@ const fetchPlans = async () => {
     
     plans.value = res.data.data.map(p => ({
       ...p,
-      featuresText: typeof p.features === 'string' ? p.features : JSON.stringify(p.features, null, 2),
+      featuresArText: typeof p.featuresAr === 'string' ? p.featuresAr : JSON.stringify(p.featuresAr || [], null, 2),
+      featuresEnText: typeof p.featuresEn === 'string' ? p.featuresEn : JSON.stringify(p.featuresEn || [], null, 2),
       saving: false
     }))
   } catch (err) {
@@ -80,22 +117,30 @@ const updatePlan = async (plan) => {
   try {
     plan.saving = true
     // Validate JSON
-    let parsedFeatures
     try {
-      parsedFeatures = JSON.parse(plan.featuresText)
-      if (!Array.isArray(parsedFeatures)) throw new Error('Not an array')
+      if (!Array.isArray(JSON.parse(plan.featuresArText))) throw new Error('Not an array')
+      if (!Array.isArray(JSON.parse(plan.featuresEnText))) throw new Error('Not an array')
     } catch (e) {
-      alert('Features must be a valid JSON array like: ["Feature 1", "Feature 2"]')
+      alert('Features must be valid JSON arrays.')
       plan.saving = false
       return
     }
 
     const token = localStorage.getItem('admin_token')
     await axios.put(`/api/plans/${plan.id}`, {
-      name: plan.name,
+      name: plan.nameEn, // fallback
+      nameAr: plan.nameAr,
+      nameEn: plan.nameEn,
       price: plan.price,
       limit: plan.limit,
-      features: plan.featuresText
+      features: plan.featuresEnText, // fallback
+      featuresAr: plan.featuresArText,
+      featuresEn: plan.featuresEnText,
+      sortOrder: plan.sortOrder,
+      isActive: plan.isActive,
+      isPopular: plan.isPopular,
+      buttonTextAr: plan.buttonTextAr,
+      buttonTextEn: plan.buttonTextEn
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })

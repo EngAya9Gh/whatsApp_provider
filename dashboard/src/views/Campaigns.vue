@@ -139,22 +139,37 @@
             <label>Message Type</label>
             <div class="radio-group" style="display:flex; gap:1rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
               <label><input type="radio" v-model="formData.type" value="text" /> Text Message</label>
-              <label><input type="radio" v-model="formData.type" value="template" /> Template</label>
-              <label><input type="radio" v-model="formData.type" value="buttons" /> 🔘 With Buttons</label>
+              <label v-if="!isMetaChannel"><input type="radio" v-model="formData.type" value="template" /> Local Template</label>
+              <label v-if="isMetaChannel"><input type="radio" v-model="formData.type" value="meta_template" /> Meta Template (Official)</label>
+              <label v-if="isMetaChannel"><input type="radio" v-model="formData.type" value="buttons" /> Buttons (Interactive)</label>
             </div>
+          </div>
+
+          <div class="form-group" v-if="formData.type === 'template'">
+            <label>Select Local Template</label>
+            <select v-model="formData.templateId" required class="form-input">
+              <option value="" disabled>Choose a template...</option>
+              <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
+            </select>
+          </div>
+
+          <div class="form-group" v-if="formData.type === 'meta_template'">
+            <label>Select Meta Template</label>
+            <div v-if="metaTemplates.length === 0" style="color: #64748B; font-size: 0.85rem; margin-bottom: 0.5rem;">
+              Fetching Meta templates... (Please wait)
+            </div>
+            <select v-model="formData.templateId" required class="form-input">
+              <option value="" disabled>Choose an approved Meta template...</option>
+              <option v-for="tpl in metaTemplates" :key="tpl.name + tpl.language" :value="tpl.name + '||' + tpl.language">
+                {{ tpl.name }} ({{ tpl.language }}) - {{ tpl.category }} - {{ tpl.status }}
+              </option>
+            </select>
+            <small class="hint">Only APPROVED templates will be delivered by Meta. Variables in Meta templates currently cannot be dynamic from CSV in this version.</small>
           </div>
 
           <div class="form-group" v-if="formData.type === 'text'">
             <label>Message Content</label>
             <textarea v-model="formData.message" rows="5" placeholder="Write your marketing message here..." required class="form-input"></textarea>
-          </div>
-
-          <div class="form-group" v-if="formData.type === 'template'">
-            <label>Select Template</label>
-            <select v-model="formData.templateId" required class="form-input">
-              <option value="" disabled>Choose a template...</option>
-              <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
-            </select>
           </div>
 
           <!-- Buttons section -->
@@ -217,11 +232,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import axios from 'axios'
 
 const campaigns = ref([])
 const templates = ref([])
+const metaTemplates = ref([])
 const channels = ref([])
 const loading = ref(true)
 const error = ref('')
@@ -269,6 +285,11 @@ const fetchTemplates = async () => {
 }
 
 const fetchChannels = async () => {
+  const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
+  if (!tenant.metaEnabled) {
+    channels.value = []
+    return
+  }
   try {
     const res = await axios.get('/api/v1/meta/channels', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -276,6 +297,30 @@ const fetchChannels = async () => {
     channels.value = res.data.data
   } catch (err) {}
 }
+
+const isMetaChannel = computed(() => {
+  const ch = channels.value.find(c => c.id === formData.value.channelId)
+  return ch && ch.providerType === 'META_CLOUD'
+})
+
+watch(() => formData.value.channelId, async (newId) => {
+  if (isMetaChannel.value) {
+    formData.value.type = 'meta_template'
+    try {
+      metaTemplates.value = []
+      const res = await axios.get(`/api/v1/meta/channel/${newId}/templates`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      })
+      if (res.data && res.data.data && res.data.data.data) {
+        metaTemplates.value = res.data.data.data // Meta Graph API structure
+      }
+    } catch(e) {
+      console.error('Failed to load meta templates', e)
+    }
+  } else {
+    formData.value.type = 'text'
+  }
+})
 
 const fetchCampaigns = async () => {
   loading.value = true
@@ -336,6 +381,11 @@ const submitCampaign = async () => {
     } else if (formData.value.type === 'template') {
       form.append('templateId', formData.value.templateId)
       form.append('interactiveType', 'TEXT')
+    } else if (formData.value.type === 'meta_template') {
+      const parts = formData.value.templateId.split('||') // name||language
+      form.append('message', parts[0]) // use message field for templateName
+      form.append('templateId', parts[1]) // use templateId field for languageCode
+      form.append('interactiveType', 'META_TEMPLATE')
     } else if (formData.value.type === 'buttons') {
       form.append('message', formData.value.message)
       form.append('interactiveType', 'BUTTONS')

@@ -1,100 +1,148 @@
 <template>
-  <div class="connect-container">
-    <h2>WhatsApp Connections</h2>
-    <p class="subtitle">Manage your WhatsApp numbers connected via Web QR (Baileys) or Official Meta Cloud API.</p>
+  <div class="max-w-4xl mx-auto pb-12 p-6 md:p-8 font-sans text-slate-800">
+    <div class="mb-8">
+      <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">WhatsApp Connections</h2>
+      <p class="text-slate-500 font-medium text-lg">Manage your WhatsApp numbers connected via Web QR (Standard) or Official Meta Cloud API.</p>
+    </div>
 
-    <!-- 1. Baileys (Web Socket) Connection -->
-    <div class="status-card">
-      <div class="card-header">
-        <h3>Web QR Connection (Standard)</h3>
-        <span class="badge" :class="status === 'CONNECTED' ? 'bg-success' : 'bg-gray'">{{ status }}</span>
+    <!-- 1. Web Socket Connection -->
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 mt-6 text-left">
+      <div class="flex justify-between items-center mb-2">
+        <h3 class="text-xl font-bold text-slate-900 m-0">Web QR Connection (Standard)</h3>
+        <span :class="status === 'CONNECTED' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-slate-100 text-slate-600 border-slate-200'" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border">
+          {{ status }}
+        </span>
       </div>
-      <p class="desc">Best for standard text and media messaging without strict Meta template approvals.</p>
-      <hr />
+      <p class="text-slate-500 text-sm mt-2 mb-6 font-medium">Best for standard text and media messaging without strict Meta template approvals.</p>
+      
+      <hr class="border-t border-slate-100 my-6" />
 
-      <div v-if="status === 'CONNECTED'" class="connected-state">
-        <div class="icon">✅</div>
-        <p>WhatsApp Phone: <strong>{{ phone }}</strong></p>
-        <button @click="disconnect" class="btn-danger">Disconnect QR Session</button>
+      <div v-if="status === 'CONNECTED'" class="text-center py-6">
+        <div class="text-5xl mb-6">✅</div>
+        <p class="text-lg text-slate-700 mb-6 font-medium">WhatsApp Phone: <strong class="text-slate-900 font-bold">{{ phone }}</strong></p>
+        <button @click="disconnect" class="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 px-6 py-2.5 rounded-lg font-bold shadow-sm transition-colors cursor-pointer">
+          Disconnect QR Session
+        </button>
       </div>
 
-      <div v-else-if="status === 'CONNECTING'" class="connecting-state">
-        <p>Open WhatsApp on your phone > Linked Devices > Link a Device.</p>
-        <div class="qr-box" v-if="qrCode">
+      <div v-else-if="status === 'CONNECTING'" class="text-center py-6">
+        <p class="text-slate-600 font-medium mb-6">Open WhatsApp on your phone > Linked Devices > Link a Device.</p>
+        <div v-if="qrCode" class="inline-block bg-slate-50 p-6 rounded-xl border border-slate-200 shadow-inner">
           <qrcode-vue :value="qrCode" :size="250" level="H" />
         </div>
-        <div v-else class="loading">Generating QR Code...</div>
+        <div v-else class="text-slate-400 font-medium animate-pulse">Generating QR Code...</div>
       </div>
 
-      <div v-else class="disconnected-state">
-        <button @click="connect" class="btn-primary" :disabled="loading">
+      <div v-else class="text-center py-6">
+        <button @click="connect" :disabled="loading" class="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-xl font-bold shadow-md transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed border-none cursor-pointer text-lg">
           {{ loading ? 'Starting Session...' : 'Link via QR Code' }}
         </button>
       </div>
     </div>
 
     <!-- 2. Meta Cloud API Connections -->
-    <div class="status-card meta-card">
-      <div class="card-header">
-        <h3>Meta Cloud API (Official)</h3>
-        <span class="badge bg-primary">RECOMMENDED FOR INTERACTIVE</span>
-      </div>
-      <p class="desc">Required for sending Interactive Messages (Buttons & Lists). Connect via official Meta Developer portal.</p>
-      
-      <!-- Webhook Setup Info Box -->
-      <div class="webhook-info-box">
-        <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg> Meta Webhook Setup</h4>
-        <p>To receive replies and button clicks, configure this Webhook in your Meta Developer App (only once per app):</p>
-        <div class="webhook-field">
-          <span>Callback URL:</span>
-          <code>{{ baseUrl }}/api/v1/meta/webhook</code>
-        </div>
-        <div class="webhook-field">
-          <span>Verify Token:</span>
-          <code>wakeel_meta_secret_1234</code>
-        </div>
-        <small class="hint" style="color: #64748B; margin-top: 0.5rem; display: block;">* You can change the Verify Token in your .env file (META_VERIFY_TOKEN)</small>
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 border-t-4 border-t-green-500 mt-8 text-left relative overflow-hidden">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <h2 class="text-2xl font-extrabold text-slate-900 m-0 flex items-center gap-3">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+          Meta Cloud API (Official)
+        </h2>
+        <span class="bg-blue-100 text-blue-800 border border-blue-200 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+          PRO Feature
+        </span>
       </div>
 
-      <hr />
-
-      <div v-if="metaChannels.length > 0" class="channels-list">
-        <div v-for="channel in metaChannels" :key="channel.id" class="channel-item">
-          <div class="channel-info">
-            <strong>+{{ channel.phoneNumber }}</strong>
-            <span class="status-dot"></span> {{ channel.status }}
-          </div>
-          <button @click="deleteMetaChannel(channel.id)" class="btn-danger-sm">Remove</button>
+      <!-- Upgrade Banner for Non-Enabled users -->
+      <div v-if="!isMetaEnabled" class="flex flex-col md:flex-row items-center gap-6 bg-orange-50 border border-orange-100 p-6 rounded-xl mt-4">
+        <div class="bg-white p-3 rounded-full shadow-sm border border-orange-100 shrink-0">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
         </div>
-      </div>
-
-      <div v-if="showMetaForm" class="meta-form">
-        <h4>Add Meta Number</h4>
-        <div class="form-group">
-          <label>Phone Number (with Country Code e.g. 9665...)</label>
-          <input type="text" v-model="metaForm.phoneNumber" placeholder="966500000000" />
-        </div>
-        <div class="form-group">
-          <label>Phone Number ID (From Meta)</label>
-          <input type="text" v-model="metaForm.metaPhoneNumberId" />
-        </div>
-        <div class="form-group">
-          <label>WABA ID (WhatsApp Business Account ID)</label>
-          <input type="text" v-model="metaForm.metaWabaId" />
-        </div>
-        <div class="form-group">
-          <label>Permanent Access Token</label>
-          <input type="password" v-model="metaForm.metaAccessToken" />
-        </div>
-        <div class="form-actions">
-          <button @click="addMetaChannel" class="btn-primary" :disabled="metaLoading">
-            {{ metaLoading ? 'Saving...' : 'Save Meta Connection' }}
+        <div class="flex-1 text-center md:text-start">
+          <h3 class="text-xl font-bold text-orange-900 mb-2">Unlock Meta Cloud API</h3>
+          <p class="text-orange-700 font-medium mb-4 text-sm md:text-base leading-relaxed">هذه الميزة متاحة فقط في باقة الأعمال (أو بطلب خاص من الإدارة)، تمنحك استقراراً تاماً وأزراراً تفاعلية رسمية.</p>
+          <button @click="goToUpgrade" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-sm transition-colors border-none cursor-pointer">
+            اضغط هنا للترقية
           </button>
-          <button @click="showMetaForm = false" class="btn-secondary">Cancel</button>
         </div>
       </div>
-      <div v-else class="mt-4">
-        <button @click="showMetaForm = true" class="btn-primary">Add Meta Number</button>
+
+      <!-- Actual Meta Form for Enterprise users -->
+      <div v-else>
+        <p class="text-slate-500 text-sm font-medium mb-6">Required for sending Interactive Messages (Buttons & Lists). Connect via official Meta Developer portal.</p>
+        
+        <!-- Webhook Setup Info Box -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 my-6">
+          <h4 class="flex items-center gap-2 text-slate-800 font-bold mb-3 mt-0 text-base">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg> 
+            Meta Webhook Setup
+          </h4>
+          <p class="text-sm text-slate-600 mb-4 font-medium">To receive replies and button clicks, configure this Webhook in your Meta Developer App (only once per app):</p>
+          
+          <div class="flex flex-col gap-3">
+            <div class="flex flex-col sm:flex-row sm:items-center bg-white p-3 rounded-lg border border-slate-200 text-sm">
+              <span class="font-bold text-slate-500 w-32 shrink-0 mb-1 sm:mb-0">Callback URL:</span>
+              <code class="text-slate-900 font-mono select-all bg-slate-50 px-2 py-1 rounded w-full overflow-x-auto">{{ baseUrl }}/api/v1/meta/webhook</code>
+            </div>
+            <div class="flex flex-col sm:flex-row sm:items-center bg-white p-3 rounded-lg border border-slate-200 text-sm">
+              <span class="font-bold text-slate-500 w-32 shrink-0 mb-1 sm:mb-0">Verify Token:</span>
+              <code class="text-slate-900 font-mono select-all bg-slate-50 px-2 py-1 rounded w-full overflow-x-auto">wakeel_meta_secret_1234</code>
+            </div>
+          </div>
+          <small class="block text-slate-400 mt-4 font-medium">* You can change the Verify Token in your .env file (META_VERIFY_TOKEN)</small>
+        </div>
+  
+        <hr class="border-t border-slate-100 my-6" />
+  
+        <div v-if="metaChannels.length > 0" class="flex flex-col gap-4 mb-6">
+          <div v-for="channel in metaChannels" :key="channel.id" class="flex justify-between items-center p-4 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 transition-colors">
+            <div class="flex items-center gap-3">
+              <strong class="text-slate-900 font-bold text-lg">+{{ channel.phoneNumber }}</strong>
+              <div class="flex items-center text-xs font-bold text-slate-500 uppercase">
+                <span class="inline-block w-2.5 h-2.5 bg-green-500 rounded-full mr-2"></span> {{ channel.status }}
+              </div>
+            </div>
+            <button @click="deleteMetaChannel(channel.id)" class="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-md font-bold text-xs transition-colors border border-red-100 cursor-pointer">
+              Remove
+            </button>
+          </div>
+        </div>
+  
+        <div v-if="showMetaForm" class="bg-slate-50 p-6 rounded-xl border border-dashed border-slate-300 mt-6">
+          <h4 class="text-lg font-bold text-slate-900 mt-0 mb-5">Add Meta Number</h4>
+          
+          <div class="grid grid-cols-1 gap-5">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Phone Number (with Country Code e.g. 9665...)</label>
+              <input type="text" v-model="metaForm.phoneNumber" placeholder="966500000000" class="w-full p-3 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Phone Number ID (From Meta)</label>
+              <input type="text" v-model="metaForm.metaPhoneNumberId" class="w-full p-3 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">WABA ID (WhatsApp Business Account ID)</label>
+              <input type="text" v-model="metaForm.metaWabaId" class="w-full p-3 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Permanent Access Token</label>
+              <input type="password" v-model="metaForm.metaAccessToken" class="w-full p-3 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all" />
+            </div>
+          </div>
+          
+          <div class="flex items-center gap-3 mt-6">
+            <button @click="addMetaChannel" :disabled="metaLoading" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-sm transition-colors disabled:opacity-50 border-none cursor-pointer">
+              {{ metaLoading ? 'Saving...' : 'Save Meta Connection' }}
+            </button>
+            <button @click="showMetaForm = false" class="bg-slate-200 text-slate-700 hover:bg-slate-300 px-6 py-2.5 rounded-lg font-bold transition-colors border-none cursor-pointer">
+              Cancel
+            </button>
+          </div>
+        </div>
+        <div v-else class="mt-6">
+          <button @click="showMetaForm = true" class="bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-500 hover:text-white px-6 py-2.5 rounded-lg font-bold shadow-sm transition-colors cursor-pointer">
+            + Add Meta Number
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -106,13 +154,18 @@ import axios from 'axios'
 import { io } from 'socket.io-client'
 import QrcodeVue from 'qrcode.vue'
 
-// Baileys State
+// Standard Web QR State
 const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
+const isMetaEnabled = ref(tenant.metaEnabled === true)
 const status = ref(tenant.sessionStatus || 'DISCONNECTED')
 const phone = ref(tenant.whatsappPhone || '')
 const qrCode = ref('')
 const loading = ref(false)
 let socket = null
+
+const goToUpgrade = () => {
+  window.location.href = '/' // Or routing to a billing page
+}
 
 // Meta State
 const metaChannels = ref([])
@@ -127,6 +180,7 @@ const metaForm = ref({
 })
 
 const fetchMetaChannels = async () => {
+  if (!isMetaEnabled.value) return; // Skip fetching if not enabled
   const token = localStorage.getItem('token')
   try {
     const res = await axios.get('/api/v1/meta/channels', {
@@ -248,48 +302,3 @@ const disconnect = async () => {
 }
 </script>
 
-<style scoped>
-.connect-container { max-width: 700px; margin: 0 auto; padding-bottom: 3rem; }
-.subtitle { color: #6b7280; margin-bottom: 2rem; }
-.status-card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-top: 1.5rem; text-align: left; }
-.meta-card { border-top: 4px solid #10b981; }
-
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.card-header h3 { margin: 0; }
-.badge { padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
-.bg-success { background: #d1fae5; color: #065f46; }
-.bg-gray { background: #f3f4f6; color: #374151; }
-.bg-primary { background: #dbeafe; color: #1e40af; }
-.desc { color: #6b7280; font-size: 0.875rem; margin-top: 0.5rem; }
-
-hr { border: 0; border-top: 1px solid #e5e7eb; margin: 1.5rem 0; }
-
-.icon { font-size: 3rem; margin-bottom: 1rem; text-align: center; }
-.connected-state, .connecting-state, .disconnected-state { text-align: center; }
-
-.btn-primary, .btn-danger, .btn-secondary { padding: 0.75rem 1.5rem; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 1rem; margin-right: 0.5rem; }
-.btn-primary { background: #3b82f6; color: white; }
-.btn-danger { background: #ef4444; color: white; }
-.btn-secondary { background: #f3f4f6; color: #374151; }
-.btn-danger-sm { background: #fee2e2; color: #991b1b; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: bold; }
-
-.qr-box { background: #f3f4f6; padding: 1rem; border-radius: 8px; margin-top: 1rem; display: inline-block; }
-
-.channels-list { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; }
-.channel-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; }
-.status-dot { display: inline-block; width: 8px; height: 8px; background: #10b981; border-radius: 50%; margin-left: 0.5rem; margin-right: 0.25rem; }
-
-.meta-form { background: #f9fafb; padding: 1.5rem; border-radius: 8px; border: 1px dashed #d1d5db; }
-.meta-form h4 { margin-top: 0; margin-bottom: 1rem; }
-.form-group { margin-bottom: 1rem; }
-.form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.875rem; color: #374151; }
-.meta-form input { width: 100%; padding: 0.75rem; border: 1px solid #CBD5E1; border-radius: 6px; font-family: monospace; }
-.form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
-.webhook-info-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
-.webhook-info-box h4 { display: flex; align-items: center; gap: 0.5rem; color: #334155; margin-top: 0; margin-bottom: 0.5rem; }
-.webhook-info-box p { font-size: 0.85rem; color: #475569; margin-bottom: 0.75rem; }
-.webhook-field { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; background: white; padding: 0.5rem; border-radius: 6px; border: 1px solid #E2E8F0; font-size: 0.85rem; }
-.webhook-field span { font-weight: 600; color: #64748B; width: 100px; }
-.webhook-field code { color: #0F172A; font-family: monospace; user-select: all; }
-.mt-4 { margin-top: 1rem; }
-</style>

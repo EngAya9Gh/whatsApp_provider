@@ -33,11 +33,11 @@
             {{ $i18n.locale === 'ar' ? 'الإصدار الجديد متاح الآن' : 'New Version Available' }}
           </div>
           <h1 class="hero-title">
-            <template v-if="$i18n.locale === 'ar'">ارتقِ بتجربة عملائك عبر <span class="text-gradient">الواتساب</span> بذكاء واحترافية</template>
-            <template v-else>Elevate your customer experience on <span class="text-gradient">WhatsApp</span></template>
+            <template v-if="$i18n.locale === 'ar'">أتمتة وتواصل ذكي عبر <span class="text-gradient">الواتساب</span> يضاعف أرباحك</template>
+            <template v-else>Smart automation & communication on <span class="text-gradient">WhatsApp</span> to boost your profits</template>
           </h1>
           <p class="hero-subtitle">
-            {{ $i18n.locale === 'ar' ? 'المنصة الأسرع والأكثر موثوقية لإرسال رسائل التحقق (OTP) والحملات التسويقية. اربط نظامك في ثوانٍ وانطلق.' : 'The fastest, most reliable platform for OTPs and marketing campaigns. Integrate your system in seconds and launch.' }}
+            {{ $i18n.locale === 'ar' ? 'المنصة الأسرع والأكثر موثوقية لإرسال رسائل التحقق (OTP)، الحملات التسويقية، والإشعارات الخدمية كالفواتير من أنظمة ERP. اربط نظامك في ثوانٍ وانطلق.' : 'The fastest, most reliable platform for OTPs, marketing campaigns, and transactional notifications like ERP invoices. Integrate your system in seconds and launch.' }}
           </p>
           <div class="hero-cta-group">
             <router-link to="/register" class="btn-primary btn-large">
@@ -185,22 +185,44 @@
         <div class="pricing-grid">
           <div v-for="plan in pricingPlans" :key="plan.id" :class="['price-card', { popular: plan.isPopular }]">
             <div v-if="plan.isPopular" class="popular-badge">{{ $i18n.locale === 'ar' ? 'الأكثر طلباً' : 'Most Popular' }}</div>
-            <h3 class="plan-name">{{ plan.name }}</h3>
-            <div class="plan-price">${{ plan.price }}</div>
-            <p class="plan-desc">{{ plan.limit }} {{ $i18n.locale === 'ar' ? 'رسالة' : 'Messages' }}</p>
+            <h3 class="plan-name">{{ $i18n.locale === 'ar' ? plan.nameAr : plan.nameEn }}</h3>
+            <div v-if="plan.price === 0 && plan.limit === 'Unlimited/Custom'" class="plan-price" style="font-size: 1.8rem;">
+              {{ $i18n.locale === 'ar' ? 'تواصل معنا' : 'Contact Us' }}
+            </div>
+            <div v-else-if="plan.price === 0" class="plan-price">{{ $i18n.locale === 'ar' ? 'مجاني' : 'Free' }}</div>
+            <div v-else class="plan-price">${{ plan.price }}</div>
+            
+            <p class="plan-desc">
+              <template v-if="plan.limit !== 'Unlimited/Custom'">
+                <span style="font-weight: bold; color: #fff;">{{ $i18n.locale === 'ar' ? 'الحد:' : 'Limit:' }}</span> {{ plan.limit }} {{ $i18n.locale === 'ar' ? 'رسالة' : 'Messages' }}
+              </template>
+              <template v-else-if="plan.id === 'pro'">
+                <span style="font-weight: bold; color: #fff;">{{ $i18n.locale === 'ar' ? 'الدفع حسب الاستهلاك' : 'Pay as you go' }}</span>
+              </template>
+              <template v-else-if="plan.id === 'enterprise'">
+                <span style="color: #FF6600; font-size: 0.95rem; font-weight: 600;">
+                  {{ $i18n.locale === 'ar' ? 'يتم احتساب اشتراك منفصل لكل رقم يتم ربطه بميتا' : 'A separate subscription is charged for each Meta number' }}
+                </span>
+              </template>
+              <template v-else>{{ plan.limit }}</template>
+            </p>
             
             <ul class="plan-features">
-              <li>
+              <li v-if="plan.limit !== 'Unlimited/Custom' && plan.id !== 'pro'">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <span>{{ plan.limit }} {{ $i18n.locale === 'ar' ? 'رسالة' : 'Messages' }}</span>
+                <span>{{ plan.limit }} {{ $i18n.locale === 'ar' ? 'رسالة مضمنة' : 'Messages included' }}</span>
               </li>
-              <li v-for="(feat, idx) in plan.featuresList" :key="idx">
+              <li v-else-if="plan.id === 'pro'">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>{{ $i18n.locale === 'ar' ? 'رسائل غير محدودة حسب الاستهلاك' : 'Unlimited pay as you go messages' }}</span>
+              </li>
+              <li v-for="(feat, idx) in ($i18n.locale === 'ar' ? plan.featuresArList : plan.featuresEnList)" :key="idx">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                 <span>{{ feat }}</span>
               </li>
             </ul>
-            <router-link to="/register" :class="plan.isPopular ? 'btn-primary block-btn' : 'btn-secondary block-btn'">
-              {{ $i18n.locale === 'ar' ? 'اشترك الآن' : 'Subscribe Now' }}
+            <router-link to="/register" :class="plan.isPopular ? 'btn-primary block-btn mt-auto' : 'btn-secondary block-btn mt-auto'" style="margin-top: auto;">
+              {{ $i18n.locale === 'ar' ? (plan.buttonTextAr || 'اشترك الآن') : (plan.buttonTextEn || 'Subscribe Now') }}
             </router-link>
           </div>
         </div>
@@ -239,7 +261,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
@@ -253,26 +275,44 @@ const toggleLanguage = () => {
   setLanguage(newLang)
 }
 
-onMounted(async () => {
+onMounted(() => {
+  fetchPlans()
+})
+
+const fetchPlans = async () => {
   try {
     const res = await axios.get('/api/plans')
-    // We sort or use them directly. Assume backend sorts them by price.
-    const plansData = res.data.data.map(p => {
-      let parsedFeatures = []
-      try { parsedFeatures = typeof p.features === 'string' ? JSON.parse(p.features) : p.features } catch(e){}
-      return {
-        id: p.planCode.toLowerCase(),
-        name: p.name,
-        price: p.price,
-        limit: p.limit,
-        isPopular: p.planCode === 'PRO' || p.planCode === 'STARTER',
-        featuresList: parsedFeatures
-      }
-    })
-    pricingPlans.value = plansData
-  } catch (err) {
-    console.error('Failed to fetch pricing plans')
+    if (res.data && res.data.data) {
+      const activePlans = res.data.data.filter(p => p.isActive)
+      // Already sorted by backend on sortOrder
+      pricingPlans.value = activePlans.map(p => {
+        let parsedFeaturesAr = []
+        let parsedFeaturesEn = []
+        try { parsedFeaturesAr = JSON.parse(p.featuresAr || '[]') } catch (e) {}
+        try { parsedFeaturesEn = JSON.parse(p.featuresEn || '[]') } catch (e) {}
+
+        return {
+          id: p.planCode.toLowerCase(),
+          nameAr: p.nameAr || p.name,
+          nameEn: p.nameEn || p.name,
+          price: p.price,
+          limit: p.limit === 0 || p.limit > 100000 ? 'Unlimited/Custom' : p.limit.toString(),
+          isPopular: p.isPopular,
+          buttonTextAr: p.buttonTextAr,
+          buttonTextEn: p.buttonTextEn,
+          featuresArList: parsedFeaturesAr,
+          featuresEnList: parsedFeaturesEn
+        }
+      })
+    }
+  } catch (error) {
+    console.error('Failed to load plans:', error)
   }
+}
+
+// Watch locale is no longer used for hardcoded translations since DB provides content, 
+// but we keep it empty so the toggle button doesn't crash if it expects it.
+watch(locale, () => {
 })
 </script>
 
@@ -407,15 +447,15 @@ onMounted(async () => {
 
 /* Pricing */
 .pricing-section { background: rgba(0,0,0,0.2); }
-.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; align-items: center; justify-content: center; max-width: 1000px; margin: 0 auto; }
-.price-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 24px; padding: 3rem 2rem; position: relative; transition: transform 0.3s; }
+.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; align-items: stretch; justify-content: center; max-width: 1200px; margin: 0 auto; }
+.price-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 24px; padding: 3rem 2rem; position: relative; transition: transform 0.3s; display: flex; flex-direction: column; height: 100%; }
 .price-card.popular { background: rgba(255, 102, 0, 0.05); border-color: rgba(255, 102, 0, 0.3); transform: scale(1.05); box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
 .popular-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #FF6600, #FF9900); color: white; padding: 4px 16px; border-radius: 999px; font-size: 0.85rem; font-weight: 700; box-shadow: 0 4px 10px rgba(255,102,0,0.3); }
 .plan-name { font-size: 1.4rem; font-weight: 800; color: #FFFFFF; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 1px; }
 .plan-price { font-size: 3.5rem; font-weight: 900; color: #FFFFFF; margin-bottom: 0.5rem; line-height: 1; }
 .plan-period { font-size: 1.2rem; font-weight: 500; color: #94A3B8; display: none; }
-.plan-desc { color: #94A3B8; font-size: 1rem; margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
-.plan-features { list-style: none; padding: 0; margin: 0 0 3rem 0; text-align: left; }
+.plan-desc { color: #94A3B8; font-size: 1rem; margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+.plan-features { list-style: none; padding: 0; margin: 0 0 3rem 0; text-align: left; flex-grow: 1; }
 .landing-page[dir="rtl"] .plan-features { text-align: right; }
 .plan-features li { margin-bottom: 1.2rem; color: #E2E8F0; display: flex; align-items: flex-start; gap: 0.75rem; font-size: 1rem; }
 .block-btn { display: block; width: 100%; text-align: center; padding: 1rem; font-size: 1.1rem; }

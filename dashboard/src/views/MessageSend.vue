@@ -21,16 +21,19 @@
               <label class="radio-label">
                 <input type="radio" v-model="messageType" value="pdf" /> {{ $t('send_message.type_pdf') || 'PDF' }}
               </label>
-              <label class="radio-label">
-                <input type="radio" v-model="messageType" value="template" /> {{ $t('send_message.type_template') || 'Template' }}
+              <label class="radio-label" v-if="!isMetaChannel">
+                <input type="radio" v-model="messageType" value="template" /> Local Template
               </label>
-              <label class="radio-label" style="color:#FF6600; font-weight:600;">
+              <label class="radio-label" v-if="isMetaChannel">
+                <input type="radio" v-model="messageType" value="meta_template" /> Meta Template
+              </label>
+              <label class="radio-label" v-if="isMetaChannel" style="color:#FF6600; font-weight:600;">
                 <input type="radio" v-model="messageType" value="buttons" /> 🔘 Buttons
               </label>
-              <label class="radio-label" style="color:#10B981; font-weight:600;">
+              <label class="radio-label" v-if="isMetaChannel" style="color:#10B981; font-weight:600;">
                 <input type="radio" v-model="messageType" value="list" /> 📋 List
               </label>
-              <label class="radio-label" style="color:#3B82F6; font-weight:600;">
+              <label class="radio-label" v-if="isMetaChannel" style="color:#3B82F6; font-weight:600;">
                 <input type="radio" v-model="messageType" value="location" /> 📍 Location
               </label>
             </div>
@@ -73,10 +76,23 @@
 
           <!-- Template Inputs -->
           <div v-if="messageType === 'template'" class="form-group">
-            <label>{{ $t('send_message.select_template') || 'Select Template' }}</label>
+            <label>{{ $t('send_message.select_template') || 'Select Local Template' }}</label>
             <select v-model="selectedTemplateId" @change="extractVariables" required class="form-input">
               <option value="" disabled>{{ $t('send_message.select_template') || 'Choose a template...' }}</option>
               <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
+            </select>
+          </div>
+
+          <div v-if="messageType === 'meta_template'" class="form-group">
+            <label>Select Meta Template</label>
+            <div v-if="metaTemplates.length === 0" style="color: #64748B; font-size: 0.85rem; margin-bottom: 0.5rem;">
+              Fetching Meta templates...
+            </div>
+            <select v-model="selectedTemplateId" required class="form-input">
+              <option value="" disabled>Choose an approved Meta template...</option>
+              <option v-for="tpl in metaTemplates" :key="tpl.name + tpl.language" :value="tpl.name + '||' + tpl.language">
+                {{ tpl.name }} ({{ tpl.language }})
+              </option>
             </select>
           </div>
 
@@ -191,10 +207,11 @@
         </p>
         <code class="endpoint-code">POST /api/v1/{{ 
           messageType === 'template' ? 'templates/send' : 
+          (messageType === 'meta_template' ? 'message/send-meta-template' :
           (messageType === 'buttons' ? 'message/send-buttons' :
           (messageType === 'list' ? 'message/send-list' :
           (messageType === 'location' ? 'message/send-location' :
-          (messageType === 'text' ? 'message/send' : 'message/upload-media')))) 
+          (messageType === 'text' ? 'message/send' : 'message/upload-media'))))) 
         }}</code>
         
         <div class="tips-box">
@@ -212,7 +229,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import axios from 'axios'
 
 const phone = ref('')
@@ -248,6 +265,7 @@ const removeRow = (sIdx, rIdx) => { listSections.value[sIdx].rows.splice(rIdx, 1
 
 // Template specific refs
 const templates = ref([])
+const metaTemplates = ref([])
 const selectedTemplateId = ref('')
 const templateVariables = ref([])
 const variableValues = ref({})
@@ -256,6 +274,28 @@ const loading = ref(false)
 const error = ref('')
 const success = ref('')
 const channels = ref([])
+
+const isMetaChannel = computed(() => {
+  const ch = channels.value.find(c => c.id === channelId.value)
+  return ch && ch.providerType === 'META_CLOUD'
+})
+
+watch(channelId, async (newId) => {
+  if (isMetaChannel.value) {
+    messageType.value = 'meta_template'
+    try {
+      metaTemplates.value = []
+      const res = await axios.get(`/api/v1/meta/channel/${newId}/templates`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      })
+      if (res.data && res.data.data && res.data.data.data) {
+        metaTemplates.value = res.data.data.data
+      }
+    } catch(e) {}
+  } else {
+    if (messageType.value === 'meta_template') messageType.value = 'text'
+  }
+})
 
 const handleFileChange = (e) => {
   if (e.target.files && e.target.files[0]) {
@@ -275,6 +315,11 @@ const fetchTemplates = async () => {
 }
 
 const fetchChannels = async () => {
+  const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
+  if (!tenant.metaEnabled) {
+    channels.value = []
+    return
+  }
   try {
     const res = await axios.get('/api/v1/meta/channels', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -374,6 +419,16 @@ const handleSend = async () => {
         templateId: selectedTemplateId.value,
         variables: variableValues.value,
         channel_id: channelId.value
+      }, config)
+    } else if (messageType.value === 'meta_template') {
+      if (!selectedTemplateId.value) throw new Error('Please select a Meta template');
+      const parts = selectedTemplateId.value.split('||'); // name||language
+      res = await axios.post('/api/v1/message/send-meta-template', {
+        phone: phone.value,
+        templateName: parts[0],
+        languageCode: parts[1],
+        components: [],
+        channelId: channelId.value
       }, config)
     } else {
       if (!selectedFile.value) {

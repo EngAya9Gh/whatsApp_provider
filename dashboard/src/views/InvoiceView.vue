@@ -57,7 +57,11 @@
         </div>
         
         <div class="invoice-footer">
-          Thank you for choosing Wakeel Platform!
+          <div class="qr-code-wrapper">
+            <qrcode-vue value="https://provider.wakeel.cc/" :size="120" level="M" />
+            <span class="qr-text">Scan to visit<br>provider.wakeel.cc</span>
+          </div>
+          <p>Thank you for choosing Wakeel Platform!</p>
         </div>
       </div>
     </div>
@@ -69,6 +73,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import html2canvas from 'html2canvas'
+import QrcodeVue from 'qrcode.vue'
 
 const route = useRoute()
 const invoice = ref(null)
@@ -272,6 +277,20 @@ onMounted(fetchInvoice)
 .total-row { font-size: 1.5rem; margin-top: 1.5rem; align-items: center; }
 .total-row .label { color: #0F172A; font-weight: 800; }
 .total-row .amount-value { color: #FF6600; font-weight: 900; font-size: 1.8rem; }
+
+.qr-code-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.qr-text {
+  font-size: 0.8rem;
+  color: #64748B;
+  font-weight: 600;
+  line-height: 1.2;
+}
 
 .invoice-footer {
   text-align: center;
