@@ -1,2 +1,6 @@
 @import "tailwindcss";
-@config "../tailwind.config.js";
+
+@theme {
+  --color-brand-primary: #FF6600;
+  --color-brand-dark: #1E293B;
+}
