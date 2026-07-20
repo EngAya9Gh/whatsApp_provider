@@ -40,6 +40,22 @@
         <span class="badge bg-primary">RECOMMENDED FOR INTERACTIVE</span>
       </div>
       <p class="desc">Required for sending Interactive Messages (Buttons & Lists). Connect via official Meta Developer portal.</p>
+      
+      <!-- Webhook Setup Info Box -->
+      <div class="webhook-info-box">
+        <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg> Meta Webhook Setup</h4>
+        <p>To receive replies and button clicks, configure this Webhook in your Meta Developer App (only once per app):</p>
+        <div class="webhook-field">
+          <span>Callback URL:</span>
+          <code>{{ baseUrl }}/api/v1/meta/webhook</code>
+        </div>
+        <div class="webhook-field">
+          <span>Verify Token:</span>
+          <code>wakeel_meta_secret_1234</code>
+        </div>
+        <small class="hint" style="color: #64748B; margin-top: 0.5rem; display: block;">* You can change the Verify Token in your .env file (META_VERIFY_TOKEN)</small>
+      </div>
+
       <hr />
 
       <div v-if="metaChannels.length > 0" class="channels-list">
@@ -101,6 +117,7 @@ let socket = null
 // Meta State
 const metaChannels = ref([])
 const showMetaForm = ref(false)
+const baseUrl = ref(window.location.origin)
 const metaLoading = ref(false)
 const metaForm = ref({
   phoneNumber: '',
@@ -266,6 +283,13 @@ hr { border: 0; border-top: 1px solid #e5e7eb; margin: 1.5rem 0; }
 .meta-form h4 { margin-top: 0; margin-bottom: 1rem; }
 .form-group { margin-bottom: 1rem; }
 .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.875rem; color: #374151; }
-.form-group input { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; }
+.meta-form input { width: 100%; padding: 0.75rem; border: 1px solid #CBD5E1; border-radius: 6px; font-family: monospace; }
+.form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.webhook-info-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+.webhook-info-box h4 { display: flex; align-items: center; gap: 0.5rem; color: #334155; margin-top: 0; margin-bottom: 0.5rem; }
+.webhook-info-box p { font-size: 0.85rem; color: #475569; margin-bottom: 0.75rem; }
+.webhook-field { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; background: white; padding: 0.5rem; border-radius: 6px; border: 1px solid #E2E8F0; font-size: 0.85rem; }
+.webhook-field span { font-weight: 600; color: #64748B; width: 100px; }
+.webhook-field code { color: #0F172A; font-family: monospace; user-select: all; }
 .mt-4 { margin-top: 1rem; }
 </style>

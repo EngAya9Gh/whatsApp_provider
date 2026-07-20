@@ -85,7 +85,6 @@ class MetaController {
                   });
                   logger.info(`Recorded button interaction: ${buttonText} from ${from}`);
                 }
-              }
               } else if (msg.type === 'text') {
                 const incomingText = msg.text.body;
                 
@@ -152,6 +151,8 @@ class MetaController {
                   }
                 }
               }
+            }
+          }
           
           if (change.value && change.value.statuses) {
             // Message Delivery Statuses (Sent, Delivered, Read, Failed)
