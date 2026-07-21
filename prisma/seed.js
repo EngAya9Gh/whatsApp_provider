@@ -17,7 +17,8 @@ async function main() {
       isActive: true,
       isPopular: false,
       buttonTextAr: 'اشترك الآن',
-      buttonTextEn: 'Subscribe Now'
+      buttonTextEn: 'Subscribe Now',
+      featureFlags: []
     },
     {
       planCode: 'STARTER',
@@ -33,7 +34,8 @@ async function main() {
       isActive: true,
       isPopular: false,
       buttonTextAr: 'اشترك الآن',
-      buttonTextEn: 'Subscribe Now'
+      buttonTextEn: 'Subscribe Now',
+      featureFlags: ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER']
     },
     {
       planCode: 'PRO',
@@ -49,7 +51,8 @@ async function main() {
       isActive: true,
       isPopular: true,
       buttonTextAr: 'اشترك الآن',
-      buttonTextEn: 'Subscribe Now'
+      buttonTextEn: 'Subscribe Now',
+      featureFlags: ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER', 'BULK_CAMPAIGN', 'EXCEL_EXPORT']
     },
     {
       planCode: 'ENTERPRISE',
@@ -65,7 +68,8 @@ async function main() {
       isActive: true,
       isPopular: false,
       buttonTextAr: 'تواصل معنا',
-      buttonTextEn: 'Contact Us'
+      buttonTextEn: 'Contact Us',
+      featureFlags: ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER', 'BULK_CAMPAIGN', 'EXCEL_EXPORT', 'META_API']
     }
   ];
 

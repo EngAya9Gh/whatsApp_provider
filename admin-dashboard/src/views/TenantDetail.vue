@@ -98,6 +98,20 @@
               <input type="checkbox" v-model="settingsForm.metaEnabled" id="metaToggle" class="w-5 h-5 text-orange-500 bg-white border-slate-300 rounded focus:ring-orange-500 focus:ring-2 accent-orange-500 cursor-pointer" />
               <label for="metaToggle" class="font-semibold text-slate-700 text-sm cursor-pointer select-none">Enable Meta Cloud Features</label>
             </div>
+
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <label class="block text-sm font-semibold text-slate-700 mb-3 border-b border-slate-200 pb-2">Custom Feature Overrides</label>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div v-for="feat in availableFeatures" :key="feat" class="flex flex-col gap-1">
+                  <span class="text-xs font-bold text-slate-600">{{ feat }}</span>
+                  <select v-model="settingsForm.customFeatures[feat]" class="bg-white border border-slate-300 text-slate-700 text-xs rounded p-1.5 outline-none">
+                    <option :value="null">Default (From Plan)</option>
+                    <option :value="true">Always Enabled</option>
+                    <option :value="false">Always Disabled</option>
+                  </select>
+                </div>
+              </div>
+            </div>
             
             <div>
               <button @click="updateSettings" :disabled="isUpdatingSettings" class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm transition-colors cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed">
@@ -264,8 +278,11 @@ const dbPlans = ref([])
 
 const settingsForm = ref({
   monthlyLimit: 0,
-  metaEnabled: false
+  metaEnabled: false,
+  customFeatures: {}
 })
+
+const availableFeatures = ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER', 'BULK_CAMPAIGN', 'EXCEL_EXPORT', 'META_API']
 
 // Invoice state
 const showInvoiceModal = ref(false)
@@ -381,8 +398,18 @@ const fetchTenant = async () => {
 
     tenant.value = res.data.data
     selectedPlan.value = tenant.value.plan
-    settingsForm.value.monthlyLimit = tenant.value.monthlyLimit
-    settingsForm.value.metaEnabled = tenant.value.metaEnabled
+    
+    const populated = {}
+    const currentFeatures = tenant.value.customFeatures || {}
+    availableFeatures.forEach(f => {
+      populated[f] = currentFeatures[f] !== undefined ? currentFeatures[f] : null
+    })
+
+    settingsForm.value = {
+      monthlyLimit: tenant.value.monthlyLimit,
+      metaEnabled: tenant.value.metaEnabled,
+      customFeatures: populated
+    }
   } catch (err) {
     error.value = err.response?.data?.error || 'Failed to load tenant details.'
   } finally {
@@ -409,16 +436,26 @@ const updatePlan = async () => {
 
 const updateSettings = async () => {
   isUpdatingSettings.value = true
+  
+  const cleanFeatures = {}
+  for (const key in settingsForm.value.customFeatures) {
+    if (settingsForm.value.customFeatures[key] !== null) {
+      cleanFeatures[key] = settingsForm.value.customFeatures[key]
+    }
+  }
+
   try {
     const token = localStorage.getItem('admin_token')
     const res = await axios.put(`/api/admin/tenants/${tenant.value.id}/settings`, {
       monthlyLimit: settingsForm.value.monthlyLimit,
-      metaEnabled: settingsForm.value.metaEnabled
+      metaEnabled: settingsForm.value.metaEnabled,
+      customFeatures: cleanFeatures
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })
     tenant.value.monthlyLimit = res.data.data.monthlyLimit
     tenant.value.metaEnabled = res.data.data.metaEnabled
+    tenant.value.customFeatures = res.data.data.customFeatures
     alert('Settings updated successfully')
   } catch (err) {
     alert(err.response?.data?.error || 'Failed to update settings')

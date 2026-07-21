@@ -1,5 +1,6 @@
 const authService = require('./auth.service');
 const logger = require('../../utils/logger');
+const entitlementService = require('../../services/entitlement.service');
 
 class AuthController {
   async register(req, res, next) {
@@ -26,7 +27,14 @@ class AuthController {
   async getMe(req, res, next) {
     try {
       // req.tenant is injected by auth middleware
-      res.status(200).json({ success: true, data: req.tenant });
+      const allowedFeatures = await entitlementService.getTenantFeatures(req.tenant.id);
+      res.status(200).json({ 
+        success: true, 
+        data: {
+          ...req.tenant,
+          allowedFeatures
+        } 
+      });
     } catch (error) {
       next(error);
     }

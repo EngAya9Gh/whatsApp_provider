@@ -8,6 +8,7 @@ const { validate, createTemplateSchema, sendTemplateSchema } = require('./templa
 const { apiKeyMiddleware } = require('../../middleware/apiKey.middleware');
 const { authMiddleware } = require('../../middleware/auth.middleware');
 const { otpRateLimiter } = require('../../middleware/rateLimiter.middleware');
+const requireFeature = require('../../middlewares/requireFeature');
 
 const router = express.Router();
 
@@ -25,13 +26,16 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// The CRUD routes should use authMiddleware (JWT) since the dashboard uses them
-router.get('/', authMiddleware, templateController.getTemplates);
-router.post('/', authMiddleware, upload.single('media'), templateController.createTemplate);
-router.put('/:id', authMiddleware, upload.single('media'), templateController.updateTemplate);
-router.delete('/:id', authMiddleware, templateController.deleteTemplate);
-
 // The send endpoint must use apiKeyMiddleware so API clients can use it
 router.post('/send', apiKeyMiddleware, validate(sendTemplateSchema), otpRateLimiter, templateController.sendTemplateMessage);
+
+// The CRUD routes should use authMiddleware (JWT) and TEMPLATES feature
+router.use(authMiddleware);
+router.use(requireFeature('TEMPLATES'));
+
+router.get('/', templateController.getTemplates);
+router.post('/', upload.single('media'), templateController.createTemplate);
+router.put('/:id', upload.single('media'), templateController.updateTemplate);
+router.delete('/:id', templateController.deleteTemplate);
 
 module.exports = router;

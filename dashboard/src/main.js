@@ -23,4 +23,15 @@ axios.interceptors.response.use(
 const app = createApp(App)
 app.use(router)
 app.use(i18n)
+
+app.config.globalProperties.$hasFeature = (feature) => {
+  try {
+    const tenant = JSON.parse(localStorage.getItem('tenant') || '{}');
+    if (!tenant.allowedFeatures) return true; // Fallback if old session
+    return tenant.allowedFeatures.includes(feature);
+  } catch (e) {
+    return false;
+  }
+}
+
 app.mount('#app')

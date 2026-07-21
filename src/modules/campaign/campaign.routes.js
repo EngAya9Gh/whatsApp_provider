@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const campaignController = require('./campaign.controller');
 const { authMiddleware } = require('../../middleware/auth.middleware');
+const requireFeature = require('../../middlewares/requireFeature');
 
 const router = express.Router();
 
@@ -31,8 +32,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
 
-// Require Dashboard Login
+// Require Dashboard Login and BULK_CAMPAIGN feature
 router.use(authMiddleware);
+router.use(requireFeature('BULK_CAMPAIGN'));
 
 router.post('/', upload.fields([{ name: 'file', maxCount: 1 }, { name: 'image', maxCount: 1 }]), campaignController.createCampaign);
 router.put('/:id', upload.fields([{ name: 'image', maxCount: 1 }]), campaignController.updateCampaign);

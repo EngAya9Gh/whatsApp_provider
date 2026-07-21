@@ -1,5 +1,6 @@
 <template>
-  <div class="page-container">
+  <FeatureLock feature="TEMPLATES" requiredPlan="STARTER">
+    <div class="page-container">
     <div class="page-header">
       <div>
         <h1 class="page-title">{{ $t('templates.title') || 'Message Templates' }}</h1>
@@ -81,12 +82,14 @@
         </form>
       </div>
     </div>
-  </div>
+    </div>
+  </FeatureLock>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import FeatureLock from '../components/FeatureLock.vue'
 
 const templates = ref([])
 const loading = ref(true)

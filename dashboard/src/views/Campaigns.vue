@@ -1,5 +1,6 @@
 <template>
-  <div class="page-container">
+  <FeatureLock feature="BULK_CAMPAIGN" requiredPlan="PRO">
+    <div class="page-container">
     <div class="page-header">
       <div>
         <h1 class="page-title">{{ $t('campaigns.title') || 'Bulk Campaigns' }}</h1>
@@ -227,13 +228,14 @@
         </form>
       </div>
     </div>
-
-  </div>
+    </div>
+  </FeatureLock>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, onUnmounted, watch } from 'vue'
 import axios from 'axios'
+import FeatureLock from '../components/FeatureLock.vue'
 
 const campaigns = ref([])
 const templates = ref([])

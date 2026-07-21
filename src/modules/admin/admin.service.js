@@ -130,8 +130,9 @@ class AdminService {
     return prisma.tenant.update({
       where: { id },
       data: {
-        monthlyLimit: data.monthlyLimit || tenant.monthlyLimit,
-        metaEnabled: data.metaEnabled
+        monthlyLimit: data.monthlyLimit !== undefined ? data.monthlyLimit : tenant.monthlyLimit,
+        metaEnabled: data.metaEnabled !== undefined ? data.metaEnabled : tenant.metaEnabled,
+        customFeatures: data.customFeatures !== undefined ? data.customFeatures : tenant.customFeatures
       }
     });
   }

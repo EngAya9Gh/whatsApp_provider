@@ -72,6 +72,7 @@ class PlanService {
     if (data.isPopular !== undefined) updateData.isPopular = Boolean(data.isPopular);
     if (data.buttonTextAr !== undefined) updateData.buttonTextAr = data.buttonTextAr;
     if (data.buttonTextEn !== undefined) updateData.buttonTextEn = data.buttonTextEn;
+    if (data.featureFlags !== undefined) updateData.featureFlags = data.featureFlags;
 
     return prisma.planSetting.update({
       where: { id },

@@ -106,9 +106,12 @@
               <svg v-else class="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
               {{ retrying ? 'Retrying...' : 'Retry Failed' }}
             </button>
-            <button @click="exportData('targets')" class="btn-export">
+            <button v-if="$hasFeature('EXCEL_EXPORT')" @click="exportData('targets')" class="btn-export">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               Export CSV
+            </button>
+            <button v-else @click="alertUpgrade('Excel Export requires PRO plan')" class="btn-export" style="background:#cbd5e1;cursor:not-allowed;" title="Upgrade to PRO to unlock">
+              🔒 Export CSV
             </button>
           </div>
         </div>
@@ -191,9 +194,12 @@
             <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             <input v-model="interactionSearch" @keyup.enter="fetchInteractions" type="text" placeholder="Search phone number..." class="form-input" />
           </div>
-          <button @click="exportData('interactions')" class="btn-export">
+          <button v-if="$hasFeature('EXCEL_EXPORT')" @click="exportData('interactions')" class="btn-export">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             Export CSV
+          </button>
+          <button v-else @click="alertUpgrade('Excel Export requires PRO plan')" class="btn-export" style="background:#cbd5e1;cursor:not-allowed;" title="Upgrade to PRO to unlock">
+            🔒 Export CSV
           </button>
         </div>
       </div>
@@ -261,8 +267,13 @@ const targetStatus = ref('ALL')
 const interactions = ref([])
 const interactionPage = ref(1)
 const interactionTotalPages = ref(1)
+const interactionStatus = ref('ALL')
 const interactionSearch = ref('')
 const interactionStats = ref(null)
+
+const alertUpgrade = (msg) => {
+  alert(msg)
+}
 
 onMounted(async () => {
   await fetchCampaignDetails()

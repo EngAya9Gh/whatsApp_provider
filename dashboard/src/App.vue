@@ -70,20 +70,24 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import axios from 'axios'
 import { setLanguage } from './i18n'
 
 const router = useRouter()
 const route = useRoute()
 const { locale } = useI18n()
 const currentLang = ref(locale.value)
+const tenant = ref({})
+
+const loadTenant = () => {
+  try { tenant.value = JSON.parse(localStorage.getItem('tenant') || '{}') } catch { tenant.value = {} }
+}
+loadTenant()
 
 const showSidebar = computed(() => !route.meta.guest && !route.meta.hideSidebar && route.path !== '/' && !!localStorage.getItem('token'))
-const tenant = computed(() => {
-  try { return JSON.parse(localStorage.getItem('tenant') || '{}') } catch { return {} }
-})
 const userInitial = computed(() => (tenant.value?.name || 'U')[0].toUpperCase())
 
 const toggleLang = () => {
@@ -97,6 +101,25 @@ const logout = () => {
   localStorage.removeItem('tenant')
   router.push('/login')
 }
+
+onMounted(async () => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    try {
+      const res = await axios.get('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (res.data && res.data.data) {
+        localStorage.setItem('tenant', JSON.stringify(res.data.data))
+        loadTenant() // Update reactive state
+      }
+    } catch (e) {
+      if (e.response && e.response.status === 401) {
+        logout()
+      }
+    }
+  }
+})
 </script>
 
 <style>

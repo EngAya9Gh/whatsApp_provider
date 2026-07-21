@@ -68,10 +68,11 @@ class AdminController {
 
   async updateSettings(req, res, next) {
     try {
-      const { monthlyLimit, metaEnabled } = req.body;
+      const { monthlyLimit, metaEnabled, customFeatures } = req.body;
       const tenant = await adminService.updateSettings(req.params.id, {
         monthlyLimit: parseInt(monthlyLimit),
-        metaEnabled: metaEnabled === true || metaEnabled === 'true'
+        metaEnabled: metaEnabled === true || metaEnabled === 'true',
+        customFeatures
       });
       res.json({ success: true, data: tenant });
     } catch (error) {

@@ -17,6 +17,7 @@ model Admin {
 }
 
 model Tenant {
+  customFeatures Json? @map("custom_features")
   id               String            @id @default(uuid())
   name             String
   email            String            @unique
@@ -220,6 +221,7 @@ model AutoResponder {
 }
 
 model PlanSetting {
+  featureFlags Json? @map("feature_flags")
   id        String   @id @default(uuid())
   planCode     Plan     @unique @map("plan_code")
   name         String

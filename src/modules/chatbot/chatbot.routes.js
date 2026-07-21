@@ -1,6 +1,7 @@
 const express = require('express');
 const chatbotController = require('./chatbot.controller');
 const { authMiddleware } = require('../../middleware/auth.middleware');
+const requireFeature = require('../../middlewares/requireFeature');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -23,6 +24,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 router.use(authMiddleware);
+router.use(requireFeature('AUTO_RESPONDER'));
 
 router.get('/', chatbotController.getRules);
 router.post('/', upload.single('media'), chatbotController.createRule);

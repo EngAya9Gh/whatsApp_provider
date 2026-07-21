@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const config = require('../../config/env');
+const entitlementService = require('../../services/entitlement.service');
 
 const prisma = new PrismaClient();
 
@@ -69,6 +70,8 @@ class AuthService {
       expiresIn: config.jwt.expiresIn
     });
 
+    const allowedFeatures = await entitlementService.getTenantFeatures(tenant.id);
+
     return {
       token,
       tenant: {
@@ -77,7 +80,8 @@ class AuthService {
         email: tenant.email,
         sessionStatus: tenant.sessionStatus,
         plan: tenant.plan,
-        metaEnabled: tenant.metaEnabled
+        metaEnabled: tenant.metaEnabled,
+        allowedFeatures
       }
     };
   }

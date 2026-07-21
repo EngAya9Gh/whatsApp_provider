@@ -73,6 +73,15 @@
             <textarea v-model="plan.featuresEnText" rows="3" required></textarea>
           </div>
 
+          <div class="form-group">
+            <label>System Features (Permissions)</label>
+            <div class="features-checklist">
+              <label v-for="feat in availableFeatures" :key="feat">
+                <input type="checkbox" :value="feat" v-model="plan.featureFlags" /> {{ feat }}
+              </label>
+            </div>
+          </div>
+
           <div class="actions">
             <button type="submit" class="btn-primary" :disabled="plan.saving">
               {{ plan.saving ? 'Saving...' : 'Save Changes' }}
@@ -91,6 +100,8 @@ import axios from 'axios'
 const plans = ref([])
 const loading = ref(true)
 
+const availableFeatures = ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER', 'BULK_CAMPAIGN', 'EXCEL_EXPORT', 'META_API']
+
 const fetchPlans = async () => {
   try {
     const token = localStorage.getItem('admin_token')
@@ -104,6 +115,7 @@ const fetchPlans = async () => {
       ...p,
       featuresArText: typeof p.featuresAr === 'string' ? p.featuresAr : JSON.stringify(p.featuresAr || [], null, 2),
       featuresEnText: typeof p.featuresEn === 'string' ? p.featuresEn : JSON.stringify(p.featuresEn || [], null, 2),
+      featureFlags: Array.isArray(p.featureFlags) ? p.featureFlags : (typeof p.featureFlags === 'string' ? JSON.parse(p.featureFlags || '[]') : []),
       saving: false
     }))
   } catch (err) {
@@ -140,7 +152,8 @@ const updatePlan = async (plan) => {
       isActive: plan.isActive,
       isPopular: plan.isPopular,
       buttonTextAr: plan.buttonTextAr,
-      buttonTextEn: plan.buttonTextEn
+      buttonTextEn: plan.buttonTextEn,
+      featureFlags: plan.featureFlags
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -262,5 +275,25 @@ onMounted(() => {
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.features-checklist {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+}
+
+.features-checklist label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  color: #334155;
+  font-size: 0.8rem;
 }
 </style>
