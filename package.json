@@ -22,6 +22,7 @@
   "homepage": "https://github.com/EngAya9Gh/whatsApp_provider#readme",
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc13",
+    "axios": "^1.18.1",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.80.5",
     "cors": "^2.8.6",
