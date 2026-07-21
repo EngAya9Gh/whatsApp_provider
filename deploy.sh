@@ -34,5 +34,5 @@ echo "Restarting Backend Server..."
 # If you are using pm2, uncomment the next line:
 # pm2 restart all
 
-echo "Deployment Complete! 🚀"
+echo "Deployment Complete! "
 echo "Note: If you run your server manually without PM2, please stop and start it again so it loads the new database schema."
