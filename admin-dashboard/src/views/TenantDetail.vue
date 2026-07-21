@@ -282,7 +282,7 @@ const settingsForm = ref({
   customFeatures: {}
 })
 
-const availableFeatures = ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER', 'BULK_CAMPAIGN', 'EXCEL_EXPORT', 'META_API']
+const availableFeatures = ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER', 'BULK_CAMPAIGN', 'EXCEL_EXPORT', 'META_API', 'LIVE_CHAT']
 
 // Invoice state
 const showInvoiceModal = ref(false)

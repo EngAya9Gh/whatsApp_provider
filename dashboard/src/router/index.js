@@ -11,6 +11,7 @@ import Chatbot from '../views/Chatbot.vue'
 
 import Landing from '../views/Landing.vue'
 import InvoiceView from '../views/InvoiceView.vue'
+import LiveChat from '../views/LiveChat.vue'
 
 import MessageSend from '../views/MessageSend.vue'
 import Templates from '../views/Templates.vue'
@@ -24,6 +25,7 @@ const routes = [
   { path: '/invoice/:id', component: InvoiceView, meta: { hideSidebar: true } },
   { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/connect', component: Connect, meta: { requiresAuth: true } },
+  { path: '/live-chat', component: LiveChat, meta: { requiresAuth: true } },
   { path: '/send-message', component: MessageSend, meta: { requiresAuth: true } },
   { path: '/chatbot', component: Chatbot, meta: { requiresAuth: true } },
   { path: '/templates', component: Templates, meta: { requiresAuth: true } },

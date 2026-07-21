@@ -156,7 +156,7 @@ import QrcodeVue from 'qrcode.vue'
 
 // Standard Web QR State
 const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
-const isMetaEnabled = ref(tenant.metaEnabled === true)
+const isMetaEnabled = ref(tenant.allowedFeatures && tenant.allowedFeatures.includes('META_API'))
 const status = ref(tenant.sessionStatus || 'DISCONNECTED')
 const phone = ref(tenant.whatsappPhone || '')
 const qrCode = ref('')

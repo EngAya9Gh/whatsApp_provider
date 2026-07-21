@@ -40,6 +40,7 @@ model Tenant {
   messageTemplates MessageTemplate[]
   usageRecords     UsageRecord[]
   channels         WhatsAppChannel[]
+  chatThreads      ChatThread[]
 
   @@map("tenants")
 }
@@ -62,6 +63,7 @@ model WhatsAppChannel {
   tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaigns         Campaign[]
   messageLogs       MessageLog[]
+  chatThreads       ChatThread[]
 
   @@index([tenantId], map: "whatsapp_channels_tenant_id_fkey")
   @@map("whatsapp_channels")
@@ -269,4 +271,43 @@ enum MessageStatus {
   DELIVERED
   READ
   FAILED
+}
+
+model ChatThread {
+  id            String       @id @default(uuid())
+  tenantId      String       @map("tenant_id")
+  channelId     String       @map("channel_id")
+  contactPhone  String       @map("contact_phone")
+  contactName   String?      @map("contact_name")
+  lastMessageAt DateTime     @default(now()) @map("last_message_at")
+  unreadCount   Int          @default(0) @map("unread_count")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  
+  messages      ChatMessage[]
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel       WhatsAppChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, channelId, contactPhone])
+  @@index([tenantId], map: "chat_threads_tenant_id_fkey")
+  @@map("chat_threads")
+}
+
+model ChatMessage {
+  id            String     @id @default(uuid())
+  threadId      String     @map("thread_id")
+  direction     String     // "INBOUND" or "OUTBOUND"
+  type          String     @default("TEXT") // "TEXT", "IMAGE", "VIDEO", "DOCUMENT", "AUDIO"
+  content       String?    @db.Text
+  hasMedia      Boolean    @default(false) @map("has_media")
+  mediaUrl      String?    @map("media_url") @db.Text
+  mediaMime     String?    @map("media_mime")
+  status        String?    // "SENT", "DELIVERED", "READ", "FAILED" for outbound
+  metaMessageId String?    @map("meta_message_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  
+  thread        ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId], map: "chat_messages_thread_id_fkey")
+  @@map("chat_messages")
 }

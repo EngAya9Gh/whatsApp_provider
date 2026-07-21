@@ -5,10 +5,11 @@ const logger = require('./utils/logger');
 const { redisClient } = require('./config/redis');
 const { Server } = require('socket.io');
 const sessionManager = require('./modules/whatsapp/session.manager');
+const socketService = require('./services/socket.service');
 
 const server = http.createServer(app);
 
-// Setup Socket.io for QR Code streaming
+// Setup Socket.io for QR Code streaming and Live Chat
 const io = new Server(server, {
   cors: {
     origin: config.frontendUrl,
@@ -16,6 +17,7 @@ const io = new Server(server, {
   }
 });
 sessionManager.setIo(io);
+socketService.init(io);
 
 // Socket.io authentication can be added here
 io.on('connection', (socket) => {

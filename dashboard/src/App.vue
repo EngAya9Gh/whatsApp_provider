@@ -19,6 +19,10 @@
           <span class="nav-icon">📨</span>
           <span class="nav-label">{{ $t('sidebar.send_message') }}</span>
         </router-link>
+        <router-link to="/live-chat" class="nav-item" active-class="active">
+          <span class="nav-icon">💬</span>
+          <span class="nav-label">Live Chat</span>
+        </router-link>
         <router-link to="/campaigns" class="nav-item" active-class="active">
           <span class="nav-icon">📢</span>
           <span class="nav-label">{{ $t('sidebar.campaigns') }}</span>

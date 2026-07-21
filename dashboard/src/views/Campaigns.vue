@@ -288,7 +288,7 @@ const fetchTemplates = async () => {
 
 const fetchChannels = async () => {
   const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
-  if (!tenant.metaEnabled) {
+  if (!tenant.allowedFeatures || !tenant.allowedFeatures.includes('META_API')) {
     channels.value = []
     return
   }

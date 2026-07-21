@@ -137,6 +137,20 @@ class MetaService {
       }
     });
   }
+
+  async sendMedia(channel, phone, type, mediaUrl, caption) {
+    // type can be 'image', 'document', 'audio', 'video'
+    const payload = {
+      type: type,
+      [type]: {
+        link: mediaUrl
+      }
+    };
+    if (caption && type !== 'audio') {
+      payload[type].caption = caption;
+    }
+    return this.sendMessage(channel, phone, payload);
+  }
 }
 
 module.exports = new MetaService();

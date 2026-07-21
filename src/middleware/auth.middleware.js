@@ -20,7 +20,7 @@ const authMiddleware = async (req, res, next) => {
     // Check if tenant still exists and is active
     const tenant = await prisma.tenant.findUnique({
       where: { id: decoded.tenantId },
-      select: { id: true, name: true, email: true, isActive: true, sessionStatus: true, plan: true, metaEnabled: true }
+      select: { id: true, name: true, email: true, isActive: true, sessionStatus: true, plan: true, metaEnabled: true, customFeatures: true }
     });
 
     if (!tenant) {

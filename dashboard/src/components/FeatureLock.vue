@@ -37,7 +37,7 @@ const hasFeature = computed(() => {
 })
 
 const upgradePlan = () => {
-  window.open('https://wakeel.cc', '_blank')
+  window.open('https://provider.wakeel.cc', '_blank')
 }
 </script>
 

@@ -2,6 +2,7 @@ const logger = require('../../utils/logger');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'wakeel_meta_secret_1234';
+const chatService = require('../chat/chat.service');
 
 class MetaController {
   
@@ -45,14 +46,26 @@ class MetaController {
               continue;
             }
 
+            const contacts = change.value.contacts || [];
+
             for (const msg of change.value.messages) {
               const from = msg.from;
+              const contactName = contacts.find(c => c.wa_id === from)?.profile?.name || null;
+              
+              // Process for Live Chat
+              try {
+                await chatService.handleIncomingMessage(channel.tenantId, channel.id, from, contactName, msg);
+              } catch (chatError) {
+                logger.error('Error handling live chat message', chatError);
+              }
               
               // Handle Interactive Replies (Buttons/Lists)
+              let buttonId = null;
+              let buttonText = null;
+              let incomingText = null;
+
               if (msg.type === 'interactive') {
                 const interactionType = msg.interactive.type; // button_reply or list_reply
-                let buttonId = null;
-                let buttonText = null;
                 
                 if (interactionType === 'button_reply') {
                   buttonId = msg.interactive.button_reply.id;
@@ -86,7 +99,7 @@ class MetaController {
                   logger.info(`Recorded button interaction: ${buttonText} from ${from}`);
                 }
               } else if (msg.type === 'text') {
-                const incomingText = msg.text.body;
+                incomingText = msg.text.body;
                 
                 // Track Text replies for Campaigns
                 const target = await prisma.campaignTarget.findFirst({
@@ -111,14 +124,18 @@ class MetaController {
                   });
                   logger.info(`Recorded text interaction for Meta campaign from ${from}`);
                 }
+              }
 
-                // Handle Auto-Responder for Meta
+              // Handle Auto-Responder for Meta (both TEXT and BUTTONS)
+              const textForBot = buttonText || null;
+              
+              if (textForBot) {
                 const rules = await prisma.autoResponder.findMany({
                   where: { tenantId: channel.tenantId, isActive: true }
                 });
 
                 for (const rule of rules) {
-                  const textLower = incomingText.trim().toLowerCase();
+                  const textLower = textForBot.trim().toLowerCase();
                   const keywordLower = rule.keyword.trim().toLowerCase();
                   let isMatch = false;
 

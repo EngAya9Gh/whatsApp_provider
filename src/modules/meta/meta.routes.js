@@ -3,7 +3,11 @@ const metaController = require('./meta.controller');
 const { authMiddleware } = require('../../middleware/auth.middleware');
 
 const requireMetaEnabled = (req, res, next) => {
-  if (req.tenant && req.tenant.metaEnabled === true) {
+  const allowed = req.tenant && (
+    req.tenant.metaEnabled === true || 
+    (req.tenant.customFeatures && req.tenant.customFeatures.META_API === true)
+  );
+  if (allowed) {
     next();
   } else {
     res.status(403).json({ success: false, message: 'Feature requires Meta Cloud to be enabled by Admin' });

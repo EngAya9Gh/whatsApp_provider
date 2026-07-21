@@ -100,7 +100,7 @@ import axios from 'axios'
 const plans = ref([])
 const loading = ref(true)
 
-const availableFeatures = ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER', 'BULK_CAMPAIGN', 'EXCEL_EXPORT', 'META_API']
+const availableFeatures = ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER', 'BULK_CAMPAIGN', 'EXCEL_EXPORT', 'META_API', 'LIVE_CHAT']
 
 const fetchPlans = async () => {
   try {
