@@ -3,7 +3,7 @@
 echo "Starting Deployment..."
 
 # 1. Update source code (uncomment if needed)
-# git pull origin main
+git pull origin main
 
 # 2. Install dependencies for root (backend)
 echo "Installing backend dependencies..."
