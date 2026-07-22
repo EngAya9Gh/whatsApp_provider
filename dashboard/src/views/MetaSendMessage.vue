@@ -1,8 +1,10 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">{{ $t('send_message.title') || 'Send Message' }}</h1>
-      <p class="page-subtitle">{{ $t('send_message.subtitle') || 'Test sending messages directly from your dashboard.' }}</p>
+  <div class="page-container p-6 w-full max-w-7xl mx-auto">
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-3xl font-black text-slate-800 tracking-tight">Meta Send Message</h1>
+        <p class="text-slate-500 mt-1">Send a message or a Meta Template instantly</p>
+      </div>
     </div>
 
     <div class="grid-layout">
@@ -13,28 +15,10 @@
             <label>{{ $t('send_message.type') || 'Message Type' }}</label>
             <div class="radio-group" style="display:flex; flex-wrap:wrap; gap:1rem;">
               <label class="radio-label">
-                <input type="radio" v-model="messageType" value="text" /> {{ $t('send_message.type_text') || 'Text' }}
-              </label>
-              <label class="radio-label">
-                <input type="radio" v-model="messageType" value="image" /> {{ $t('send_message.type_image') || 'Image' }}
-              </label>
-              <label class="radio-label">
-                <input type="radio" v-model="messageType" value="pdf" /> {{ $t('send_message.type_pdf') || 'PDF' }}
-              </label>
-              <label class="radio-label" v-if="!isMetaChannel">
-                <input type="radio" v-model="messageType" value="template" /> Local Template
-              </label>
-              <label class="radio-label" v-if="isMetaChannel">
                 <input type="radio" v-model="messageType" value="meta_template" /> Meta Template
               </label>
-              <label class="radio-label" v-if="isMetaChannel" style="color:#FF6600; font-weight:600;">
-                <input type="radio" v-model="messageType" value="buttons" /> 🔘 Buttons
-              </label>
-              <label class="radio-label" v-if="isMetaChannel" style="color:#10B981; font-weight:600;">
-                <input type="radio" v-model="messageType" value="list" /> 📋 List
-              </label>
-              <label class="radio-label" v-if="isMetaChannel" style="color:#3B82F6; font-weight:600;">
-                <input type="radio" v-model="messageType" value="location" /> 📍 Location
+              <label class="radio-label">
+                <input type="radio" v-model="messageType" value="text" /> Free-form Text (24h Window)
               </label>
             </div>
           </div>
@@ -47,40 +31,19 @@
 
           <div class="form-group">
             <label>Sending Channel</label>
-            <select v-model="channelId" class="form-input">
-              <option value="">Default Web QR Connection</option>
+            <select v-model="channelId" class="form-input" required>
+              <option value="" disabled>Select Meta Channel</option>
               <option v-for="ch in channels" :key="ch.id" :value="ch.id">
                 +{{ ch.phoneNumber }} (Meta Cloud)
               </option>
             </select>
-            <small class="hint">Recommended: Select a Meta channel for Buttons and Lists.</small>
           </div>
 
           <!-- Text Input -->
           <div v-if="messageType === 'text'" class="form-group">
             <label>{{ $t('send_message.message') || 'Message Content' }}</label>
-            <textarea v-model="textContent" rows="4" :placeholder="$t('send_message.message_placeholder') || 'Hello, this is a custom message...'" required class="form-input"></textarea>
-          </div>
-
-          <!-- Media Inputs (File Upload) -->
-          <div v-if="messageType === 'image' || messageType === 'pdf'" class="form-group">
-            <label>{{ $t('send_message.media') || 'Upload File' }}</label>
-            <input type="file" @change="handleFileChange" :accept="messageType === 'image' ? 'image/*' : 'application/pdf'" required class="form-input" />
-            <small class="hint">{{ $t('send_message.media_hint') || 'Max file size: 10MB.' }}</small>
-          </div>
-
-          <div v-if="messageType === 'image' || messageType === 'pdf'" class="form-group">
-            <label>{{ $t('send_message.caption') || 'Caption (Optional)' }}</label>
-            <input type="text" v-model="caption" placeholder="..." class="form-input" />
-          </div>
-
-          <!-- Template Inputs -->
-          <div v-if="messageType === 'template'" class="form-group">
-            <label>{{ $t('send_message.select_template') || 'Select Local Template' }}</label>
-            <select v-model="selectedTemplateId" @change="extractVariables" required class="form-input">
-              <option value="" disabled>{{ $t('send_message.select_template') || 'Choose a template...' }}</option>
-              <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.name }}</option>
-            </select>
+            <textarea v-model="textContent" rows="4" placeholder="Hello, this is a custom message..." required class="form-input"></textarea>
+            <small class="hint">Note: You can only send free-form text if the user has messaged you within the last 24 hours.</small>
           </div>
 
           <div v-if="messageType === 'meta_template'" class="form-group">
@@ -96,131 +59,32 @@
             </select>
           </div>
 
-          <!-- Buttons Inputs -->
-          <div v-if="messageType === 'buttons'" class="form-group interactive-box">
-            <label>Message Content</label>
-            <textarea v-model="textContent" rows="3" placeholder="Message text..." required class="form-input"></textarea>
-            
-            <div style="margin-top: 1rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
-              <label>Buttons (Max 3)</label>
-              <button type="button" @click="addSendButton" class="btn-text" style="color:#10B981" :disabled="buttonsList.length >= 3">+ Add Button</button>
-            </div>
-            <div v-for="(btn, i) in buttonsList" :key="i" style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
-              <input v-model="btn.text" placeholder="Button Text" class="form-input" style="flex:1" maxlength="20" required />
-              <select v-model="btn.type" class="form-input" style="width:100px;">
-                <option value="reply">Reply</option>
-                <option value="url">URL</option>
-              </select>
-              <input v-if="btn.type === 'url'" v-model="btn.url" placeholder="https://" class="form-input" style="flex:1" required />
-              <button type="button" @click="removeSendButton(i)" class="btn-text" style="color:#DC2626">✕</button>
-            </div>
-            
-            <label style="margin-top:1rem;">Optional Image Attachment</label>
-            <input type="file" @change="handleFileChange" accept="image/*" class="form-input" />
-          </div>
-
-          <!-- List Inputs -->
-          <div v-if="messageType === 'list'" class="form-group interactive-box">
-            <label>List Title</label>
-            <input v-model="listTitle" placeholder="Awesome Options" required class="form-input" style="margin-bottom:0.2rem;" maxlength="60" />
-            <small class="hint" style="margin-bottom:1rem;">العنوان العريض الذي يظهر أعلى الرسالة (مثال: "قائمة منتجاتنا")</small>
-
-            <label>List Body (Message)</label>
-            <textarea v-model="listBody" rows="2" placeholder="Please select an option" required class="form-input" style="margin-bottom:0.2rem;" maxlength="1024"></textarea>
-            <small class="hint" style="margin-bottom:1rem;">النص الأساسي الذي يشرح للعميل ماذا يفعل (مثال: "يرجى اختيار المنتج")</small>
-
-            <label>Main Button Text (To open list)</label>
-            <input v-model="listButtonText" placeholder="View Options" required class="form-input" style="margin-bottom:0.2rem;" maxlength="20" />
-            <small class="hint" style="margin-bottom:1.5rem;">الكلمة المكتوبة على الزر لكي تفتح القائمة المنبثقة (مثال: "عرض الخيارات")</small>
-
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; align-items: center;">
-              <div>
-                <label style="margin: 0;">Sections (Min 1)</label>
-                <small class="hint" style="margin-top:0;">تقسيم القائمة لعناوين رئيسية (مثال: قسم "العطور"، وقسم "المكياج")</small>
-              </div>
-              <button type="button" @click="addSection" class="btn-text" style="color:#10B981">+ Add Section</button>
-            </div>
-            <div v-for="(section, sIdx) in listSections" :key="sIdx" class="section-box">
-              <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
-                <input v-model="section.title" placeholder="Section Title" required class="form-input" maxlength="24" />
-                <button type="button" @click="removeSection(sIdx)" class="btn-text" style="color:#DC2626" :disabled="listSections.length <= 1">✕</button>
-              </div>
-              <div class="rows-box">
-                <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem; align-items: center;">
-                  <div>
-                    <label style="font-size:0.8rem; margin:0;">Rows (Options)</label>
-                    <small class="hint" style="font-size: 0.7rem; margin-top: 0;">الخيارات التي سيختار منها العميل (مثال: "عطر العود")</small>
-                  </div>
-                  <button type="button" @click="addRow(sIdx)" class="btn-text" style="font-size:0.8rem; color:#3B82F6">+ Add Row</button>
-                </div>
-                <div v-for="(row, rIdx) in section.rows" :key="rIdx" style="display:flex; gap:0.5rem; margin-bottom:0.5rem; align-items:center;">
-                  <input v-model="row.title" placeholder="Row Title" required class="form-input" style="flex:1" maxlength="24" />
-                  <input v-model="row.description" placeholder="Description (Optional)" class="form-input" style="flex:1.5" maxlength="72" />
-                  <button type="button" @click="removeRow(sIdx, rIdx)" class="btn-text" style="color:#DC2626" :disabled="section.rows.length <= 1">✕</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Location Inputs -->
-          <div v-if="messageType === 'location'" class="form-group interactive-box">
-            <div style="display:flex; gap:1rem; margin-bottom:1rem;">
-              <div style="flex:1;">
-                <label>Latitude</label>
-                <input type="number" step="any" v-model="locationLat" placeholder="24.7136" required class="form-input" />
-              </div>
-              <div style="flex:1;">
-                <label>Longitude</label>
-                <input type="number" step="any" v-model="locationLng" placeholder="46.6753" required class="form-input" />
-              </div>
-            </div>
-            <label>Location Name (Optional)</label>
-            <input v-model="locationName" placeholder="Kingdom Centre" class="form-input" style="margin-bottom:1rem;" maxlength="100" />
-            <label>Address (Optional)</label>
-            <input v-model="locationAddress" placeholder="Riyadh, Saudi Arabia" class="form-input" maxlength="200" />
-          </div>
-
-          <!-- Dynamic Template Variables -->
-          <div v-if="messageType === 'template' && templateVariables.length > 0" class="variables-box">
-            <h4>{{ $t('send_message.fill_variables') || 'Fill in Variables:' }}</h4>
-            <div v-for="variable in templateVariables" :key="variable" class="form-group" style="margin-bottom: 0.5rem;">
-              <label>{{ variable }}</label>
-              <input type="text" v-model="variableValues[variable]" :placeholder="`Value for ${variable}`" required class="form-input" />
-            </div>
-          </div>
-
           <div v-if="error" class="error-msg">{{ error }}</div>
           <div v-if="success" class="success-msg">{{ success }}</div>
 
           <button type="submit" class="btn-submit" :disabled="loading">
             <span v-if="loading" class="spinner"></span>
-            {{ loading ? ($t('send_message.sending') || 'Sending...') : ($t('send_message.send') || 'Send Message') }}
+            {{ loading ? 'Sending...' : 'Send Meta Message' }}
           </button>
         </form>
       </div>
 
       <!-- Preview or Info -->
       <div class="card info-card">
-        <h2 class="card-title">{{ $t('send_message.how_it_works') || 'How it works' }}</h2>
+        <h2 class="card-title">How Meta API works</h2>
         <p class="info-text">
-          {{ $t('send_message.info_text') || 'This tool uses your own API to send messages. When you click send, the dashboard makes a request to:' }}
+          Sending messages through Meta Cloud API uses your official WABA channel.
         </p>
         <code class="endpoint-code">POST /api/v1/{{ 
-          messageType === 'template' ? 'templates/send' : 
-          (messageType === 'meta_template' ? 'message/send-meta-template' :
-          (messageType === 'buttons' ? 'message/send-buttons' :
-          (messageType === 'list' ? 'message/send-list' :
-          (messageType === 'location' ? 'message/send-location' :
-          (messageType === 'text' ? 'message/send' : 'message/upload-media'))))) 
+          messageType === 'meta_template' ? 'message/send-meta-template' : 'message/send'
         }}</code>
         
         <div class="tips-box">
-          <h4>{{ $t('send_message.pro_tips') || '💡 Pro Tips' }}</h4>
+          <h4>💡 Meta Pro Tips</h4>
           <ul>
-            <li>{{ $t('send_message.tip_1') || 'Ensure your WhatsApp is connected (Check the WhatsApp tab).' }}</li>
-            <li>{{ $t('send_message.tip_2') || 'Text and Template messages are delivered instantly.' }}</li>
-            <li>{{ $t('send_message.tip_3') || 'Media messages (images and PDFs) are securely uploaded and sent.' }}</li>
-            <li>{{ $t('send_message.tip_4') || 'All messages count towards your monthly limit.' }}</li>
+            <li>To initiate a new conversation, you MUST use a pre-approved Meta Template.</li>
+            <li>Free-form text messages can only be sent if the user has messaged you within the last 24 hours.</li>
+            <li>Templates require Meta approval before they can be sent.</li>
           </ul>
         </div>
       </div>
@@ -321,10 +185,11 @@ const fetchChannels = async () => {
     return
   }
   try {
-    const res = await axios.get('/api/v1/meta/channels', {
+    const res = await axios.get('/api/v1/channels', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
-    channels.value = res.data.data
+    channels.value = res.data.data.filter(c => c.providerType === 'META_CLOUD')
+    if (channels.value.length > 0) { channelId.value = channels.value[0].id }
   } catch (err) {
     console.error('Failed to load channels', err)
   }

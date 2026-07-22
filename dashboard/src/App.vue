@@ -32,7 +32,7 @@
           <span class="nav-icon">📢</span>
           <span class="nav-label">{{ $t('sidebar.campaigns') }}</span>
         </router-link>
-        <router-link v-if="$hasFeature('TEMPLATES')" to="/templates" class="nav-item" active-class="active">
+        <router-link to="/templates" class="nav-item" active-class="active">
           <span class="nav-icon">📋</span>
           <span class="nav-label">{{ $t('sidebar.templates') }}</span>
         </router-link>
