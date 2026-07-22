@@ -14,6 +14,14 @@
               class="form-control"
             />
           </div>
+          <div class="channel-filter" v-if="channels.length > 0">
+            <select v-model="selectedChannel" @change="fetchThreads" class="channel-select">
+              <option value="">All Sending Numbers ({{ channels.length }})</option>
+              <option v-for="ch in channels" :key="ch.id" :value="ch.id">
+                {{ ch.name || ch.phoneNumber }} ({{ ch.displayPhoneNumber || ch.phoneNumber }})
+              </option>
+            </select>
+          </div>
         </div>
         
         <div class="threads-list" v-if="threads.length > 0">
@@ -33,6 +41,9 @@
               </div>
               <div class="thread-bottom">
                 <span class="thread-phone">{{ thread.contactPhone }}</span>
+                <span class="channel-tag" v-if="thread.channel?.displayPhoneNumber || thread.channel?.phoneNumber">
+                  {{ thread.channel.displayPhoneNumber || thread.channel.phoneNumber }}
+                </span>
                 <span class="unread-badge" v-if="thread.unreadCount > 0">{{ thread.unreadCount }}</span>
               </div>
             </div>
@@ -154,6 +165,8 @@ const threads = ref([])
 const messages = ref([])
 const selectedThread = ref(null)
 const searchQuery = ref('')
+const channels = ref([])
+const selectedChannel = ref('')
 const newMessage = ref('')
 const attachment = ref(null)
 const fileInput = ref(null)
@@ -163,12 +176,23 @@ const loadingMessages = ref(false)
 const sending = ref(false)
 const messagesContainer = ref(null)
 
+const fetchChannels = async () => {
+  try {
+    const res = await axios.get('/api/v1/meta/channels')
+    channels.value = res.data.data || []
+  } catch (e) {
+    console.error('Error fetching channels:', e)
+  }
+}
+
 const fetchThreads = async () => {
   loadingThreads.value = true
   try {
-    const res = await axios.get('/api/v1/chat/threads', {
-      params: { search: searchQuery.value, limit: 50 }
-    })
+    const params = { search: searchQuery.value, limit: 50 }
+    if (selectedChannel.value) {
+      params.channelId = selectedChannel.value
+    }
+    const res = await axios.get('/api/v1/chat/threads', { params })
     threads.value = res.data.data.threads
   } catch (error) {
     console.error('Error fetching threads:', error)
@@ -317,6 +341,7 @@ const handleMediaError = (e) => {
 }
 
 onMounted(() => {
+  fetchChannels()
   fetchThreads()
 
   // Initialize Socket.io
@@ -650,6 +675,38 @@ onUnmounted(() => {
   margin-bottom: 10px;
   font-size: 0.9rem;
   box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.search-box input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1px solid #ddd;
+  font-size: 0.9rem;
+}
+
+.channel-filter {
+  margin-top: 10px;
+}
+
+.channel-select {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  font-size: 0.8rem;
+  background: white;
+  color: #334155;
+  outline: none;
+}
+
+.channel-tag {
+  font-size: 0.65rem;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
 }
 
 .btn-clear {

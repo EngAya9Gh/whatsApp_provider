@@ -203,11 +203,28 @@ class SessionManager {
             }
             // --- End Campaign Text Reply Tracking ---
 
+            const target = await prisma.campaignTarget.findFirst({
+              where: {
+                phone: { contains: senderPhone },
+                campaign: { tenantId }
+              },
+              orderBy: { id: 'desc' }
+            });
+
             const rules = await prisma.autoResponder.findMany({
               where: { tenantId, isActive: true }
             });
 
-            for (const rule of rules) {
+            const applicableRules = rules.filter(rule => {
+              if (!rule.campaignId) return true;
+              return target && target.campaignId === rule.campaignId;
+            }).sort((a, b) => {
+              if (a.campaignId && !b.campaignId) return -1;
+              if (!a.campaignId && b.campaignId) return 1;
+              return 0;
+            });
+
+            for (const rule of applicableRules) {
               const textLower = incomingText.trim().toLowerCase();
               const keywordLower = rule.keyword.trim().toLowerCase();
               let isMatch = false;

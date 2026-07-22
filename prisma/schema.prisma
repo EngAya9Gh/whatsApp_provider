@@ -144,6 +144,7 @@ model Campaign {
   endDate         DateTime?           @map("end_date")
   interactions    ButtonInteraction[]
   targets         CampaignTarget[]
+  autoResponders  AutoResponder[]
   tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   channel         WhatsAppChannel?    @relation(fields: [channelId], references: [id])
 
@@ -184,15 +185,20 @@ model ButtonInteraction {
 }
 
 model Invoice {
-  id           String   @id @default(uuid())
-  tenantId     String   @map("tenant_id")
-  amount       String
-  description  String   @db.Text
-  status       String   @default("UNPAID")
-  createdAt    DateTime @default(now()) @map("created_at")
-  billingCycle String   @default("Monthly") @map("billing_cycle")
-  dueDate      DateTime @default(now()) @map("due_date")
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  amount        String
+  description   String   @db.Text
+  status        String   @default("UNPAID")
+  createdAt     DateTime @default(now()) @map("created_at")
+  billingCycle  String   @default("Monthly") @map("billing_cycle")
+  dueDate       DateTime @default(now()) @map("due_date")
+  items         Json?
+  taxRate       Float?   @default(15.0) @map("tax_rate")
+  taxAmount     String?  @map("tax_amount")
+  buyerDetails  Json?    @map("buyer_details")
+  sellerDetails Json?    @map("seller_details")
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId], map: "invoices_tenant_id_fkey")
   @@map("invoices")
@@ -216,9 +222,12 @@ model AutoResponder {
   locationName    String?   @map("location_name")
   endDate         DateTime? @map("end_date")
   startDate       DateTime? @map("start_date")
+  campaignId      String?   @map("campaign_id")
   tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaign        Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
   @@index([tenantId], map: "auto_responders_tenant_id_fkey")
+  @@index([campaignId], map: "auto_responders_campaign_id_fkey")
   @@map("auto_responders")
 }
 
@@ -310,4 +319,12 @@ model ChatMessage {
 
   @@index([threadId], map: "chat_messages_thread_id_fkey")
   @@map("chat_messages")
+}
+
+model SystemSetting {
+  id        String   @id @default("GLOBAL")
+  data      Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
 }

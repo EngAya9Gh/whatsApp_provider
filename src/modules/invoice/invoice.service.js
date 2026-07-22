@@ -7,7 +7,7 @@ class InvoiceService {
       where: { id },
       include: {
         tenant: {
-          select: { name: true, email: true, plan: true }
+          select: { name: true, email: true, plan: true, companyName: true, whatsappPhone: true, customFeatures: true }
         }
       }
     });

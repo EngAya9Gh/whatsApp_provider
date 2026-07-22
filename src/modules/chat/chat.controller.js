@@ -4,12 +4,13 @@ const logger = require('../../utils/logger');
 class ChatController {
   async getThreads(req, res, next) {
     try {
-      const { page, limit, search } = req.query;
+      const { page, limit, search, channelId } = req.query;
       const result = await chatService.getThreads(
         req.tenant.id,
         parseInt(page) || 1,
         parseInt(limit) || 50,
-        search
+        search,
+        channelId
       );
       res.json({ success: true, data: result });
     } catch (error) {

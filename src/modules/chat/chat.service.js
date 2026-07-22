@@ -6,10 +6,13 @@ const billingService = require('../billing/billing.service');
 const logger = require('../../utils/logger');
 
 class ChatService {
-  async getThreads(tenantId, page = 1, limit = 50, search = '') {
+  async getThreads(tenantId, page = 1, limit = 50, search = '', channelId = null) {
     const skip = (page - 1) * limit;
     
     let where = { tenantId };
+    if (channelId) {
+      where.channelId = channelId;
+    }
     if (search) {
       where.OR = [
         { contactPhone: { contains: search } },
@@ -23,7 +26,7 @@ class ChatService {
       skip,
       take: limit,
       include: {
-        channel: { select: { phoneNumber: true } }
+        channel: { select: { id: true, phoneNumber: true, name: true, displayPhoneNumber: true } }
       }
     });
 

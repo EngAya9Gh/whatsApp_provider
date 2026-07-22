@@ -78,12 +78,47 @@ class AuthService {
         id: tenant.id,
         name: tenant.name,
         email: tenant.email,
+        companyName: tenant.companyName,
+        customFeatures: tenant.customFeatures,
         sessionStatus: tenant.sessionStatus,
         plan: tenant.plan,
         metaEnabled: tenant.metaEnabled,
         allowedFeatures
       }
     };
+  }
+
+  async updateProfile(tenantId, data) {
+    const existing = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!existing) throw { status: 404, message: 'Tenant not found' };
+
+    const currentFeatures = (typeof existing.customFeatures === 'object' && existing.customFeatures !== null)
+      ? existing.customFeatures
+      : {};
+
+    const updatedFeatures = {
+      ...currentFeatures,
+      companyDetails: {
+        vatNumber: data.vatNumber !== undefined ? data.vatNumber : (currentFeatures.companyDetails?.vatNumber || ''),
+        crn: data.crn !== undefined ? data.crn : (currentFeatures.companyDetails?.crn || ''),
+        street: data.street !== undefined ? data.street : (currentFeatures.companyDetails?.street || ''),
+        district: data.district !== undefined ? data.district : (currentFeatures.companyDetails?.district || ''),
+        city: data.city !== undefined ? data.city : (currentFeatures.companyDetails?.city || ''),
+        country: data.country !== undefined ? data.country : (currentFeatures.companyDetails?.country || ''),
+        buildingNo: data.buildingNo !== undefined ? data.buildingNo : (currentFeatures.companyDetails?.buildingNo || ''),
+        postalCode: data.postalCode !== undefined ? data.postalCode : (currentFeatures.companyDetails?.postalCode || '')
+      }
+    };
+
+    const updatedTenant = await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        companyName: data.companyName !== undefined ? data.companyName : existing.companyName,
+        customFeatures: updatedFeatures
+      }
+    });
+
+    return updatedTenant;
   }
 }
 

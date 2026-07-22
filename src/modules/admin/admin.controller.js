@@ -82,8 +82,10 @@ class AdminController {
 
   async createInvoice(req, res, next) {
     try {
-      const { amount, description, billingCycle, status } = req.body;
-      const invoice = await adminService.createInvoice(req.params.id, amount, description, billingCycle, status);
+      const { amount, description, billingCycle, status, items, taxRate, taxAmount, buyerDetails, sellerDetails } = req.body;
+      const invoice = await adminService.createInvoice(
+        req.params.id, amount, description, billingCycle, status, items, taxRate, taxAmount, buyerDetails, sellerDetails
+      );
       res.json({ success: true, data: invoice });
     } catch (error) {
       next(error);
@@ -104,6 +106,46 @@ class AdminController {
     try {
       const invoices = await adminService.getAllInvoices();
       res.json({ success: true, data: invoices });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resetTenantPassword(req, res, next) {
+    try {
+      const { newPassword } = req.body;
+      const result = await adminService.resetTenantPassword(req.params.id, newPassword);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      if (error.message.includes('at least 6 characters') || error.message.includes('Tenant not found')) {
+        return res.status(400).json({ error: error.message });
+      }
+      next(error);
+    }
+  }
+
+  async getSystemSettings(req, res, next) {
+    try {
+      const settings = await adminService.getSystemSettings();
+      res.json({ success: true, data: settings });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateSystemSettings(req, res, next) {
+    try {
+      const settings = await adminService.updateSystemSettings(req.body);
+      res.json({ success: true, data: settings });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getUnbilledUsage(req, res, next) {
+    try {
+      const items = await adminService.calculateUnbilledUsage(req.params.id);
+      res.json({ success: true, data: items });
     } catch (error) {
       next(error);
     }

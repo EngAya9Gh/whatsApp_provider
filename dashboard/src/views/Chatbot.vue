@@ -29,6 +29,7 @@
           <thead class="text-xs text-slate-500 uppercase bg-slate-50">
             <tr>
               <th scope="col" class="px-6 py-4 font-bold">Keyword</th>
+              <th scope="col" class="px-6 py-4 font-bold">Scope / Campaign</th>
               <th scope="col" class="px-6 py-4 font-bold">Match Type</th>
               <th scope="col" class="px-6 py-4 font-bold">Response Type</th>
               <th scope="col" class="px-6 py-4 font-bold">Status</th>
@@ -50,6 +51,14 @@
             </tr>
             <tr v-for="rule in rules" :key="rule.id" class="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
               <td class="px-6 py-4 font-extrabold text-slate-800 text-base">{{ rule.keyword }}</td>
+              <td class="px-6 py-4">
+                <span v-if="rule.campaign" class="bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit">
+                  📢 {{ rule.campaign.name }}
+                </span>
+                <span v-else class="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1 rounded-full text-xs font-bold w-fit">
+                  🌐 Global (All Messages)
+                </span>
+              </td>
               <td class="px-6 py-4">
                 <span class="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1 rounded-full text-xs font-bold">{{ rule.matchType }}</span>
               </td>
@@ -99,6 +108,15 @@
             <label class="font-bold text-slate-700 text-sm">Keyword / Button Text</label>
             <input v-model="form.keyword" required placeholder="e.g. Yes, Confirm, 1" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-medium focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all" />
             <small class="text-slate-500 font-medium">The exact word or phrase to look for.</small>
+          </div>
+
+          <div class="grid gap-2">
+            <label class="font-bold text-slate-700 text-sm">Target Campaign (Optional / ربط بحملة معينة)</label>
+            <select v-model="form.campaignId" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 font-medium focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all cursor-pointer">
+              <option value="">🌐 Global (All Messages - عام لجميع الرسائل)</option>
+              <option v-for="c in campaigns" :key="c.id" :value="c.id">📢 {{ c.name }}</option>
+            </select>
+            <small class="text-slate-500 font-medium">If selected, this auto-reply will only trigger for recipients who received this specific campaign.</small>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -195,6 +213,7 @@ import axios from 'axios'
 import FeatureLock from '../components/FeatureLock.vue'
 
 const rules = ref([])
+const campaigns = ref([])
 const loading = ref(true)
 const submitting = ref(false)
 const showModal = ref(false)
@@ -204,6 +223,7 @@ const success = ref('')
 
 const form = ref({
   keyword: '',
+  campaignId: '',
   matchType: 'EXACT',
   responseType: 'TEXT',
   message: '',
@@ -215,6 +235,18 @@ const form = ref({
   endDate: ''
 })
 const selectedFile = ref(null)
+
+const fetchCampaigns = async () => {
+  const token = localStorage.getItem('token')
+  try {
+    const res = await axios.get('/api/v1/campaigns', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    campaigns.value = res.data.data
+  } catch (err) {
+    console.error('Failed to load campaigns for dropdown', err)
+  }
+}
 
 const fetchRules = async () => {
   loading.value = true
@@ -238,7 +270,7 @@ const handleFileUpload = (e) => {
 const closeModal = () => {
   showModal.value = false
   editingRule.value = null
-  form.value = { keyword: '', matchType: 'EXACT', responseType: 'TEXT', message: '', lat: '', lng: '', locationName: '', locationAddress: '', startDate: '', endDate: '' }
+  form.value = { keyword: '', campaignId: '', matchType: 'EXACT', responseType: 'TEXT', message: '', lat: '', lng: '', locationName: '', locationAddress: '', startDate: '', endDate: '' }
   selectedFile.value = null
   error.value = ''
 }
@@ -255,6 +287,7 @@ const editRule = (rule) => {
 
   form.value = {
     keyword: rule.keyword,
+    campaignId: rule.campaignId || '',
     matchType: rule.matchType,
     responseType: rule.responseType,
     message: rule.message || '',
@@ -277,6 +310,7 @@ const submitRule = async () => {
   try {
     const formData = new FormData()
     formData.append('keyword', form.value.keyword)
+    formData.append('campaignId', form.value.campaignId || '')
     formData.append('matchType', form.value.matchType)
     formData.append('responseType', form.value.responseType)
     
@@ -357,6 +391,7 @@ const toggleStatus = async (rule) => {
 
 onMounted(() => {
   fetchRules()
+  fetchCampaigns()
 })
 </script>
 

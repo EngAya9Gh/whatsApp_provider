@@ -5,6 +5,7 @@ import Tenants from '../views/Tenants.vue'
 import TenantDetail from '../views/TenantDetail.vue'
 import BillingAdmin from '../views/BillingAdmin.vue'
 import PlansAdmin from '../views/PlansAdmin.vue'
+import Settings from '../views/Settings.vue'
 
 const routes = [
   { path: '/login', component: Login, meta: { guest: true } },
@@ -13,6 +14,7 @@ const routes = [
   { path: '/tenants/:id', component: TenantDetail, meta: { requiresAuth: true } },
   { path: '/billing', component: BillingAdmin, meta: { requiresAuth: true } },
   { path: '/plans', component: PlansAdmin, meta: { requiresAuth: true } },
+  { path: '/settings', component: Settings, meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({

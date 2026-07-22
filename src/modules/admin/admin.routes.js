@@ -34,8 +34,14 @@ router.get('/tenants/:id', adminAuth, adminController.getTenantById.bind(adminCo
 router.put('/tenants/:id/plan', adminAuth, adminController.updatePlan.bind(adminController));
 router.put('/tenants/:id/toggle', adminAuth, adminController.toggleTenant.bind(adminController));
 router.put('/tenants/:id/settings', adminAuth, adminController.updateSettings.bind(adminController));
+router.put('/tenants/:id/password', adminAuth, adminController.resetTenantPassword.bind(adminController));
 router.post('/tenants/:id/invoices', adminAuth, adminController.createInvoice.bind(adminController));
+router.get('/tenants/:id/unbilled-usage', adminAuth, adminController.getUnbilledUsage.bind(adminController));
 router.get('/invoices', adminAuth, adminController.getAllInvoices.bind(adminController));
 router.put('/invoices/:id/status', adminAuth, adminController.updateInvoiceStatus.bind(adminController));
+
+// System Settings
+router.get('/settings', adminAuth, adminController.getSystemSettings.bind(adminController));
+router.put('/settings', adminAuth, adminController.updateSystemSettings.bind(adminController));
 
 module.exports = router;

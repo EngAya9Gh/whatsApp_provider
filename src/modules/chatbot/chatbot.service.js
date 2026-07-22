@@ -5,6 +5,9 @@ class ChatbotService {
   async getAutoResponders(tenantId) {
     return await prisma.autoResponder.findMany({
       where: { tenantId },
+      include: {
+        campaign: { select: { id: true, name: true } }
+      },
       orderBy: { createdAt: 'desc' }
     });
   }

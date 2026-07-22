@@ -20,6 +20,9 @@
         <router-link to="/plans" class="nav-item" active-class="active">
           <span class="nav-icon">📦</span> {{ $t('sidebar.plans') }}
         </router-link>
+        <router-link to="/settings" class="nav-item" active-class="active">
+          <span class="nav-icon">⚙️</span> Settings
+        </router-link>
       </nav>
 
       <div class="sidebar-footer">

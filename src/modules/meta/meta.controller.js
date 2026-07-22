@@ -127,14 +127,33 @@ class MetaController {
               }
 
               // Handle Auto-Responder for Meta (both TEXT and BUTTONS)
-              const textForBot = buttonText || null;
+              const textForBot = buttonText || incomingText || null;
               
               if (textForBot) {
+                // Find latest campaign target for this recipient
+                const target = await prisma.campaignTarget.findFirst({
+                  where: {
+                    phone: { contains: from },
+                    campaign: { tenantId: channel.tenantId }
+                  },
+                  orderBy: { id: 'desc' }
+                });
+
                 const rules = await prisma.autoResponder.findMany({
                   where: { tenantId: channel.tenantId, isActive: true }
                 });
 
-                for (const rule of rules) {
+                // Filter & sort rules: Campaign-specific rules first, then global rules
+                const applicableRules = rules.filter(rule => {
+                  if (!rule.campaignId) return true; // Global rule
+                  return target && target.campaignId === rule.campaignId; // Campaign-specific rule
+                }).sort((a, b) => {
+                  if (a.campaignId && !b.campaignId) return -1;
+                  if (!a.campaignId && b.campaignId) return 1;
+                  return 0;
+                });
+
+                for (const rule of applicableRules) {
                   const textLower = textForBot.trim().toLowerCase();
                   const keywordLower = rule.keyword.trim().toLowerCase();
                   let isMatch = false;
@@ -149,22 +168,14 @@ class MetaController {
                   if (isMatch) {
                     try {
                       const messageService = require('../message/message.service');
+                      const replyText = rule.message || '';
                       
-                      if (rule.buttons) {
-                        const parsedButtons = typeof rule.buttons === 'string' ? JSON.parse(rule.buttons) : rule.buttons;
-                        await messageService.sendButtonsMessage(channel.tenantId, from, rule.response, parsedButtons, null, channel.id);
-                      } else if (rule.interactiveType === 'LIST' && rule.listSections) {
-                        const parsedSections = typeof rule.listSections === 'string' ? JSON.parse(rule.listSections) : rule.listSections;
-                        await messageService.sendListMessage(channel.tenantId, from, 'Options', rule.response, rule.listButtonText || 'Menu', parsedSections, channel.id);
-                      } else {
-                        await messageService.sendCustomMessage(channel.tenantId, from, rule.response, channel.id);
-                      }
-                      logger.info(`[AutoResponder] Meta Reply sent to ${from}`);
-                      
-                      if (!rule.triggerMultiple) break;
+                      await messageService.sendMessage(channel.tenantId, from, replyText, null, channel.id);
+                      logger.info(`[AutoResponder] Meta Reply sent to ${from} (Rule: ${rule.keyword}, Campaign: ${rule.campaignId || 'Global'})`);
                     } catch (e) {
                       logger.error(`[AutoResponder] Meta Failed to send reply to ${from}`, e);
                     }
+                    break; // stop processing after first match
                   }
                 }
               }

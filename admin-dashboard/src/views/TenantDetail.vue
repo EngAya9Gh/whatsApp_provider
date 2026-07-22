@@ -15,6 +15,9 @@
       </div>
       
       <div class="flex items-center gap-3" v-if="tenant">
+        <button @click="openPasswordModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 border-none cursor-pointer">
+          Reset Password
+        </button>
         <button @click="openInvoiceModal" class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed border-none">
           Generate Receipt
         </button>
@@ -219,41 +222,123 @@
       </div>
     </div>
 
-    <!-- Invoice Modal -->
+    <!-- Invoice Modal (Dynamic Items) -->
     <div v-if="showInvoiceModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl relative">
+      <div class="bg-white rounded-2xl p-8 w-full max-w-4xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
         <h3 class="text-2xl font-extrabold text-slate-900 mb-6 tracking-tight mt-0">Generate Receipt</h3>
         
-        <div class="mb-5">
-          <label class="block text-sm font-semibold text-slate-700 mb-2">Amount</label>
-          <input v-model="invoiceAmount" type="text" placeholder="e.g., $50.00 or 500 EGP" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-3 outline-none transition-all" />
+        <div v-if="loadingUnbilled" class="text-center py-8 text-slate-500">
+          Calculating unbilled usage & applying margins...
         </div>
-        
-        <div class="mb-5">
-          <label class="block text-sm font-semibold text-slate-700 mb-2">Item / Package</label>
-          <select v-model="selectedPackage" @change="onPackageChange" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-3 outline-none transition-all mb-3">
-            <option value="Subscription - FREE Plan">FREE Plan</option>
-            <option value="Subscription - STARTER Plan">STARTER Plan</option>
-            <option value="Subscription - PRO Plan">PRO Plan</option>
-            <option value="Subscription - ENTERPRISE Plan">ENTERPRISE Plan</option>
-            <option value="Custom">Custom (Enter manually)</option>
-          </select>
-          <input v-if="selectedPackage === 'Custom'" v-model="invoiceDescription" type="text" placeholder="Enter custom description..." class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-3 outline-none transition-all" />
+
+        <div v-else>
+          <div class="mb-5 flex justify-between items-end gap-4">
+            <div class="flex-1">
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Billing Cycle</label>
+              <select v-model="billingCycle" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2.5 outline-none transition-all">
+                <option value="Monthly">Monthly</option>
+                <option value="Yearly">Yearly</option>
+                <option value="One-time">One-time / Custom</option>
+              </select>
+            </div>
+            <button @click="addInvoiceItem" class="px-4 py-2 text-sm font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors border-none cursor-pointer">
+              + Add Manual Item
+            </button>
+          </div>
+
+          <!-- Items Table -->
+          <div class="border border-slate-200 rounded-lg overflow-hidden mb-6">
+            <table class="w-full text-sm text-left">
+              <thead class="bg-slate-50 text-slate-600">
+                <tr>
+                  <th class="px-3 py-2">Item Name</th>
+                  <th class="px-3 py-2">Description</th>
+                  <th class="px-3 py-2 w-24">Qty</th>
+                  <th class="px-3 py-2 w-32">Price (Rate)</th>
+                  <th class="px-3 py-2 w-24">Total</th>
+                  <th class="px-3 py-2 w-16"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, index) in invoiceItems" :key="item.id" class="border-t border-slate-100">
+                  <td class="px-3 py-2">
+                    <input v-model="item.name" class="w-full border border-slate-200 rounded p-1.5 text-sm" placeholder="Item Name"/>
+                  </td>
+                  <td class="px-3 py-2">
+                    <input v-model="item.description" class="w-full border border-slate-200 rounded p-1.5 text-sm" placeholder="Description"/>
+                  </td>
+                  <td class="px-3 py-2">
+                    <input v-model.number="item.qty" type="number" min="1" class="w-full border border-slate-200 rounded p-1.5 text-sm" @input="updateItemTotal(item)"/>
+                  </td>
+                  <td class="px-3 py-2">
+                    <input v-model.number="item.rate" type="number" step="0.0001" class="w-full border border-slate-200 rounded p-1.5 text-sm" @input="updateItemTotal(item)"/>
+                  </td>
+                  <td class="px-3 py-2 font-mono font-medium text-slate-700">
+                    {{ parseFloat(item.total).toFixed(2) }}
+                  </td>
+                  <td class="px-3 py-2 text-center">
+                    <button @click="removeInvoiceItem(index)" class="text-red-500 hover:text-red-700 font-bold border-none bg-transparent cursor-pointer p-1">×</button>
+                  </td>
+                </tr>
+                <tr v-if="!invoiceItems.length">
+                  <td colspan="6" class="px-3 py-4 text-center text-slate-400">No items added.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Summary -->
+          <div class="flex justify-end mb-8">
+            <div class="w-64 space-y-2 text-sm">
+              <div class="flex justify-between text-slate-600">
+                <span>Subtotal:</span>
+                <span class="font-mono">{{ invoiceSubtotal.toFixed(2) }}</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span>VAT ({{ taxRate }}%):</span>
+                <span class="font-mono">{{ invoiceTaxAmount.toFixed(2) }}</span>
+              </div>
+              <div class="flex justify-between font-bold text-lg text-slate-900 border-t border-slate-200 pt-2">
+                <span>Total:</span>
+                <span class="font-mono">{{ invoiceGrandTotal.toFixed(2) }}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <button @click="showInvoiceModal = false" class="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border-none cursor-pointer">Cancel</button>
+            <button @click="createInvoice" :disabled="isCreatingInvoice || !invoiceItems.length" class="px-6 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg shadow-sm transition-colors cursor-pointer border-none disabled:opacity-50">
+              {{ isCreatingInvoice ? 'Creating...' : 'Create Invoice' }}
+            </button>
+          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div v-if="showPasswordModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl relative">
+        <h3 class="text-2xl font-extrabold text-slate-900 mb-2 tracking-tight mt-0">Reset Password</h3>
+        <p class="text-sm text-slate-500 mb-6">Set a new login password for {{ tenant?.name }}.</p>
         
-        <div class="mb-8">
-          <label class="block text-sm font-semibold text-slate-700 mb-2">Billing Cycle</label>
-          <select v-model="billingCycle" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-3 outline-none transition-all">
-            <option value="Monthly">Monthly</option>
-            <option value="Yearly">Yearly</option>
-            <option value="One-time">One-time / Custom</option>
-          </select>
+        <div class="mb-6">
+          <label class="block text-sm font-semibold text-slate-700 mb-2">New Password</label>
+          <div class="relative">
+            <input v-model="newPassword" :type="showPasswordText ? 'text' : 'password'" placeholder="At least 6 characters..." class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-3 pr-24 outline-none transition-all" />
+            <button @click="generateRandomPassword" type="button" class="absolute right-2 top-2 text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 px-2.5 py-1.5 rounded transition-colors border-none cursor-pointer">
+              Generate
+            </button>
+          </div>
+          <div class="flex items-center gap-2 mt-2">
+            <input type="checkbox" v-model="showPasswordText" id="toggleShowPass" class="cursor-pointer accent-orange-500" />
+            <label for="toggleShowPass" class="text-xs text-slate-600 cursor-pointer select-none">Show password</label>
+          </div>
         </div>
         
         <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
-          <button @click="showInvoiceModal = false" class="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border-none cursor-pointer">Cancel</button>
-          <button @click="createInvoice" :disabled="isCreatingInvoice" class="px-6 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg shadow-sm transition-colors cursor-pointer border-none disabled:opacity-50">
-            {{ isCreatingInvoice ? 'Creating...' : 'Create Invoice' }}
+          <button @click="showPasswordModal = false" class="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border-none cursor-pointer">Cancel</button>
+          <button @click="resetPassword" :disabled="isResettingPassword || !newPassword || newPassword.length < 6" class="px-6 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors cursor-pointer border-none disabled:opacity-50">
+            {{ isResettingPassword ? 'Updating...' : 'Save New Password' }}
           </button>
         </div>
       </div>
@@ -262,7 +347,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 
@@ -284,45 +369,136 @@ const settingsForm = ref({
 
 const availableFeatures = ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER', 'BULK_CAMPAIGN', 'EXCEL_EXPORT', 'META_API', 'LIVE_CHAT']
 
-// Invoice state
+// Removed old invoice state, using dynamic state below
+
+// Password reset state
+const showPasswordModal = ref(false)
+const newPassword = ref('')
+const showPasswordText = ref(false)
+const isResettingPassword = ref(false)
+
+const openPasswordModal = () => {
+  newPassword.value = ''
+  showPasswordText.value = false
+  showPasswordModal.value = true
+}
+
+const generateRandomPassword = () => {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$'
+  let pass = ''
+  for (let i = 0; i < 10; i++) {
+    pass += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  newPassword.value = pass
+  showPasswordText.value = true
+}
+
+const resetPassword = async () => {
+  if (!newPassword.value || newPassword.value.length < 6) {
+    alert('Password must be at least 6 characters.')
+    return
+  }
+  isResettingPassword.value = true
+  try {
+    const token = localStorage.getItem('admin_token')
+    await axios.put(`/api/admin/tenants/${route.params.id}/password`, {
+      newPassword: newPassword.value
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    alert('Password updated successfully!')
+    showPasswordModal.value = false
+  } catch (err) {
+    alert(err.response?.data?.error || 'Failed to update password.')
+  } finally {
+    isResettingPassword.value = false
+  }
+}
+
+
+// Dynamic Invoice State
 const showInvoiceModal = ref(false)
-const invoiceAmount = ref('')
-const invoiceDescription = ref('')
-const selectedPackage = ref('Subscription - STARTER Plan')
 const billingCycle = ref('Monthly')
 const isCreatingInvoice = ref(false)
+const loadingUnbilled = ref(false)
+const invoiceItems = ref([])
+const taxRate = ref(15.0)
 
-const onPackageChange = () => {
-  if (selectedPackage.value !== 'Custom') {
-    invoiceDescription.value = selectedPackage.value
-  } else {
-    invoiceDescription.value = ''
-  }
+const invoiceSubtotal = computed(() => {
+  return invoiceItems.value.reduce((sum, item) => sum + parseFloat(item.total || 0), 0)
+})
+
+const invoiceTaxAmount = computed(() => {
+  return invoiceSubtotal.value * (taxRate.value / 100)
+})
+
+const invoiceGrandTotal = computed(() => {
+  return invoiceSubtotal.value + invoiceTaxAmount.value
+})
+
+const updateItemTotal = (item) => {
+  item.total = (parseFloat(item.qty || 0) * parseFloat(item.rate || 0)).toFixed(2)
+}
+
+const addInvoiceItem = () => {
+  invoiceItems.value.push({
+    id: 'man-' + Date.now(),
+    name: '',
+    description: '',
+    qty: 1,
+    rate: 0,
+    total: '0.00'
+  })
+}
+
+const removeInvoiceItem = (index) => {
+  invoiceItems.value.splice(index, 1)
 }
 
 const getInvoiceUrl = (id) => {
-  const baseUrl = window.location.origin.replace('5174', '5173')
-  return `${baseUrl}/invoice/${id}`
+  const host = window.location.hostname
+  const port = host === 'localhost' || host === '127.0.0.1' ? ':5173' : ''
+  const protocol = window.location.protocol
+  return `${protocol}//${host}${port}/invoice/${id}`
 }
 
-const openInvoiceModal = () => {
-  const planDesc = `Subscription - ${tenant.value.plan} Plan`
-  
-  // Check if it's one of the standard plans
-  const standardPlans = ['Subscription - FREE Plan', 'Subscription - STARTER Plan', 'Subscription - PRO Plan', 'Subscription - ENTERPRISE Plan']
-  if (standardPlans.includes(planDesc)) {
-    selectedPackage.value = planDesc
-  } else {
-    selectedPackage.value = 'Custom'
-  }
-  
-  invoiceDescription.value = planDesc
+const openInvoiceModal = async () => {
   showInvoiceModal.value = true
+  loadingUnbilled.value = true
+  invoiceItems.value = []
+  
+  try {
+    const token = localStorage.getItem('admin_token')
+    
+    // Fetch global settings for tax rate
+    const settingsRes = await axios.get('/api/admin/settings', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (settingsRes.data?.data?.data?.taxRate !== undefined) {
+      taxRate.value = parseFloat(settingsRes.data.data.data.taxRate)
+    }
+
+    // Fetch unbilled usage
+    const usageRes = await axios.get(`/api/admin/tenants/${route.params.id}/unbilled-usage`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    if (usageRes.data.success && usageRes.data.data.length > 0) {
+      invoiceItems.value = usageRes.data.data
+    } else {
+      addInvoiceItem() // Add one blank item if no usage
+    }
+  } catch (err) {
+    console.error('Failed to fetch unbilled usage', err)
+    addInvoiceItem()
+  } finally {
+    loadingUnbilled.value = false
+  }
 }
 
 const createInvoice = async () => {
-  if (!invoiceAmount.value) {
-    alert('Please enter an amount.')
+  if (!invoiceItems.value.length) {
+    alert('Please add at least one item.')
     return
   }
   isCreatingInvoice.value = true
@@ -330,27 +506,34 @@ const createInvoice = async () => {
   try {
     const token = localStorage.getItem('admin_token')
     
-    // Append billing cycle to description if not One-time
-    const finalDescription = billingCycle.value === 'One-time' 
-      ? invoiceDescription.value 
-      : `${invoiceDescription.value} (${billingCycle.value})`
+    // Generate brief description for backwards compatibility
+    const itemNames = invoiceItems.value.map(i => i.name).join(', ')
+    const description = billingCycle.value === 'One-time' ? itemNames : `${itemNames} (${billingCycle.value})`
       
-    const res = await axios.post(`/api/admin/tenants/${route.params.id}/invoices`, {
-      amount: invoiceAmount.value,
-      description: finalDescription,
-      billingCycle: billingCycle.value
-    }, {
+    // Create the final payload
+    const payload = {
+      amount: invoiceGrandTotal.value.toFixed(2),
+      description: description,
+      billingCycle: billingCycle.value,
+      status: 'UNPAID',
+      items: invoiceItems.value,
+      taxRate: taxRate.value,
+      taxAmount: invoiceTaxAmount.value.toFixed(2)
+      // buyerDetails & sellerDetails can be filled by backend, but we'll let service handle seller, or we fetch it here.
+      // Actually, admin.service.js doesn't auto-fetch sellerDetails in createInvoice. Let's fix that in service.
+    }
+
+    const res = await axios.post(`/api/admin/tenants/${route.params.id}/invoices`, payload, {
       headers: { Authorization: `Bearer ${token}` }
     })
     
     const invoiceId = res.data.data.id
     const invoiceUrl = getInvoiceUrl(invoiceId)
     
-    // Open the generated invoice in a new tab so the admin can see it before sharing
+    // Use proper base URL replacement or routing
     window.open(invoiceUrl, '_blank')
     
     showInvoiceModal.value = false
-    invoiceAmount.value = ''
     await fetchTenant() // Refresh to show the new invoice in the list
     
   } catch (err) {

@@ -5,6 +5,15 @@ import router from './router'
 import i18n from './i18n'
 import axios from 'axios'
 
+// Global request interceptor to include Authorization header
+axios.interceptors.request.use(config => {
+  const token = localStorage.getItem('token')
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
 // Global interceptor for expired tokens
 axios.interceptors.response.use(
   response => response,
