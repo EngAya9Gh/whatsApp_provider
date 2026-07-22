@@ -7,34 +7,59 @@
       </a>
 
       <nav class="sidebar-nav">
+        <!-- GENERAL -->
+        <div class="nav-section-title">General</div>
         <router-link to="/dashboard" class="nav-item" exact-active-class="active">
           <span class="nav-icon">📊</span>
           <span class="nav-label">{{ $t('sidebar.dashboard') }}</span>
         </router-link>
         <router-link to="/connect" class="nav-item" active-class="active">
           <span class="nav-icon">📱</span>
-          <span class="nav-label">{{ $t('sidebar.whatsapp') || 'WhatsApp' }}</span>
-        </router-link>
-        <router-link to="/send-message" class="nav-item" active-class="active">
-          <span class="nav-icon">📨</span>
-          <span class="nav-label">{{ $t('sidebar.send_message') }}</span>
+          <span class="nav-label">Connections</span>
         </router-link>
         <router-link to="/live-chat" class="nav-item" active-class="active">
           <span class="nav-icon">💬</span>
           <span class="nav-label">Live Chat</span>
         </router-link>
-        <router-link to="/campaigns" class="nav-item" active-class="active">
+
+        <!-- STANDARD (QR WEB) -->
+        <div class="nav-section-title mt-4">Standard (QR)</div>
+        <router-link to="/send-message" class="nav-item" active-class="active">
+          <span class="nav-icon">📨</span>
+          <span class="nav-label">{{ $t('sidebar.send_message') }}</span>
+        </router-link>
+        <router-link v-if="$hasFeature('BULK_CAMPAIGN')" to="/campaigns" class="nav-item" active-class="active">
           <span class="nav-icon">📢</span>
           <span class="nav-label">{{ $t('sidebar.campaigns') }}</span>
         </router-link>
-        <router-link to="/templates" class="nav-item" active-class="active">
+        <router-link v-if="$hasFeature('TEMPLATES')" to="/templates" class="nav-item" active-class="active">
           <span class="nav-icon">📋</span>
           <span class="nav-label">{{ $t('sidebar.templates') }}</span>
         </router-link>
-        <router-link to="/chatbot" class="nav-item" active-class="active">
+        <router-link v-if="$hasFeature('AUTO_RESPONDER')" to="/chatbot" class="nav-item" active-class="active">
           <span class="nav-icon">🤖</span>
           <span class="nav-label">Auto Responder</span>
         </router-link>
+
+        <!-- META CLOUD -->
+        <template v-if="$hasFeature('META_API')">
+          <div class="nav-section-title mt-4 text-emerald-600">Meta Cloud</div>
+          <router-link to="/meta-send-message" class="nav-item" active-class="active">
+            <span class="nav-icon">📨</span>
+            <span class="nav-label">Send Message</span>
+          </router-link>
+          <router-link to="/meta-templates" class="nav-item" active-class="active">
+            <span class="nav-icon">📝</span>
+            <span class="nav-label">Meta Templates</span>
+          </router-link>
+          <router-link to="/meta-campaigns" class="nav-item" active-class="active">
+            <span class="nav-icon">📢</span>
+            <span class="nav-label">Meta Campaigns</span>
+          </router-link>
+        </template>
+
+        <!-- SYSTEM -->
+        <div class="nav-section-title mt-4">System</div>
         <router-link to="/keys" class="nav-item" active-class="active">
           <span class="nav-icon">🔑</span>
           <span class="nav-label">{{ $t('sidebar.api_keys') }}</span>
@@ -190,6 +215,31 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+}
+
+.nav-section-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: #64748B;
+  padding: 0.75rem 0.875rem 0.25rem;
+}
+
+.nav-section-title.text-emerald-600 {
+  color: #10B981;
 }
 
 .nav-item {

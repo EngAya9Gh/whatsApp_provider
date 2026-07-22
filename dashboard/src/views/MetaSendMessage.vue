@@ -315,13 +315,16 @@ const fetchTemplates = async () => {
 }
 
 const fetchChannels = async () => {
+  const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
+  if (!tenant.allowedFeatures || !tenant.allowedFeatures.includes('META_API')) {
+    channels.value = []
+    return
+  }
   try {
-    const res = await axios.get('/api/v1/channels', {
+    const res = await axios.get('/api/v1/meta/channels', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
-    channels.value = res.data.data.filter(c => c.providerType !== 'META_CLOUD')
-    // SET DEFAULT CHANNEL
-    if (channels.value.length > 0) { channelId.value = channels.value[0].id }
+    channels.value = res.data.data
   } catch (err) {
     console.error('Failed to load channels', err)
   }

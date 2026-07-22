@@ -1,11 +1,17 @@
 const logger = require('../../utils/logger');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+
 const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'wakeel_meta_secret_1234';
 const chatService = require('../chat/chat.service');
 
 class MetaController {
-  
+
+  /**
+   * Handle Meta webhook verification (GET request).
+   * Meta sends: hub.mode=subscribe, hub.verify_token, hub.challenge
+   * We must respond with hub.challenge if token matches.
+   */
   async verifyWebhook(req, res) {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
@@ -13,218 +19,324 @@ class MetaController {
 
     if (mode && token) {
       if (mode === 'subscribe' && token === META_VERIFY_TOKEN) {
-        logger.info('Meta Webhook verified successfully');
+        logger.info('[MetaWebhook] ✅ Verification successful');
         return res.status(200).send(challenge);
       } else {
-        logger.error('Meta Webhook verification failed: Token mismatch');
+        logger.error('[MetaWebhook] ❌ Verification failed: Token mismatch');
         return res.sendStatus(403);
       }
     }
     return res.sendStatus(400);
   }
 
+  /**
+   * Handle all incoming webhook POST events from Meta.
+   * 
+   * Event types we handle:
+   *  1. messages   — incoming WhatsApp messages from customers
+   *  2. statuses   — delivery receipts: sent | delivered | read | failed
+   * 
+   * Meta expects 200 OK immediately. Processing happens asynchronously after.
+   */
   async handleWebhook(req, res) {
-    // Meta sends 200 OK immediately and handles payload async
+    // ✅ Respond 200 immediately — Meta will retry if we don't respond fast enough
     res.sendStatus(200);
 
     const body = req.body;
-    if (body.object === 'whatsapp_business_account') {
-      for (const entry of body.entry) {
-        for (const change of entry.changes) {
-          if (change.value && change.value.messages) {
-            // Incoming Message
-            const metadata = change.value.metadata;
-            const metaPhoneNumberId = metadata.phone_number_id;
-            
-            // Find which tenant this belongs to
-            const channel = await prisma.whatsAppChannel.findFirst({
-              where: { metaPhoneNumberId, status: 'CONNECTED' }
-            });
+    if (!body || body.object !== 'whatsapp_business_account') return;
 
-            if (!channel) {
-              logger.warn(`Received webhook for unknown phone number ID: ${metaPhoneNumberId}`);
-              continue;
+    for (const entry of body.entry) {
+      for (const change of entry.changes) {
+        if (!change.value) continue;
+
+        const metadata = change.value.metadata;
+        const metaPhoneNumberId = metadata?.phone_number_id;
+
+        // Find the channel this webhook belongs to
+        const channel = await prisma.whatsAppChannel.findFirst({
+          where: { metaPhoneNumberId, status: 'CONNECTED' }
+        }).catch(() => null);
+
+        if (!channel) {
+          logger.warn(`[MetaWebhook] Unknown phone_number_id: ${metaPhoneNumberId}`);
+          continue;
+        }
+
+        // --- HMAC Signature Verification (Per-Channel) ---
+        // Verify signature ONLY if the channel has a metaAppSecret configured
+        if (channel.metaAppSecret && req.rawBody) {
+          const signature = req.headers['x-hub-signature-256'];
+          if (!signature) {
+            logger.error(`[MetaWebhook] Missing signature for channel ${channel.id}`);
+            return; // Stop processing this invalid request
+          }
+
+          const crypto = require('crypto');
+          const expectedSignature = 'sha256=' + crypto
+            .createHmac('sha256', channel.metaAppSecret)
+            .update(req.rawBody)
+            .digest('hex');
+
+          const sigBuffer = Buffer.from(signature);
+          const expectedBuffer = Buffer.from(expectedSignature);
+
+          if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+            logger.error(`[MetaWebhook] ❌ Invalid signature for channel ${channel.id}`);
+            return; // Stop processing
+          }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // 1. INCOMING MESSAGES
+        // ─────────────────────────────────────────────────────────────
+        if (change.value.messages) {
+          const contacts = change.value.contacts || [];
+
+          for (const msg of change.value.messages) {
+            const from = msg.from; // sender's WhatsApp phone number
+            const contactName = contacts.find(c => c.wa_id === from)?.profile?.name || null;
+
+            // Forward to Live Chat service
+            try {
+              await chatService.handleIncomingMessage(
+                channel.tenantId, channel.id, from, contactName, msg
+              );
+            } catch (chatError) {
+              logger.error('[MetaWebhook] Live chat error', chatError.message);
             }
 
-            const contacts = change.value.contacts || [];
+            // Parse message text/button payload for AutoResponder
+            let buttonId = null;
+            let buttonText = null;
+            let incomingText = null;
 
-            for (const msg of change.value.messages) {
-              const from = msg.from;
-              const contactName = contacts.find(c => c.wa_id === from)?.profile?.name || null;
-              
-              // Process for Live Chat
-              try {
-                await chatService.handleIncomingMessage(channel.tenantId, channel.id, from, contactName, msg);
-              } catch (chatError) {
-                logger.error('Error handling live chat message', chatError);
+            if (msg.type === 'interactive') {
+              const interactionType = msg.interactive.type; // button_reply or list_reply
+
+              if (interactionType === 'button_reply') {
+                buttonId = msg.interactive.button_reply.id;
+                buttonText = msg.interactive.button_reply.title;
+              } else if (interactionType === 'list_reply') {
+                buttonId = msg.interactive.list_reply.id;
+                buttonText = msg.interactive.list_reply.title;
               }
-              
-              // Handle Interactive Replies (Buttons/Lists)
-              let buttonId = null;
-              let buttonText = null;
-              let incomingText = null;
 
-              if (msg.type === 'interactive') {
-                const interactionType = msg.interactive.type; // button_reply or list_reply
-                
-                if (interactionType === 'button_reply') {
-                  buttonId = msg.interactive.button_reply.id;
-                  buttonText = msg.interactive.button_reply.title;
-                } else if (interactionType === 'list_reply') {
-                  buttonId = msg.interactive.list_reply.id;
-                  buttonText = msg.interactive.list_reply.title;
-                }
-
-                if (buttonId) {
-                  // Find the target associated with this phone for any active campaign of this tenant
-                  const target = await prisma.campaignTarget.findFirst({
-                    where: {
-                      phone: { contains: from },
-                      campaign: { tenantId: channel.tenantId }
-                    },
-                    orderBy: { id: 'desc' }
-                  });
-
-                  await prisma.buttonInteraction.create({
-                    data: {
-                      tenantId: channel.tenantId,
-                      campaignId: target ? target.campaignId : 'UNKNOWN',
-                      campaignTargetId: target ? target.id : null,
-                      phone: from,
-                      buttonId,
-                      buttonText,
-                      interactionType: 'BUTTON'
-                    }
-                  });
-                  logger.info(`Recorded button interaction: ${buttonText} from ${from}`);
-                }
-              } else if (msg.type === 'text') {
-                incomingText = msg.text.body;
-                
-                // Track Text replies for Campaigns
+              if (buttonId) {
                 const target = await prisma.campaignTarget.findFirst({
                   where: {
                     phone: { contains: from },
                     campaign: { tenantId: channel.tenantId }
                   },
                   orderBy: { id: 'desc' }
-                });
+                }).catch(() => null);
 
-                if (target) {
-                  await prisma.buttonInteraction.create({
-                    data: {
-                      tenantId: channel.tenantId,
-                      campaignId: target.campaignId,
-                      campaignTargetId: target.id,
-                      phone: from,
-                      buttonId: 'TEXT_REPLY',
-                      buttonText: incomingText.substring(0, 200),
-                      interactionType: 'TEXT'
-                    }
-                  });
-                  logger.info(`Recorded text interaction for Meta campaign from ${from}`);
-                }
-              }
-
-              // Handle Auto-Responder for Meta (both TEXT and BUTTONS)
-              const textForBot = buttonText || incomingText || null;
-              
-              if (textForBot) {
-                // Find latest campaign target for this recipient
-                const target = await prisma.campaignTarget.findFirst({
-                  where: {
-                    phone: { contains: from },
-                    campaign: { tenantId: channel.tenantId }
-                  },
-                  orderBy: { id: 'desc' }
-                });
-
-                const rules = await prisma.autoResponder.findMany({
-                  where: { tenantId: channel.tenantId, isActive: true }
-                });
-
-                // Filter & sort rules: Campaign-specific rules first, then global rules
-                const applicableRules = rules.filter(rule => {
-                  if (!rule.campaignId) return true; // Global rule
-                  return target && target.campaignId === rule.campaignId; // Campaign-specific rule
-                }).sort((a, b) => {
-                  if (a.campaignId && !b.campaignId) return -1;
-                  if (!a.campaignId && b.campaignId) return 1;
-                  return 0;
-                });
-
-                for (const rule of applicableRules) {
-                  const textLower = textForBot.trim().toLowerCase();
-                  const keywordLower = rule.keyword.trim().toLowerCase();
-                  let isMatch = false;
-
-                  const now = new Date();
-                  if (rule.startDate && now < new Date(rule.startDate)) continue;
-                  if (rule.endDate && now > new Date(rule.endDate)) continue;
-
-                  if (rule.matchType === 'EXACT' && textLower === keywordLower) isMatch = true;
-                  else if (rule.matchType === 'CONTAINS' && textLower.includes(keywordLower)) isMatch = true;
-
-                  if (isMatch) {
-                    try {
-                      const messageService = require('../message/message.service');
-                      const replyText = rule.message || '';
-                      
-                      await messageService.sendMessage(channel.tenantId, from, replyText, null, channel.id);
-                      logger.info(`[AutoResponder] Meta Reply sent to ${from} (Rule: ${rule.keyword}, Campaign: ${rule.campaignId || 'Global'})`);
-                    } catch (e) {
-                      logger.error(`[AutoResponder] Meta Failed to send reply to ${from}`, e);
-                    }
-                    break; // stop processing after first match
+                await prisma.buttonInteraction.create({
+                  data: {
+                    tenantId: channel.tenantId,
+                    campaignId: target ? target.campaignId : 'UNKNOWN',
+                    campaignTargetId: target ? target.id : null,
+                    phone: from,
+                    buttonId,
+                    buttonText,
+                    interactionType: 'BUTTON'
                   }
+                }).catch(e => logger.error('[MetaWebhook] buttonInteraction create error', e));
+
+                logger.info(`[MetaWebhook] Button interaction: "${buttonText}" from ${from}`);
+              }
+
+            } else if (msg.type === 'text') {
+              incomingText = msg.text.body;
+
+              // Track text replies for campaigns
+              const target = await prisma.campaignTarget.findFirst({
+                where: {
+                  phone: { contains: from },
+                  campaign: { tenantId: channel.tenantId }
+                },
+                orderBy: { id: 'desc' }
+              }).catch(() => null);
+
+              if (target) {
+                await prisma.buttonInteraction.create({
+                  data: {
+                    tenantId: channel.tenantId,
+                    campaignId: target.campaignId,
+                    campaignTargetId: target.id,
+                    phone: from,
+                    buttonId: 'TEXT_REPLY',
+                    buttonText: incomingText.substring(0, 200),
+                    interactionType: 'TEXT'
+                  }
+                }).catch(e => logger.error('[MetaWebhook] textInteraction create error', e));
+              }
+            }
+
+            // Auto Responder — match keywords and send replies
+            const textForBot = buttonText || incomingText || null;
+
+            if (textForBot) {
+              const target = await prisma.campaignTarget.findFirst({
+                where: {
+                  phone: { contains: from },
+                  campaign: { tenantId: channel.tenantId }
+                },
+                orderBy: { id: 'desc' }
+              }).catch(() => null);
+
+              const rules = await prisma.autoResponder.findMany({
+                where: { tenantId: channel.tenantId, isActive: true }
+              }).catch(() => []);
+
+              // Campaign-specific rules first, then global rules
+              const applicableRules = rules.filter(rule => {
+                if (!rule.campaignId) return true;
+                return target && target.campaignId === rule.campaignId;
+              }).sort((a, b) => {
+                if (a.campaignId && !b.campaignId) return -1;
+                if (!a.campaignId && b.campaignId) return 1;
+                return 0;
+              });
+
+              for (const rule of applicableRules) {
+                const now = new Date();
+                if (rule.startDate && now < new Date(rule.startDate)) continue;
+                if (rule.endDate && now > new Date(rule.endDate)) continue;
+
+                const textLower = textForBot.trim().toLowerCase();
+                const keywordLower = rule.keyword.trim().toLowerCase();
+                let isMatch = false;
+
+                if (rule.matchType === 'EXACT' && textLower === keywordLower) isMatch = true;
+                else if (rule.matchType === 'CONTAINS' && textLower.includes(keywordLower)) isMatch = true;
+
+                if (isMatch) {
+                  try {
+                    const messageService = require('../message/message.service');
+                    await messageService.sendMessage(channel.tenantId, from, rule.message || '', null, channel.id);
+                    logger.info(`[AutoResponder] Replied to ${from} — Rule: "${rule.keyword}" (Campaign: ${rule.campaignId || 'Global'})`);
+                  } catch (e) {
+                    logger.error(`[AutoResponder] Failed reply to ${from}`, e.message);
+                  }
+                  break;
                 }
               }
             }
           }
-          
-          if (change.value && change.value.statuses) {
-            // Message Delivery Statuses (Sent, Delivered, Read, Failed)
-            // Can be implemented later for precise message tracking
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // 2. DELIVERY STATUS UPDATES
+        // 
+        // Per Meta docs (https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples):
+        // statuses[].status can be: "sent" | "delivered" | "read" | "failed"
+        // statuses[].id      = wamid (Meta message ID)
+        // statuses[].errors  = array of error objects when status is "failed"
+        // ─────────────────────────────────────────────────────────────
+        if (change.value.statuses) {
+          for (const statusUpdate of change.value.statuses) {
+            const { id: wamid, status, recipient_id, timestamp, errors } = statusUpdate;
+
+            logger.info(`[MetaWebhook] Status: ${status} for wamid ${wamid} (to: ${recipient_id})`);
+
+            try {
+              // Update the MessageLog that has this wamid
+              const updateData = { deliveryStatus: status };
+
+              // If failed, update status to FAILED and save error
+              if (status === 'failed') {
+                updateData.status = 'FAILED';
+                if (errors && errors.length > 0) {
+                  const errDetails = errors.map(e => `[${e.code}] ${e.title}: ${e.message || e.error_data?.details || ''}`).join('; ');
+                  updateData.errorMessage = errDetails;
+                  logger.error(`[MetaWebhook] Message ${wamid} FAILED: ${errDetails}`);
+                }
+              }
+
+              // Find and update the log entry by metaMessageId (wamid)
+              await prisma.messageLog.updateMany({
+                where: { metaMessageId: wamid },
+                data: updateData
+              });
+
+            } catch (statusError) {
+              logger.error(`[MetaWebhook] Status update error for wamid ${wamid}`, statusError.message);
+            }
           }
         }
       }
     }
   }
 
+  /**
+   * Add a new Meta Cloud channel for the authenticated tenant.
+   * Required body: phoneNumber, metaPhoneNumberId, metaWabaId, metaAccessToken, metaAppSecret
+   * Optional body: displayPhoneNumber, name
+   */
   async addChannel(req, res, next) {
     try {
       const tenantId = req.tenant.id;
-      const { phoneNumber, metaPhoneNumberId, metaWabaId, metaAccessToken } = req.body;
-      
+      const {
+        phoneNumber,
+        metaPhoneNumberId,
+        metaWabaId,
+        metaAccessToken,
+        metaAppSecret,
+        displayPhoneNumber,
+        name
+      } = req.body;
+
+      if (!phoneNumber || !metaPhoneNumberId || !metaWabaId || !metaAccessToken || !metaAppSecret) {
+        return res.status(400).json({ error: 'Missing required Meta credentials (including metaAppSecret)' });
+      }
+
+      const existingChannel = await prisma.whatsAppChannel.findFirst({
+        where: { tenantId, providerType: 'META_CLOUD' }
+      });
+
+      if (existingChannel) {
+        return res.status(400).json({ error: 'A Meta Cloud channel already exists for this tenant' });
+      }
+
       const channel = await prisma.whatsAppChannel.create({
         data: {
           tenantId,
           providerType: 'META_CLOUD',
           phoneNumber,
+          status: 'CONNECTED',
           metaPhoneNumberId,
           metaWabaId,
           metaAccessToken,
-          status: 'CONNECTED'
+          metaAppSecret,
+          displayPhoneNumber: displayPhoneNumber || phoneNumber,
+          name: name || ''
         }
       });
-      
+
       res.status(201).json({ success: true, data: channel });
     } catch (error) {
       next(error);
     }
   }
 
+  /**
+   * Get all Meta channels for the authenticated tenant.
+   * Returns channel details including phone_number_id (needed for sending messages).
+   */
   async getChannels(req, res, next) {
     try {
       const tenantId = req.tenant.id;
       const channels = await prisma.whatsAppChannel.findMany({
-        where: { tenantId },
+        where: { tenantId, providerType: 'META_CLOUD' },
         select: {
           id: true,
           providerType: true,
-          phoneNumber: true,
+          phoneNumber: true,      // display phone number
+          metaPhoneNumberId: true, // Meta's internal phone number ID
+          metaWabaId: true,        // WhatsApp Business Account ID
           status: true,
           createdAt: true
+          // metaAccessToken is intentionally excluded (sensitive)
         }
       });
       res.status(200).json({ success: true, data: channels });
@@ -233,21 +345,28 @@ class MetaController {
     }
   }
 
+  /**
+   * Delete a Meta channel.
+   */
   async deleteChannel(req, res, next) {
     try {
       const tenantId = req.tenant.id;
       const { id } = req.params;
-      
+
       await prisma.whatsAppChannel.deleteMany({
         where: { id, tenantId }
       });
-      
+
       res.status(200).json({ success: true, message: 'Channel deleted successfully' });
     } catch (error) {
       next(error);
     }
   }
 
+  /**
+   * Fetch approved Meta templates for a specific channel.
+   * Templates are fetched live from Meta API — not cached locally.
+   */
   async getTemplates(req, res, next) {
     try {
       const tenantId = req.tenant.id;
@@ -263,7 +382,7 @@ class MetaController {
 
       const metaService = require('./meta.service');
       const templatesData = await metaService.fetchTemplates(channel);
-      
+
       res.status(200).json({ success: true, data: templatesData });
     } catch (error) {
       next(error);

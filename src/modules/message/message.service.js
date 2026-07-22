@@ -18,14 +18,17 @@ class MessageService {
 
     const channel = await this._getChannel(channelId);
     try {
+      let metaMessageId = null;
       if (channel && channel.providerType === 'META_CLOUD') {
-        await metaService.sendText(channel, phone, message);
+        const metaRes = await metaService.sendText(channel, phone, message);
+        // Meta returns: { messages: [{ id: "wamid.xxx" }] }
+        metaMessageId = metaRes?.messages?.[0]?.id || null;
       } else {
         await whatsappService.sendTextMessage(tenantId, phone, message);
       }
-      
+
       await prisma.messageLog.create({
-        data: { tenantId, channelId, phone, messageType: 'CUSTOM', status: 'SENT' }
+        data: { tenantId, channelId, phone, messageType: 'CUSTOM', status: 'SENT', metaMessageId, deliveryStatus: metaMessageId ? 'sent' : null }
       });
       await billingService.incrementUsage(tenantId, 'sent');
       return { success: true, message: 'Message sent successfully' };
@@ -48,13 +51,15 @@ class MessageService {
     }
 
     try {
-      await metaService.sendTemplate(channel, phone, templateName, languageCode, components);
-      
+      const metaRes = await metaService.sendTemplate(channel, phone, templateName, languageCode, components);
+      // Meta returns: { messages: [{ id: "wamid.xxx" }] }
+      const metaMessageId = metaRes?.messages?.[0]?.id || null;
+
       await prisma.messageLog.create({
-        data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'SENT' }
+        data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'SENT', metaMessageId, deliveryStatus: 'sent' }
       });
       await billingService.incrementUsage(tenantId, 'sent');
-      return { success: true, message: 'Template sent successfully' };
+      return { success: true, message: 'Template sent successfully', metaMessageId };
     } catch (error) {
       await prisma.messageLog.create({
         data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'FAILED', errorMessage: error.message || 'Sending failed' }

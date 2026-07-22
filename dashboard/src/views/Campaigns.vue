@@ -330,7 +330,8 @@ const fetchCampaigns = async () => {
     const res = await axios.get('/api/v1/campaigns', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
-    campaigns.value = res.data.data
+    // Filter out META campaigns to only show BAILEYS here
+    campaigns.value = res.data.data.filter(c => c.campaignType !== 'META')
     campaigns.value.forEach(c => {
       if (c.status !== 'PENDING') loadStats(c.id)
     })

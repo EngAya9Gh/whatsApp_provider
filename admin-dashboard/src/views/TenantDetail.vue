@@ -124,6 +124,65 @@
           </div>
         </div>
 
+        <!-- Meta Configuration Panel -->
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200" v-if="settingsForm.metaEnabled || (tenant.channels && tenant.channels.length > 0)">
+          <div class="flex justify-between items-center mb-5 border-b border-slate-100 pb-3">
+            <h3 class="text-lg font-bold text-slate-900 m-0">Meta Channels</h3>
+            <button v-if="!showMetaForm" @click="openMetaForm()" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded-lg text-sm font-bold border-none cursor-pointer transition-colors">
+              + Add Channel
+            </button>
+          </div>
+          
+          <div v-if="!showMetaForm">
+            <div v-if="tenant.channels && tenant.channels.length > 0" class="flex flex-col gap-3">
+              <div v-for="channel in tenant.channels" :key="channel.id" class="p-4 bg-slate-50 border border-slate-200 rounded-lg flex justify-between items-center">
+                <div>
+                  <div class="font-bold text-slate-800">{{ channel.displayPhoneNumber }} <span class="text-xs font-normal text-slate-500 bg-slate-200 px-2 py-0.5 rounded">{{ channel.phoneNumber }}</span></div>
+                  <div class="text-xs text-slate-500 mt-1">ID: {{ channel.metaPhoneNumberId }} | WABA: {{ channel.metaWabaId }}</div>
+                </div>
+                <button @click="openMetaForm(channel)" class="text-emerald-600 font-bold text-sm bg-transparent border-none cursor-pointer hover:underline">Edit</button>
+              </div>
+            </div>
+            <div v-else class="text-center py-6 text-slate-500 text-sm">
+              No Meta channels configured for this tenant.
+            </div>
+          </div>
+
+          <div v-if="showMetaForm" class="flex flex-col gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Display Phone Number</label>
+              <input type="text" v-model="metaForm.displayPhoneNumber" placeholder="e.g. +966 500 000 000" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Actual Phone Number (with Country Code)</label>
+              <input type="text" v-model="metaForm.phoneNumber" placeholder="e.g. 966500000000" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Phone Number ID</label>
+              <input type="text" v-model="metaForm.metaPhoneNumberId" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">WABA ID</label>
+              <input type="text" v-model="metaForm.metaWabaId" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Permanent Access Token</label>
+              <input type="password" v-model="metaForm.metaAccessToken" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">App Secret</label>
+              <input type="password" v-model="metaForm.metaAppSecret" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
+            </div>
+            
+            <div class="flex gap-3 mt-2">
+              <button @click="saveMetaConfig" :disabled="isSavingMeta" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-semibold shadow-sm transition-colors cursor-pointer border-none disabled:opacity-50">
+                {{ isSavingMeta ? 'Saving...' : 'Save Meta Channel' }}
+              </button>
+              <button @click="showMetaForm = false" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-semibold border-none cursor-pointer">Cancel</button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Right Column -->
@@ -358,6 +417,8 @@ const error = ref(null)
 const selectedPlan = ref('')
 const isUpdatingPlan = ref(false)
 const isUpdatingSettings = ref(false)
+const isSavingMeta = ref(false)
+const showMetaForm = ref(false)
 
 const dbPlans = ref([])
 
@@ -365,6 +426,15 @@ const settingsForm = ref({
   monthlyLimit: 0,
   metaEnabled: false,
   customFeatures: {}
+})
+
+const metaForm = ref({
+  phoneNumber: '',
+  displayPhoneNumber: '',
+  metaPhoneNumberId: '',
+  metaWabaId: '',
+  metaAccessToken: '',
+  metaAppSecret: ''
 })
 
 const availableFeatures = ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER', 'BULK_CAMPAIGN', 'EXCEL_EXPORT', 'META_API', 'LIVE_CHAT']
@@ -593,11 +663,21 @@ const fetchTenant = async () => {
       metaEnabled: tenant.value.metaEnabled,
       customFeatures: populated
     }
+
   } catch (err) {
     error.value = err.response?.data?.error || 'Failed to load tenant details.'
   } finally {
     loading.value = false
   }
+}
+
+const openMetaForm = (channel = null) => {
+  if (channel) {
+    metaForm.value = { ...channel }
+  } else {
+    metaForm.value = { phoneNumber: '', displayPhoneNumber: '', metaPhoneNumberId: '', metaWabaId: '', metaAccessToken: '', metaAppSecret: '' }
+  }
+  showMetaForm.value = true
 }
 
 const updatePlan = async () => {
@@ -619,31 +699,34 @@ const updatePlan = async () => {
 
 const updateSettings = async () => {
   isUpdatingSettings.value = true
-  
-  const cleanFeatures = {}
-  for (const key in settingsForm.value.customFeatures) {
-    if (settingsForm.value.customFeatures[key] !== null) {
-      cleanFeatures[key] = settingsForm.value.customFeatures[key]
-    }
-  }
-
   try {
-    const token = localStorage.getItem('admin_token')
-    const res = await axios.put(`/api/admin/tenants/${tenant.value.id}/settings`, {
-      monthlyLimit: settingsForm.value.monthlyLimit,
-      metaEnabled: settingsForm.value.metaEnabled,
-      customFeatures: cleanFeatures
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
+    const res = await axios.put(`/api/admin/tenants/${route.params.id}/settings`, settingsForm.value, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` }
     })
     tenant.value.monthlyLimit = res.data.data.monthlyLimit
     tenant.value.metaEnabled = res.data.data.metaEnabled
     tenant.value.customFeatures = res.data.data.customFeatures
     alert('Settings updated successfully')
   } catch (err) {
-    alert(err.response?.data?.error || 'Failed to update settings')
+    alert('Failed to update settings')
   } finally {
     isUpdatingSettings.value = false
+  }
+}
+
+const saveMetaConfig = async () => {
+  isSavingMeta.value = true
+  try {
+    await axios.post(`/api/admin/tenants/${route.params.id}/meta-channel`, metaForm.value, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` }
+    })
+    alert('Meta Channel saved successfully')
+    showMetaForm.value = false
+    fetchTenant()
+  } catch (err) {
+    alert(err.response?.data?.error || 'Failed to save Meta Channel')
+  } finally {
+    isSavingMeta.value = false
   }
 }
 

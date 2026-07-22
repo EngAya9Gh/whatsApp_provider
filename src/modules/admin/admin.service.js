@@ -95,10 +95,17 @@ class AdminService {
         apiKeys: { select: { id: true, keyPrefix: true, label: true, createdAt: true, lastUsedAt: true, isActive: true } },
         usageRecords: { orderBy: { month: 'desc' }, take: 6 },
         messageLogs: { orderBy: { createdAt: 'desc' }, take: 20 },
-        invoices: { orderBy: { createdAt: 'desc' } }
+        invoices: { orderBy: { createdAt: 'desc' } },
+        channels: { where: { providerType: 'META_CLOUD' } }
       }
     });
     if (!tenant) throw new Error('Tenant not found');
+    
+    // Attach metaConfig for frontend convenience
+    tenant.metaConfig = tenant.channels && tenant.channels.length > 0 
+      ? tenant.channels[0] 
+      : null;
+      
     return tenant;
   }
 
@@ -133,6 +140,52 @@ class AdminService {
         monthlyLimit: data.monthlyLimit !== undefined ? data.monthlyLimit : tenant.monthlyLimit,
         metaEnabled: data.metaEnabled !== undefined ? data.metaEnabled : tenant.metaEnabled,
         customFeatures: data.customFeatures !== undefined ? data.customFeatures : tenant.customFeatures
+      }
+    });
+  }
+
+  async addMetaChannel(tenantId, channelData) {
+    const { phoneNumber, metaPhoneNumberId, metaWabaId, metaAccessToken, metaAppSecret, displayPhoneNumber, name } = channelData;
+    
+    if (!phoneNumber || !metaPhoneNumberId || !metaWabaId || !metaAccessToken || !metaAppSecret) {
+      throw new Error('Missing required Meta credentials');
+    }
+
+    // Check if channel already exists for tenant
+    const existingChannel = await prisma.whatsAppChannel.findFirst({
+      where: { tenantId, providerType: 'META_CLOUD' }
+    });
+
+    if (existingChannel) {
+      // Update existing
+      return await prisma.whatsAppChannel.update({
+        where: { id: existingChannel.id },
+        data: {
+          phoneNumber,
+          metaPhoneNumberId,
+          metaWabaId,
+          metaAccessToken,
+          metaAppSecret,
+          displayPhoneNumber: displayPhoneNumber || phoneNumber,
+          name: name || '',
+          status: 'CONNECTED'
+        }
+      });
+    }
+
+    // Create new
+    return await prisma.whatsAppChannel.create({
+      data: {
+        tenantId,
+        providerType: 'META_CLOUD',
+        phoneNumber,
+        status: 'CONNECTED',
+        metaPhoneNumberId,
+        metaWabaId,
+        metaAccessToken,
+        metaAppSecret,
+        displayPhoneNumber: displayPhoneNumber || phoneNumber,
+        name: name || ''
       }
     });
   }
@@ -176,6 +229,17 @@ class AdminService {
         taxAmount: taxAmount.toString(),
         buyerDetails: finalBuyerDetails,
         sellerDetails: finalSellerDetails
+      }
+    });
+  }
+
+  async getAllInvoices() {
+    return prisma.invoice.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        tenant: {
+          select: { id: true, name: true, email: true }
+        }
       }
     });
   }

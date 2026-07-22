@@ -8,21 +8,22 @@ const { campaignQueue } = require('../../workers/campaign.worker');
 const fs = require('fs');
 
 class CampaignService {
-  async parseFile(file) {
-    const phones = new Set();
+  async parseFile(file, isMeta = false) {
+    const records = []; // Array of { phone, variables: [] }
     const filePath = file.path;
     const fs = require('fs');
-    console.log('[DEBUG] Parsing file:', filePath);
-    console.log('[DEBUG] File exists?', fs.existsSync(filePath));
-    console.log('[DEBUG] CWD:', process.cwd());
     
     if (file.mimetype === 'text/csv') {
       await new Promise((resolve, reject) => {
         fs.createReadStream(filePath)
-          .pipe(csv())
+          .pipe(csv({ headers: false })) // Disable headers to parse by index
           .on('data', (data) => {
-            const phone = Object.values(data).find(val => /^[0-9]{10,15}$/.test(val?.toString().replace(/[^0-9]/g, '')));
-            if (phone) phones.add(phone.replace(/[^0-9]/g, ''));
+            const values = Object.values(data);
+            const phone = values[0]?.toString().replace(/[^0-9]/g, '');
+            if (phone && phone.length >= 10 && phone.length <= 15) {
+              const variables = isMeta ? values.slice(1).map(v => v?.toString() || '') : [];
+              records.push({ phone, variables });
+            }
           })
           .on('end', resolve)
           .on('error', reject);
@@ -35,31 +36,32 @@ class CampaignService {
       const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
       
       data.forEach(row => {
-        row.forEach(cell => {
-          const val = cell?.toString().replace(/[^0-9]/g, '');
-          if (val && val.length >= 10 && val.length <= 15) {
-            phones.add(val);
-          }
-        });
+        const phone = row[0]?.toString().replace(/[^0-9]/g, '');
+        if (phone && phone.length >= 10 && phone.length <= 15) {
+          const variables = isMeta ? row.slice(1).map(v => v?.toString() || '') : [];
+          records.push({ phone, variables });
+        }
       });
     }
     
     fs.unlink(filePath, () => {});
 
-    return Array.from(phones);
+    return records;
   }
 
-  async createCampaign({ tenantId, name, message, templateId, file, image, buttons, interactiveType, startDate, endDate }) {
-    // 1. Parse phones from file
-    const phones = await this.parseFile(file);
-    if (phones.length === 0) {
-      throw { status: 400, message: 'No valid phone numbers found in the uploaded file' };
+  async createCampaign({ tenantId, name, message, templateId, file, image, buttons, interactiveType, startDate, endDate, campaignType, channelId, metaCategory }) {
+    const isMeta = campaignType === 'META';
+    // 1. Parse phones and variables from file
+    const records = await this.parseFile(file, isMeta);
+    if (records.length === 0) {
+      throw { status: 400, message: 'No valid phone numbers found in the uploaded file (ensure phone is in the first column)' };
     }
 
     // 2. Create Campaign (PENDING state)
     const campaign = await prisma.campaign.create({
       data: {
         tenantId,
+        channelId: channelId || null,
         name,
         message: message || null,
         templateId: templateId || null,
@@ -69,14 +71,17 @@ class CampaignService {
         interactiveType: interactiveType || 'TEXT',
         startDate: startDate || null,
         endDate: endDate || null,
+        campaignType: campaignType || 'BAILEYS',
+        metaCategory: metaCategory || null,
         status: 'PENDING'
       }
     });
 
     // 3. Create Campaign Targets
-    const targetData = phones.map(phone => ({
+    const targetData = records.map(record => ({
       campaignId: campaign.id,
-      phone,
+      phone: record.phone,
+      variables: isMeta ? JSON.stringify(record.variables) : null,
       status: 'PENDING'
     }));
     
@@ -144,33 +149,51 @@ class CampaignService {
     }
 
     // Add Jobs to BullMQ
-    const jobs = campaign.targets.map((target, index) => {
-      // Add a randomized delay between 5s and 15s for each message to avoid WhatsApp rate limiting
-      const randomDelay = Math.floor(Math.random() * (15000 - 5000 + 1) + 5000);
-      return {
-        name: 'send-campaign-message',
+    let jobs = [];
+    if (campaign.campaignType === 'META') {
+      const { metaCampaignQueue } = require('../../workers/meta.campaign.worker');
+      jobs = campaign.targets.map((target, index) => ({
+        name: 'send-meta-campaign-message',
         data: {
-          tenantId,
-          phone: target.phone,
-          message: campaign.message,
-          templateId: campaign.templateId,
-          mediaPath: campaign.mediaPath,
-          mediaMime: campaign.mediaMime,
-          buttons: campaign.buttons,
-          interactiveType: campaign.interactiveType || 'TEXT',
+          campaignId: campaign.id,
           targetId: target.id,
-          channelId: campaign.channelId
+          tenantId: campaign.tenantId,
+          channelId: campaign.channelId,
+          phone: target.phone,
+          variables: target.variables ? JSON.parse(target.variables) : [],
+          templateName: campaign.message,
+          metaCategory: campaign.metaCategory
         },
-        opts: {
-          removeOnComplete: true,
-          removeOnFail: false,
-          delay: index * randomDelay
-        }
-      };
-    });
-    
-    if (jobs.length > 0) {
-      await campaignQueue.addBulk(jobs);
+        opts: { delay: index * 1000 } // Stagger by 1 sec
+      }));
+      if (jobs.length > 0) await metaCampaignQueue.addBulk(jobs);
+    } else {
+      jobs = campaign.targets.map((target, index) => {
+        // Add a randomized delay between 5s and 15s for each message to avoid WhatsApp rate limiting
+        const randomDelay = Math.floor(Math.random() * (15000 - 5000 + 1) + 5000);
+        return {
+          name: 'send-campaign-message',
+          data: {
+            campaignId: campaign.id,
+            targetId: target.id,
+            tenantId: campaign.tenantId,
+            phone: target.phone,
+            message: campaign.message,
+            templateId: campaign.templateId,
+            mediaPath: campaign.mediaPath,
+            mediaMime: campaign.mediaMime,
+            buttons: campaign.buttons ? JSON.parse(campaign.buttons) : null,
+            interactiveType: campaign.interactiveType || 'TEXT',
+            channelId: campaign.channelId
+          },
+          opts: {
+            removeOnComplete: true,
+            removeOnFail: false,
+            delay: index * randomDelay
+          }
+        };
+      });
+      if (jobs.length > 0) await campaignQueue.addBulk(jobs);
     }
 
     await prisma.campaign.update({

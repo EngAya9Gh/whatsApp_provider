@@ -18,6 +18,11 @@ import Templates from '../views/Templates.vue'
 import Campaigns from '../views/Campaigns.vue'
 import CampaignDetails from '../views/CampaignDetails.vue'
 
+import MetaTemplates from '../views/MetaTemplates.vue'
+import MetaCampaigns from '../views/MetaCampaigns.vue'
+import MetaAutoReply from '../views/MetaAutoReply.vue'
+import MetaSendMessage from '../views/MetaSendMessage.vue'
+
 const routes = [
   { path: '/login', component: Login, meta: { guest: true } },
   { path: '/register', component: Register, meta: { guest: true } },
@@ -35,6 +40,12 @@ const routes = [
   { path: '/logs', component: Logs, meta: { requiresAuth: true } },
   { path: '/billing', component: Billing, meta: { requiresAuth: true } },
   { path: '/settings', component: Settings, meta: { requiresAuth: true } },
+
+  // Meta Cloud Routes
+  { path: '/meta-send-message', component: MetaSendMessage, meta: { requiresAuth: true } },
+  { path: '/meta-templates', component: MetaTemplates, meta: { requiresAuth: true } },
+  { path: '/meta-campaigns', component: MetaCampaigns, meta: { requiresAuth: true } },
+  { path: '/meta-autoreply', component: MetaAutoReply, meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({

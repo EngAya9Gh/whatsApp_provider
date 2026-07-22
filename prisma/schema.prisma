@@ -51,15 +51,19 @@ model WhatsAppChannel {
   providerType      String   @default("BAILEYS") @map("provider_type") // BAILEYS or META_CLOUD
   phoneNumber       String?  @map("phone_number")
   status            String   @default("DISCONNECTED")
-  
+
   // Meta Specific fields
   metaPhoneNumberId String?  @map("meta_phone_number_id")
   metaWabaId        String?  @map("meta_waba_id")
   metaAccessToken   String?  @map("meta_access_token") @db.Text
-  
+  metaAppSecret     String?  @map("meta_app_secret") @db.Text // Required for HMAC validation
+  // Human-readable label for this channel (e.g. "Support Line", "+966500000000")
+  name              String?  @default("") @map("name")
+  displayPhoneNumber String? @map("display_phone_number") // from Meta Business Manager
+
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
-  
+
   tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaigns         Campaign[]
   messageLogs       MessageLog[]
@@ -68,6 +72,7 @@ model WhatsAppChannel {
   @@index([tenantId], map: "whatsapp_channels_tenant_id_fkey")
   @@map("whatsapp_channels")
 }
+
 
 model ApiKey {
   id         String    @id @default(uuid())
@@ -85,19 +90,24 @@ model ApiKey {
 }
 
 model MessageLog {
-  id           String        @id @default(uuid())
-  tenantId     String        @map("tenant_id")
-  channelId    String?       @map("channel_id")
-  phone        String
-  messageType  MessageType   @default(OTP) @map("message_type")
-  status       MessageStatus @default(QUEUED)
-  errorMessage String?       @map("error_message") @db.Text
-  createdAt    DateTime      @default(now()) @map("created_at")
-  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  channel      WhatsAppChannel? @relation(fields: [channelId], references: [id])
+  id              String        @id @default(uuid())
+  tenantId        String        @map("tenant_id")
+  channelId       String?       @map("channel_id")
+  phone           String
+  messageType     MessageType   @default(OTP) @map("message_type")
+  status          MessageStatus @default(QUEUED)
+  errorMessage    String?       @map("error_message") @db.Text
+  // Meta Cloud API specific: wamid returned from Meta API on send
+  metaMessageId   String?       @map("meta_message_id") @db.VarChar(200)
+  // Tracks Meta delivery lifecycle: sent → delivered → read → failed
+  deliveryStatus  String?       @map("delivery_status") @default("pending")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel         WhatsAppChannel? @relation(fields: [channelId], references: [id])
 
   @@index([tenantId], map: "message_logs_tenant_id_fkey")
   @@index([channelId], map: "message_logs_channel_id_fkey")
+  @@index([metaMessageId], map: "message_logs_meta_message_id_idx")
   @@map("message_logs")
 }
 
@@ -134,6 +144,8 @@ model Campaign {
   name            String
   message         String?             @db.Text
   status          String              @default("PENDING")
+  campaignType    String              @default("BAILEYS") @map("campaign_type") // BAILEYS or META
+  metaCategory    String?             @map("meta_category") // MARKETING, UTILITY, AUTHENTICATION
   createdAt       DateTime            @default(now()) @map("created_at")
   mediaMime       String?             @map("media_mime")
   mediaPath       String?             @map("media_path")
@@ -159,6 +171,7 @@ model CampaignTarget {
   phone        String
   status       String              @default("PENDING")
   error        String?             @db.Text
+  variables    String?             @db.Text // Store JSON array of variables
   interactions ButtonInteraction[]
   campaign     Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
@@ -186,6 +199,7 @@ model ButtonInteraction {
 
 model Invoice {
   id            String   @id @default(uuid())
+  invoiceNumber Int      @unique @default(autoincrement()) @map("invoice_number")
   tenantId      String   @map("tenant_id")
   amount        String
   description   String   @db.Text

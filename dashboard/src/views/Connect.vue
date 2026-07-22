@@ -106,42 +106,8 @@
             </button>
           </div>
         </div>
-  
-        <div v-if="showMetaForm" class="bg-slate-50 p-6 rounded-xl border border-dashed border-slate-300 mt-6">
-          <h4 class="text-lg font-bold text-slate-900 mt-0 mb-5">Add Meta Number</h4>
-          
-          <div class="grid grid-cols-1 gap-5">
-            <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-2">Phone Number (with Country Code e.g. 9665...)</label>
-              <input type="text" v-model="metaForm.phoneNumber" placeholder="966500000000" class="w-full p-3 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all" />
-            </div>
-            <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-2">Phone Number ID (From Meta)</label>
-              <input type="text" v-model="metaForm.metaPhoneNumberId" class="w-full p-3 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all" />
-            </div>
-            <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-2">WABA ID (WhatsApp Business Account ID)</label>
-              <input type="text" v-model="metaForm.metaWabaId" class="w-full p-3 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all" />
-            </div>
-            <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-2">Permanent Access Token</label>
-              <input type="password" v-model="metaForm.metaAccessToken" class="w-full p-3 border border-slate-300 rounded-lg font-mono text-slate-900 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all" />
-            </div>
-          </div>
-          
-          <div class="flex items-center gap-3 mt-6">
-            <button @click="addMetaChannel" :disabled="metaLoading" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-sm transition-colors disabled:opacity-50 border-none cursor-pointer">
-              {{ metaLoading ? 'Saving...' : 'Save Meta Connection' }}
-            </button>
-            <button @click="showMetaForm = false" class="bg-slate-200 text-slate-700 hover:bg-slate-300 px-6 py-2.5 rounded-lg font-bold transition-colors border-none cursor-pointer">
-              Cancel
-            </button>
-          </div>
-        </div>
-        <div v-else class="mt-6">
-          <button @click="showMetaForm = true" class="bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-500 hover:text-white px-6 py-2.5 rounded-lg font-bold shadow-sm transition-colors cursor-pointer">
-            + Add Meta Number
-          </button>
+        <div v-if="metaChannels.length === 0" class="text-slate-500 mt-6 font-medium text-sm">
+          No Meta Cloud numbers configured. Please contact your administrator to set up official Meta APIs.
         </div>
       </div>
     </div>
@@ -176,7 +142,8 @@ const metaForm = ref({
   phoneNumber: '',
   metaPhoneNumberId: '',
   metaWabaId: '',
-  metaAccessToken: ''
+  metaAccessToken: '',
+  metaAppSecret: ''
 })
 
 const fetchMetaChannels = async () => {
@@ -189,27 +156,6 @@ const fetchMetaChannels = async () => {
     metaChannels.value = res.data.data
   } catch (err) {
     console.error('Failed to fetch meta channels', err)
-  }
-}
-
-const addMetaChannel = async () => {
-  if (!metaForm.value.phoneNumber || !metaForm.value.metaPhoneNumberId || !metaForm.value.metaAccessToken) {
-    alert('Please fill all required fields');
-    return;
-  }
-  metaLoading.value = true
-  const token = localStorage.getItem('token')
-  try {
-    await axios.post('/api/v1/meta/channel', metaForm.value, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    showMetaForm.value = false
-    metaForm.value = { phoneNumber: '', metaPhoneNumberId: '', metaWabaId: '', metaAccessToken: '' }
-    fetchMetaChannels()
-  } catch (err) {
-    alert(err.response?.data?.message || 'Failed to add meta channel')
-  } finally {
-    metaLoading.value = false
   }
 }
 

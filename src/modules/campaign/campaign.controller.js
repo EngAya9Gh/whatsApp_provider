@@ -3,7 +3,7 @@ const campaignService = require('./campaign.service');
 exports.createCampaign = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
-    const { name, message, templateId, interactiveType, startDate, endDate } = req.body;
+    const { name, message, templateId, templateName, interactiveType, startDate, endDate, campaignType, channelId, metaCategory } = req.body;
     const file = req.files?.file?.[0];
     const image = req.files?.image?.[0];
 
@@ -22,21 +22,48 @@ exports.createCampaign = async (req, res, next) => {
     if (!file) {
       return res.status(400).json({ error: 'Excel or CSV file is required' });
     }
-    if (!name || (!message && !templateId)) {
-      return res.status(400).json({ error: 'Campaign name and either message or template are required' });
+    
+    // For Meta campaigns, templateName is required instead of message
+    if (campaignType === 'META') {
+      if (!name || !templateName) {
+        return res.status(400).json({ error: 'Campaign name and Meta template name are required for Meta campaigns' });
+      }
+      
+      // Default to first Meta Channel if not provided
+      if (!req.body.channelId) {
+        const { PrismaClient } = require('@prisma/client');
+        const prisma = new PrismaClient();
+        const firstMetaChannel = await prisma.whatsAppChannel.findFirst({
+          where: { tenantId, providerType: 'META_CLOUD' }
+        });
+        if (!firstMetaChannel) {
+          return res.status(400).json({ error: 'No Meta Cloud channel found for this tenant. Please set up Meta configuration first.' });
+        }
+        req.body.channelId = firstMetaChannel.id;
+      }
+    } else {
+      if (!name || (!message && !templateId)) {
+        return res.status(400).json({ error: 'Campaign name and either message or template are required' });
+      }
     }
+
+    // Pass the resolved channelId
+    const resolvedChannelId = campaignType === 'META' ? req.body.channelId : channelId;
 
     const result = await campaignService.createCampaign({
       tenantId,
       name,
-      message,
+      message: campaignType === 'META' ? templateName : message,
       templateId,
       file,
       image,
       buttons,
       interactiveType: interactiveType || 'TEXT',
       startDate: startDate ? new Date(startDate) : null,
-      endDate: endDate ? new Date(endDate) : null
+      endDate: endDate ? new Date(endDate) : null,
+      campaignType: campaignType || 'BAILEYS',
+      channelId: resolvedChannelId,
+      metaCategory
     });
 
     res.status(201).json(result);

@@ -50,13 +50,8 @@
             <tbody>
               <tr>
                 <td class="lbl-en">Invoice Number</td>
-                <td class="val">{{ formattedInvoiceNumber }}</td>
+                <td class="val">INV-{{ invoice.invoiceNumber }}</td>
                 <td class="lbl-ar">رقم الفاتورة</td>
-              </tr>
-              <tr>
-                <td class="lbl-en">PO Number</td>
-                <td class="val">{{ poNumber || 'N/A' }}</td>
-                <td class="lbl-ar">رقم أمر الشراء</td>
               </tr>
               <tr>
                 <td class="lbl-en">Issue Date</td>
@@ -397,9 +392,7 @@ const fetchInvoice = async () => {
 }
 
 const formattedInvoiceNumber = computed(() => {
-  if (!invoice.value?.id) return '2015659'
-  const shortId = invoice.value.id.split('-')[0].toUpperCase()
-  return `20${shortId.slice(0, 5)}`
+  return invoice.value?.invoiceNumber || invoice.value?.id || 'N/A'
 })
 
 const finalBuyerDetails = computed(() => {
@@ -446,11 +439,6 @@ const invoiceItems = computed(() => {
     return invoice.value.items;
   }
   return [];
-})
-
-const poNumber = computed(() => {
-  if (!invoice.value?.id) return 'PO-2026-001'
-  return `PO-${invoice.value.id.slice(0, 4).toUpperCase()}`
 })
 
 const qrCodeUrl = computed(() => {

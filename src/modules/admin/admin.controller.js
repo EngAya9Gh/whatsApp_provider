@@ -80,6 +80,18 @@ class AdminController {
     }
   }
 
+  async addMetaChannel(req, res, next) {
+    try {
+      const { phoneNumber, metaPhoneNumberId, metaWabaId, metaAccessToken, metaAppSecret, displayPhoneNumber, name } = req.body;
+      const channel = await adminService.addMetaChannel(req.params.id, {
+        phoneNumber, metaPhoneNumberId, metaWabaId, metaAccessToken, metaAppSecret, displayPhoneNumber, name
+      });
+      res.json({ success: true, data: channel });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createInvoice(req, res, next) {
     try {
       const { amount, description, billingCycle, status, items, taxRate, taxAmount, buyerDetails, sellerDetails } = req.body;
