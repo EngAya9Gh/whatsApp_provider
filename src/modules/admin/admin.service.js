@@ -139,7 +139,8 @@ class AdminService {
       data: {
         monthlyLimit: data.monthlyLimit !== undefined ? data.monthlyLimit : tenant.monthlyLimit,
         metaEnabled: data.metaEnabled !== undefined ? data.metaEnabled : tenant.metaEnabled,
-        customFeatures: data.customFeatures !== undefined ? data.customFeatures : tenant.customFeatures
+        customFeatures: data.customFeatures !== undefined ? data.customFeatures : tenant.customFeatures,
+        currency: data.currency !== undefined ? data.currency : tenant.currency
       }
     });
   }
@@ -274,11 +275,37 @@ class AdminService {
             authenticationBaseCost: 0.0107,
             authenticationMarkupPercent: 20,
             serviceBaseCost: 0.0150,
-            serviceMarkupPercent: 20
+            serviceMarkupPercent: 20,
+            qrMessagePrice: 0.05,
+            exchangeRateUsdToSar: 3.75,
+            enableWalletDeduction: true
           }
         }
       });
     }
+
+    // Retroactively inject fields if they don't exist in DB yet
+    let requiresUpdate = false;
+    if (settings.data && settings.data.qrMessagePrice === undefined) {
+      settings.data.qrMessagePrice = 0.05;
+      requiresUpdate = true;
+    }
+    if (settings.data && settings.data.exchangeRateUsdToSar === undefined) {
+      settings.data.exchangeRateUsdToSar = 3.75;
+      requiresUpdate = true;
+    }
+    if (settings.data && settings.data.enableWalletDeduction === undefined) {
+      settings.data.enableWalletDeduction = true;
+      requiresUpdate = true;
+    }
+
+    if (requiresUpdate) {
+      await prisma.systemSetting.update({
+        where: { id: 'GLOBAL' },
+        data: { data: settings.data }
+      });
+    }
+
     return settings;
   }
 

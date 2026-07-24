@@ -32,9 +32,17 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
 
-// Require Dashboard Login and BULK_CAMPAIGN feature
+// Require Dashboard Login and feature access (allowing both Baileys and Meta campaigns)
 router.use(authMiddleware);
-router.use(requireFeature('BULK_CAMPAIGN'));
+router.use((req, res, next) => {
+  // Allow if they have either Baileys Campaign or Meta Campaign feature
+  const features = req.tenant.customFeatures || {};
+  if (features.BAILEYS_CAMPAIGN || features.META_CAMPAIGN || req.tenant.metaEnabled) {
+    next();
+  } else {
+    return res.status(403).json({ error: 'Feature requires PRO plan or Meta enabled' });
+  }
+});
 
 router.post('/', upload.fields([{ name: 'file', maxCount: 1 }, { name: 'image', maxCount: 1 }]), campaignController.createCampaign);
 router.put('/:id', upload.fields([{ name: 'image', maxCount: 1 }]), campaignController.updateCampaign);

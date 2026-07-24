@@ -4,6 +4,7 @@ const prisma = new PrismaClient();
 
 const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'wakeel_meta_secret_1234';
 const chatService = require('../chat/chat.service');
+const webhookService = require('../webhook/webhook.service');
 
 class MetaController {
 
@@ -248,6 +249,28 @@ class MetaController {
                 }
               }
             }
+
+            // --- Dispatch Incoming Message Webhook ---
+            try {
+              // Create a payload that looks like Meta's
+              const payload = {
+                object: 'whatsapp_business_account',
+                entry: [{
+                  id: channel.metaWabaId || 'unknown_waba_id',
+                  changes: [{
+                    value: {
+                      metadata: { phone_number_id: channel.metaPhoneNumberId, display_phone_number: channel.displayPhoneNumber },
+                      contacts,
+                      messages: [msg]
+                    },
+                    field: 'messages'
+                  }]
+                }]
+              };
+              await webhookService.dispatchIncomingMessage(channel.tenantId, payload, 'META');
+            } catch (whError) {
+              logger.error('[MetaWebhook] Error dispatching incoming webhook', whError);
+            }
           }
         }
 
@@ -287,6 +310,26 @@ class MetaController {
 
             } catch (statusError) {
               logger.error(`[MetaWebhook] Status update error for wamid ${wamid}`, statusError.message);
+            }
+
+            // --- Dispatch Delivery Status Webhook ---
+            try {
+              const payload = {
+                object: 'whatsapp_business_account',
+                entry: [{
+                  id: channel.metaWabaId || 'unknown_waba_id',
+                  changes: [{
+                    value: {
+                      metadata: { phone_number_id: channel.metaPhoneNumberId, display_phone_number: channel.displayPhoneNumber },
+                      statuses: [statusUpdate]
+                    },
+                    field: 'messages'
+                  }]
+                }]
+              };
+              await webhookService.dispatchDeliveryStatus(channel.tenantId, payload, 'META');
+            } catch (whError) {
+              logger.error('[MetaWebhook] Error dispatching status webhook', whError);
             }
           }
         }

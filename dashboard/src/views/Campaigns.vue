@@ -1,5 +1,5 @@
 <template>
-  <FeatureLock feature="BULK_CAMPAIGN" requiredPlan="PRO">
+  <FeatureLock feature="BAILEYS_CAMPAIGN" requiredPlan="PRO">
     <div class="page-container">
     <div class="page-header">
       <div>

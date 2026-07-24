@@ -23,40 +23,42 @@
         </router-link>
 
         <!-- STANDARD (QR WEB) -->
-        <div class="nav-section-title mt-4">Standard (QR)</div>
-        <router-link to="/send-message" class="nav-item" active-class="active">
+        <template v-if="$hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('SEND_MESSAGE') || $hasFeature('BAILEYS_CAMPAIGN') || $hasFeature('TEMPLATES') || $hasFeature('BAILEYS_AUTORESPONDER')">
+          <div class="nav-section-title mt-4">{{ $t('sidebar.standard_mode') !== 'sidebar.standard_mode' ? $t('sidebar.standard_mode') : 'Standard Mode' }}</div>
+        <router-link v-if="$hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('SEND_MESSAGE')" to="/send-message" class="nav-item" active-class="active">
           <span class="nav-icon">📨</span>
           <span class="nav-label">{{ $t('sidebar.send_message') }}</span>
         </router-link>
-        <router-link v-if="$hasFeature('BULK_CAMPAIGN')" to="/campaigns" class="nav-item" active-class="active">
+        <router-link v-if="$hasFeature('BAILEYS_CAMPAIGN')" to="/campaigns" class="nav-item" active-class="active">
           <span class="nav-icon">📢</span>
           <span class="nav-label">{{ $t('sidebar.campaigns') }}</span>
         </router-link>
-        <router-link to="/templates" class="nav-item" active-class="active">
+        <router-link v-if="$hasFeature('TEMPLATES')" to="/templates" class="nav-item" active-class="active">
           <span class="nav-icon">📋</span>
           <span class="nav-label">{{ $t('sidebar.templates') }}</span>
         </router-link>
-        <router-link v-if="$hasFeature('AUTO_RESPONDER')" to="/chatbot" class="nav-item" active-class="active">
+        <router-link v-if="$hasFeature('BAILEYS_AUTORESPONDER')" to="/chatbot" class="nav-item" active-class="active">
           <span class="nav-icon">🤖</span>
           <span class="nav-label">Auto Responder</span>
         </router-link>
+        </template>
 
         <!-- META CLOUD -->
-        <template v-if="$hasFeature('META_API')">
+        <template v-if="$hasFeature('META_API') || $hasFeature('META_CAMPAIGN') || $hasFeature('META_AUTORESPONDER')">
           <div class="nav-section-title mt-4 text-emerald-600">Meta Cloud</div>
-          <router-link to="/meta-send-message" class="nav-item" active-class="active">
+          <router-link v-if="$hasFeature('META_SEND_MESSAGE')" to="/meta-send-message" class="nav-item" active-class="active">
             <span class="nav-icon">📨</span>
             <span class="nav-label">Send Message</span>
           </router-link>
-          <router-link to="/meta-templates" class="nav-item" active-class="active">
+          <router-link v-if="$hasFeature('META_TEMPLATES')" to="/meta-templates" class="nav-item" active-class="active">
             <span class="nav-icon">📝</span>
             <span class="nav-label">Meta Templates</span>
           </router-link>
-          <router-link to="/meta-campaigns" class="nav-item" active-class="active">
+          <router-link v-if="$hasFeature('META_CAMPAIGN')" to="/meta-campaigns" class="nav-item" active-class="active">
             <span class="nav-icon">📢</span>
             <span class="nav-label">Meta Campaigns</span>
           </router-link>
-          <router-link to="/meta-chatbot" class="nav-item" active-class="active">
+          <router-link v-if="$hasFeature('META_AUTORESPONDER')" to="/meta-chatbot" class="nav-item" active-class="active">
             <span class="nav-icon">🤖</span>
             <span class="nav-label">Meta Auto Reply</span>
           </router-link>
@@ -83,6 +85,10 @@
         <router-link to="/settings" class="nav-item" active-class="active">
           <span class="nav-icon">⚙️</span>
           <span class="nav-label">{{ $t('sidebar.settings') }}</span>
+        </router-link>
+        <router-link to="/developer" class="nav-item" active-class="active">
+          <span class="nav-icon">🛠️</span>
+          <span class="nav-label">{{ $t('sidebar.developer_tools', 'Developer Tools') }}</span>
         </router-link>
       </nav>
 
@@ -193,7 +199,7 @@ body {
 /* ── Sidebar ── */
 .sidebar {
   width: var(--sidebar-width);
-  min-height: 100vh;
+  height: 100vh;
   background: var(--brand-darker);
   display: flex;
   flex-direction: column;
@@ -219,6 +225,7 @@ body {
 
 .sidebar-nav {
   flex: 1;
+  min-height: 0; /* Ensures flex container can shrink and trigger scroll */
   padding: 1rem 0.75rem;
   display: flex;
   flex-direction: column;

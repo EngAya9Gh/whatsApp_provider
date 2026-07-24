@@ -57,7 +57,46 @@ class CampaignService {
       throw { status: 400, message: 'No valid phone numbers found in the uploaded file (ensure phone is in the first column)' };
     }
 
-    // 2. Create Campaign (PENDING state)
+    // 2. Calculate Cost & Deduct Wallet
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    const settings = await prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } });
+    
+    let messagePrice = 0;
+    
+    if (isMeta) {
+      // Get category price (marketing, utility, authentication, service)
+      const category = (metaCategory || 'marketing').toLowerCase();
+      let baseCost = settings?.data?.[`${category}BaseCost`] || 0.0501;
+      let markupPercent = settings?.data?.[`${category}MarkupPercent`] || 20;
+      messagePrice = baseCost + (baseCost * (markupPercent / 100));
+    } else {
+      messagePrice = settings?.data?.qrMessagePrice || 0.05;
+    }
+    
+    const totalCostSar = records.length * messagePrice;
+    
+    // Convert to USD if tenant uses USD
+    let totalCost = totalCostSar;
+    const exchangeRate = settings?.data?.exchangeRateUsdToSar || 3.75;
+    if (tenant.currency === 'USD') {
+      totalCost = totalCostSar / exchangeRate;
+    }
+
+    if (settings?.data?.enableWalletDeduction !== false) {
+      if (tenant.walletBalance < totalCost) {
+        throw { status: 400, message: `Insufficient wallet balance. Estimated cost: ${totalCost.toFixed(4)} ${tenant.currency || 'SAR'}, Available: ${tenant.walletBalance.toFixed(4)} ${tenant.currency || 'SAR'}` };
+      }
+
+      // Deduct from wallet
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: {
+          walletBalance: { decrement: totalCost }
+        }
+      });
+    }
+
+    // 3. Create Campaign (PENDING state)
     const campaign = await prisma.campaign.create({
       data: {
         tenantId,
@@ -90,7 +129,8 @@ class CampaignService {
     return {
       success: true,
       campaignId: campaign.id,
-      totalNumbers: phones.length,
+      totalNumbers: records.length,
+      totalCost,
       message: 'Campaign created successfully and is ready to start.'
     };
   }
@@ -196,9 +236,45 @@ class CampaignService {
       if (jobs.length > 0) await campaignQueue.addBulk(jobs);
     }
 
+    // Calculate Pricing for META
+    let totalCost = 0;
+    const totalMessages = campaign.targets.length;
+
+    if (campaign.campaignType === 'META' && campaign.metaCategory) {
+      try {
+        const { getSystemSettings } = require('../admin/admin.service').prototype;
+        const adminService = new (require('../admin/admin.service'))();
+        const settings = await adminService.getSystemSettings();
+        
+        let baseCost = 0;
+        let markup = 0;
+        const cat = campaign.metaCategory.toLowerCase();
+        
+        if (cat === 'utility') {
+          baseCost = settings.utilityBaseCost || 0;
+          markup = settings.utilityMarkupPercent || 0;
+        } else if (cat === 'marketing') {
+          baseCost = settings.marketingBaseCost || 0;
+          markup = settings.marketingMarkupPercent || 0;
+        } else if (cat === 'authentication') {
+          baseCost = settings.authenticationBaseCost || 0;
+          markup = settings.authenticationMarkupPercent || 0;
+        }
+        
+        const costPerMessage = baseCost * (1 + (markup / 100));
+        totalCost = costPerMessage * totalMessages;
+      } catch (e) {
+        console.error('[CampaignService] Failed to calculate total cost', e);
+      }
+    }
+
     await prisma.campaign.update({
       where: { id: campaign.id },
-      data: { status: 'RUNNING' }
+      data: { 
+        status: 'RUNNING',
+        totalCost,
+        totalMessages
+      }
     });
 
     return {

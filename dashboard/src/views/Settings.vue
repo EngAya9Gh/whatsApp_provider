@@ -70,29 +70,6 @@
       </form>
     </div>
 
-    <!-- Webhook URL Card -->
-    <div class="settings-card">
-      <div class="card-header">
-        <div class="header-icon">🔗</div>
-        <div>
-          <h3>{{ isAr ? 'رابط الـ Webhook' : 'Webhook URL' }}</h3>
-          <p class="description">{{ isAr ? 'إعداد رابط Webhook لاستلام الإشعارات' : 'Receive real-time notifications for incoming messages' }}</p>
-        </div>
-      </div>
-
-      <form @submit.prevent="saveWebhook">
-        <div class="form-group full-width">
-          <label>Endpoint URL</label>
-          <input type="url" v-model="webhookUrl" placeholder="https://your-domain.com/webhook" />
-        </div>
-        <div class="form-actions">
-          <button type="submit" class="btn-primary" :disabled="loadingWebhook">
-            {{ loadingWebhook ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'حفظ الـ Webhook' : 'Save Webhook') }}
-          </button>
-          <span v-if="savedWebhook" class="success-text">✓ {{ isAr ? 'تم الحفظ بنجاح!' : 'Saved successfully!' }}</span>
-        </div>
-      </form>
-    </div>
   </div>
 </template>
 
@@ -103,10 +80,6 @@ import axios from 'axios'
 
 const { locale } = useI18n()
 const isAr = computed(() => locale.value === 'ar')
-
-const webhookUrl = ref('')
-const loadingWebhook = ref(false)
-const savedWebhook = ref(false)
 
 const loadingTax = ref(false)
 const savedTax = ref(false)
@@ -133,18 +106,19 @@ const fetchProfile = async () => {
     })
     
     const data = res.data.data
-    webhookUrl.value = data.webhookUrl || ''
     form.value.companyName = data.companyName || data.name || ''
     
     const details = data.customFeatures?.companyDetails || {}
-    form.value.vatNumber = details.vatNumber || ''
-    form.value.crn = details.crn || ''
-    form.value.street = details.street || ''
-    form.value.district = details.district || ''
-    form.value.city = details.city || ''
-    form.value.country = details.country || ''
-    form.value.buildingNo = details.buildingNo || ''
-    form.value.postalCode = details.postalCode || ''
+    Object.assign(form.value, {
+      vatNumber: details.vatNumber || '',
+      crn: details.crn || '',
+      street: details.street || '',
+      district: details.district || '',
+      city: details.city || '',
+      country: details.country || '',
+      buildingNo: details.buildingNo || '',
+      postalCode: details.postalCode || ''
+    })
     
   } catch (err) {
     console.error('Error loading settings:', err)
@@ -174,18 +148,6 @@ const saveCompanyDetails = async () => {
   } finally {
     loadingTax.value = false
   }
-}
-
-const saveWebhook = () => {
-  loadingWebhook.value = true
-  setTimeout(() => {
-    const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
-    tenant.webhookUrl = webhookUrl.value
-    localStorage.setItem('tenant', JSON.stringify(tenant))
-    loadingWebhook.value = false
-    savedWebhook.value = true
-    setTimeout(() => savedWebhook.value = false, 3000)
-  }, 500)
 }
 
 onMounted(fetchProfile)

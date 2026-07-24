@@ -68,11 +68,12 @@ class AdminController {
 
   async updateSettings(req, res, next) {
     try {
-      const { monthlyLimit, metaEnabled, customFeatures } = req.body;
+      const { monthlyLimit, metaEnabled, customFeatures, currency } = req.body;
       const tenant = await adminService.updateSettings(req.params.id, {
         monthlyLimit: parseInt(monthlyLimit),
         metaEnabled: metaEnabled === true || metaEnabled === 'true',
-        customFeatures
+        customFeatures,
+        currency
       });
       res.json({ success: true, data: tenant });
     } catch (error) {
@@ -158,6 +159,44 @@ class AdminController {
     try {
       const items = await adminService.calculateUnbilledUsage(req.params.id);
       res.json({ success: true, data: items });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateWalletBalance(req, res, next) {
+    try {
+      // Direct prisma call for simplicity, or could go through adminService
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+      
+      const { amount, action } = req.body; // action: 'ADD', 'SET', 'DEDUCT'
+      let numAmount = parseFloat(amount);
+      if (isNaN(numAmount) || numAmount < 0) {
+        return res.status(400).json({ error: 'Invalid amount' });
+      }
+
+      const tenant = await prisma.tenant.findUnique({ where: { id: req.params.id } });
+      if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+      let newBalance = tenant.walletBalance;
+      if (action === 'ADD') {
+        newBalance += numAmount;
+      } else if (action === 'DEDUCT') {
+        newBalance -= numAmount;
+        if (newBalance < 0) newBalance = 0;
+      } else if (action === 'SET') {
+        newBalance = numAmount;
+      } else {
+        return res.status(400).json({ error: 'Invalid action' });
+      }
+
+      const updated = await prisma.tenant.update({
+        where: { id: req.params.id },
+        data: { walletBalance: newBalance }
+      });
+
+      res.json({ success: true, data: updated });
     } catch (error) {
       next(error);
     }

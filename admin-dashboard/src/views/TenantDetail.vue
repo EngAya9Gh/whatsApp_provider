@@ -116,6 +116,14 @@
               </div>
             </div>
             
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Tenant Currency</label>
+              <select v-model="settingsForm.currency" class="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none">
+                <option value="SAR">Saudi Riyal (SAR)</option>
+                <option value="USD">US Dollar (USD)</option>
+              </select>
+            </div>
+            
             <div>
               <button @click="updateSettings" :disabled="isUpdatingSettings" class="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm transition-colors cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed">
                 {{ isUpdatingSettings ? 'Saving...' : 'Save Settings' }}
@@ -188,6 +196,33 @@
       <!-- Right Column -->
       <div class="lg:col-span-7 flex flex-col gap-6">
         
+        <!-- Wallet Management Panel -->
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 overflow-hidden">
+          <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-100">
+            <h3 class="text-lg font-bold text-slate-900 m-0">Wallet Management</h3>
+            <div class="text-lg font-bold">
+              Current Balance: <span class="text-[#FF6600]">{{ tenant.walletBalance || 0 }} {{ tenant.currency || 'SAR' }}</span>
+            </div>
+          </div>
+          <div class="flex items-end gap-3">
+            <div class="flex-1">
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Amount</label>
+              <input type="number" step="0.01" v-model="walletForm.amount" placeholder="e.g. 50.00" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
+            </div>
+            <div class="flex-1">
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Action</label>
+              <select v-model="walletForm.action" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none">
+                <option value="ADD">Add Funds</option>
+                <option value="DEDUCT">Deduct Funds</option>
+                <option value="SET">Set Balance To</option>
+              </select>
+            </div>
+            <button @click="updateWallet" :disabled="isUpdatingWallet" class="bg-[#FF6600] hover:bg-[#e65c00] text-white px-6 py-2 rounded-lg font-semibold shadow-sm transition-colors cursor-pointer border-none disabled:opacity-50">
+              {{ isUpdatingWallet ? 'Updating...' : 'Update' }}
+            </button>
+          </div>
+        </div>
+
         <!-- Invoices Panel -->
         <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 overflow-hidden">
           <h3 class="text-lg font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">Invoices</h3>
@@ -423,21 +458,28 @@ const showMetaForm = ref(false)
 const dbPlans = ref([])
 
 const settingsForm = ref({
-  monthlyLimit: 0,
+  monthlyLimit: 20,
   metaEnabled: false,
-  customFeatures: {}
+  customFeatures: {},
+  currency: 'SAR'
 })
 
 const metaForm = ref({
-  phoneNumber: '',
   displayPhoneNumber: '',
+  phoneNumber: '',
   metaPhoneNumberId: '',
   metaWabaId: '',
   metaAccessToken: '',
   metaAppSecret: ''
 })
 
-const availableFeatures = ['TEMPLATES', 'API_ACCESS', 'AUTO_RESPONDER', 'BULK_CAMPAIGN', 'EXCEL_EXPORT', 'META_API', 'LIVE_CHAT']
+const walletForm = ref({
+  amount: '',
+  action: 'ADD'
+})
+const isUpdatingWallet = ref(false)
+
+const availableFeatures = ['META_CAMPAIGN', 'BAILEYS_CAMPAIGN', 'META_SEND_MESSAGE', 'BAILEYS_SEND_MESSAGE', 'META_AUTORESPONDER', 'BAILEYS_AUTORESPONDER', 'META_TEMPLATES', 'TEMPLATES', 'LIVE_CHAT', 'EXCEL_EXPORT', 'API_ACCESS']
 
 // Removed old invoice state, using dynamic state below
 
@@ -532,6 +574,38 @@ const getInvoiceUrl = (id) => {
   return `${protocol}//${host}${port}/invoice/${id}`
 }
 
+const updateWallet = async () => {
+  if (!walletForm.value.amount || walletForm.value.amount <= 0) {
+    return alert('Please enter a valid amount');
+  }
+  
+  if (!confirm(`Are you sure you want to ${walletForm.value.action} ${walletForm.value.amount} to this tenant's wallet?`)) return;
+
+  try {
+    isUpdatingWallet.value = true
+    const token = localStorage.getItem('admin_token')
+    await axios.put(`/api/admin/tenants/${route.params.id}/wallet`, {
+      amount: walletForm.value.amount,
+      action: walletForm.value.action
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    // Refresh tenant data to see new balance
+    await fetchTenant()
+    
+    walletForm.value.amount = ''
+    walletForm.value.action = 'ADD'
+    alert('Wallet updated successfully!')
+  } catch (err) {
+    console.error('Failed to update wallet:', err)
+    alert('Failed to update wallet')
+  } finally {
+    isUpdatingWallet.value = false
+  }
+}
+
+// Generate Invoice Logic
 const openInvoiceModal = async () => {
   showInvoiceModal.value = true
   loadingUnbilled.value = true
@@ -652,18 +726,32 @@ const fetchTenant = async () => {
     tenant.value = res.data.data
     selectedPlan.value = tenant.value.plan
     
+    const data = tenant.value
     const populated = {}
-    const currentFeatures = tenant.value.customFeatures || {}
+    const currentFeatures = data.customFeatures || {}
     availableFeatures.forEach(f => {
       populated[f] = currentFeatures[f] !== undefined ? currentFeatures[f] : null
     })
 
     settingsForm.value = {
-      monthlyLimit: tenant.value.monthlyLimit,
-      metaEnabled: tenant.value.metaEnabled,
-      customFeatures: populated
+      monthlyLimit: data.monthlyLimit || 20,
+      metaEnabled: data.metaEnabled || false,
+      customFeatures: data.customFeatures || {},
+      currency: data.currency || 'SAR'
     }
 
+    // Sync meta form if channel exists
+    if (tenant.value.channels && tenant.value.channels.length > 0) {
+      const channel = tenant.value.channels[0]
+      metaForm.value = {
+        displayPhoneNumber: channel.displayPhoneNumber,
+        phoneNumber: channel.phoneNumber,
+        metaPhoneNumberId: channel.metaPhoneNumberId,
+        metaWabaId: channel.metaWabaId,
+        metaAccessToken: channel.metaAccessToken,
+        metaAppSecret: channel.metaAppSecret
+      }
+    }
   } catch (err) {
     error.value = err.response?.data?.error || 'Failed to load tenant details.'
   } finally {
@@ -706,6 +794,7 @@ const updateSettings = async () => {
     tenant.value.monthlyLimit = res.data.data.monthlyLimit
     tenant.value.metaEnabled = res.data.data.metaEnabled
     tenant.value.customFeatures = res.data.data.customFeatures
+    tenant.value.currency = res.data.data.currency
     alert('Settings updated successfully')
   } catch (err) {
     alert('Failed to update settings')

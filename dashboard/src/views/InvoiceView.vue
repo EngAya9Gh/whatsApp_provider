@@ -24,25 +24,33 @@
 
       <!-- Main Official Tax Invoice Document -->
       <div class="tax-invoice-document" id="invoice-content" ref="invoiceContent">
-        <!-- Document Top Header -->
-        <header class="doc-header">
+        <table style="width: 100%; border-collapse: collapse; border: none;">
+          <thead style="display: table-header-group;">
+            <tr>
+              <td style="padding: 0; padding-top: 25px; border: none;">
+                <!-- Document Top Header -->
+                <header class="doc-header">
           <div class="header-brand-left">
             <img src="/logo.svg" alt="Wakeel Logo" class="brand-logo" />
-            <div class="brand-subtext">منصة وكيـل للحلول الرقمية</div>
-          </div>
-          <div class="header-center-title">
-            <h1>Tax Invoice فاتورة ضريبية</h1>
-            <div class="status-stamp" :class="invoice.status.toLowerCase()">
-              {{ invoice.status === 'PAID' ? 'مدفوعة / PAID' : 'معلقة / PENDING' }}
-            </div>
           </div>
           <div class="header-company-right">
-            <h2 class="ar-name">شركة وكيـل لتقنية المعلومات </h2>
+            <h2 class="ar-name">شركة وكيـل لتقنية المعلومات</h2>
             <h3 class="en-name">WAKEEL INFORMATION TECHNOLOGY CO. LTD</h3>
           </div>
         </header>
 
         <div class="orange-divider"></div>
+              </td>
+            </tr>
+          </thead>
+          
+          <tbody style="display: table-row-group;">
+            <tr>
+              <td style="padding: 0; border: none;">
+                
+          <div class="header-center-title main-invoice-title">
+            <h1>Tax Invoice فاتورة ضريبية</h1>
+          </div>
 
         <!-- Meta Information Section & QR Code -->
         <section class="invoice-meta-section">
@@ -323,24 +331,31 @@
           </div>
         </section>
 
+              </td>
+            </tr>
+          </tbody>
+
+          <tfoot style="display: table-footer-group;">
+            <tr>
+              <td style="padding: 0; border: none;">
         <!-- Terms, Dispute Rights & Support Contacts Footer -->
         <footer class="doc-footer">
           <div class="footer-columns">
             <div class="col-en">
-              <p>- You have the right to review and dispute your invoice within 60 days from the date of issuance.</p>
-              <p>- Complaints can be submitted through the following channels:</p>
-              <p class="indent">1- Through the ticketing system available in your account at Wakeel Platform</p>
-              <p class="indent">2- Through the email system, at: <strong>support@wakeel.cc</strong></p>
-              <p class="indent">3- Through direct contact at: <strong>9200015404</strong></p>
-              <p>- We will review your request and respond within a maximum of 72 hours</p>
+              <p>- You have a 60-day window from the issuance date to review and raise any concerns regarding this invoice.</p>
+              <p>- For support and complaints, please reach out to us via:</p>
+              <p class="indent">1. The integrated Ticketing System inside your Wakeel Dashboard.</p>
+              <p class="indent">2. Our official support email: <strong>support@wakeel.cc</strong></p>
+              <p class="indent">3. Our customer care hotline: <strong>9200015404</strong></p>
+              <p>- All inquiries are carefully reviewed, and our team will resolve them within a maximum of 72 hours.</p>
             </div>
             <div class="col-ar">
-              <p>- لديك الحق في مراجعة فاتورتك والاعتراض عليها خلال 60 يوماً من تاريخ صدورها</p>
-              <p>- يتم تقديم الشكاوى عبر التواصل معنا عبر إحدى القنوات التالية</p>
-              <p class="indent">1. نظام التذاكر المتوفر داخل حسابك على منصة وكيل</p>
-              <p class="indent">2. البريد الإلكتروني: <strong>support@wakeel.cc</strong></p>
-              <p class="indent">3. رقم التواصل: <strong>9200015404</strong></p>
-              <p>- سنقوم بدراسة طلبك والرد عليك خلال 72 ساعة كحد أقصى.</p>
+              <p>- يحق لك مراجعة الفاتورة وتقديم أي ملاحظات أو اعتراضات خلال فترة 60 يوماً من تاريخ الإصدار.</p>
+              <p>- نسعد باستقبال استفساراتكم وشكاويكم من خلال القنوات الرسمية التالية:</p>
+              <p class="indent">1. إنشاء تذكرة دعم فني مباشرة من داخل لوحة تحكم وكيل.</p>
+              <p class="indent">2. التواصل عبر البريد الإلكتروني: <strong>support@wakeel.cc</strong></p>
+              <p class="indent">3. الاتصال بخدمة العملاء: <strong>9200015404</strong></p>
+              <p>- يلتزم فريقنا بمراجعة جميع الطلبات ومعالجتها في مدة لا تتجاوز 72 ساعة كحد أقصى.</p>
             </div>
           </div>
 
@@ -361,6 +376,10 @@
             <span>شركة وكيـل لتقنية المعلومات  - جميع الحقوق محفوظة © {{ new Date().getFullYear() }}</span>
           </div>
         </footer>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     </div>
   </div>
@@ -649,8 +668,8 @@ onMounted(fetchInvoice)
 .doc-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
 }
 
 .header-brand-left {
@@ -659,37 +678,22 @@ onMounted(fetchInvoice)
   align-items: flex-start;
 }
 .brand-logo {
-  height: 58px;
+  height: 40px;
   width: auto;
 }
-.brand-subtext {
-  font-size: 0.8rem;
-  color: #6B7280;
-  margin-top: 0.25rem;
-  font-weight: 600;
-}
 
-.header-center-title {
+.header-center-title.main-invoice-title {
   text-align: center;
+  margin-bottom: 1.5rem;
+  margin-top: 0.5rem;
 }
-.header-center-title h1 {
+.header-center-title.main-invoice-title h1 {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   font-weight: 800;
   color: #111827;
   letter-spacing: -0.01em;
 }
-.status-stamp {
-  display: inline-block;
-  margin-top: 0.5rem;
-  padding: 0.3rem 0.9rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-.status-stamp.paid { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
-.status-stamp.pending { background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
 
 .header-company-right {
   text-align: right;
@@ -697,14 +701,14 @@ onMounted(fetchInvoice)
 }
 .header-company-right .ar-name {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 800;
   color: #1F2937;
   line-height: 1.3;
 }
 .header-company-right .en-name {
   margin: 0.2rem 0 0 0;
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   font-weight: 700;
   color: #6B7280;
   letter-spacing: 0.04em;
@@ -714,7 +718,7 @@ onMounted(fetchInvoice)
 .orange-divider {
   height: 3px;
   background: #FF6600;
-  margin: 1rem 0 1.5rem 0;
+  margin: 0.75rem 0 1.25rem 0;
   border-radius: 2px;
 }
 
@@ -1071,8 +1075,14 @@ onMounted(fetchInvoice)
 
 /* Print Stylesheet for flawless A4 output */
 @media print {
+  @page {
+    margin: 5mm 0mm 0mm 0mm;
+  }
   .no-print {
     display: none !important;
+  }
+  thead td {
+    padding-top: 15px !important;
   }
   body, .invoice-page {
     background: white !important;

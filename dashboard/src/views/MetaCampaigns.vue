@@ -30,8 +30,12 @@
         <div class="text-sm text-slate-600 mb-2">
           <strong>Category:</strong> {{ campaign.metaCategory || 'Unknown' }}
         </div>
-        <div class="text-sm text-slate-600 mb-4">
+        <div class="text-sm text-slate-600 mb-2">
           <strong>Date:</strong> {{ new Date(campaign.createdAt).toLocaleDateString() }}
+        </div>
+        <div class="flex items-center justify-between text-sm text-slate-600 mb-4 bg-slate-50 p-2 rounded-lg border border-slate-100">
+          <div><strong>Messages:</strong> {{ campaign.totalMessages || 0 }}</div>
+          <div class="font-bold text-orange-600">Cost: ${{ (campaign.totalCost || 0).toFixed(4) }}</div>
         </div>
         <router-link :to="`/campaigns/${campaign.id}`" class="block text-center w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-bold text-sm transition-colors no-underline">
           View Details

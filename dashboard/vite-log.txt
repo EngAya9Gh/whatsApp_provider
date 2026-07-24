@@ -1,0 +1,71 @@
+
+> whatsapp-saas-dashboard@1.0.0 dev
+> vite
+
+6:20:28 PM [vite] (client) Re-optimizing dependencies because lockfile has changed
+
+  VITE v8.1.5  ready in 354 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+6:38:42 PM [vite] (client) dependency optimized: qrcode.vue
+6:38:44 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:38:44 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:38:44 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:38:44 PM [vite] (client) [console.error] Failed to load dashboard stats: AxiosError: Request failed with status code 500
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+6:38:49 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:38:49 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:38:49 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:38:49 PM [vite] (client) [console.error] Failed to load dashboard stats: AxiosError: Request failed with status code 500
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+6:38:49 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:38:49 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:38:49 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:38:49 PM [vite] (client) [console.error] Failed to load dashboard stats: AxiosError: Request failed with status code 500
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+6:38:49 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:38:49 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:38:49 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:38:49 PM [vite] (client) [console.error] Failed to load dashboard stats: AxiosError: Request failed with status code 500
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+6:38:56 PM [vite] (client) [console.error] Failed to load dashboard stats: AxiosError: Request failed with status code 500
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+6:39:01 PM [vite] (client) [console.error] Failed to load dashboard stats: AxiosError: Request failed with status code 500
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+6:44:33 PM [vite] (client) hmr update /src/views/Dashboard.vue, /src/tailwind.css
+6:44:50 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:44:50 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:44:50 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:45:09 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:45:09 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:45:09 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:46:07 PM [vite] (client) hmr update /src/views/Dashboard.vue, /src/tailwind.css
+6:47:18 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:47:18 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:47:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:47:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:47:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:47:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:47:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:47:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:47:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:47:20 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:47:20 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:47:20 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:47:20 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:47:20 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:47:20 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:47:22 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:47:22 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:47:22 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:48:19 PM [vite] (client) hmr update /src/views/Dashboard.vue, /src/views/Dashboard.vue?vue&type=style&index=0&scoped=7f773d42&lang.css, /src/tailwind.css
+6:49:05 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:49:05 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:49:05 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.

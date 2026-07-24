@@ -166,6 +166,42 @@
             </div>
           </div>
           
+          <!-- QR Campaigns -->
+          <div class="p-4 border border-slate-100 rounded-lg bg-slate-50/50">
+            <h4 class="font-bold text-slate-800 mb-3 text-sm">QR Messages (Baileys)</h4>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Deduction Cost (SAR)</label>
+                <input v-model="form.qrMessagePrice" type="number" step="0.0001" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block p-2 outline-none font-mono" />
+              </div>
+            </div>
+          </div>
+          
+          <!-- Wallet Deduction Toggle -->
+          <div class="p-4 border border-slate-100 rounded-lg bg-slate-50/50">
+            <h4 class="font-bold text-slate-800 mb-3 text-sm">Wallet System</h4>
+            <div class="flex items-center gap-3">
+              <input type="checkbox" v-model="form.enableWalletDeduction" id="walletToggle" class="w-5 h-5 text-orange-500 bg-white border-slate-300 rounded focus:ring-orange-500 focus:ring-2 accent-orange-500 cursor-pointer" />
+              <label for="walletToggle" class="font-semibold text-slate-700 text-sm cursor-pointer select-none">Enable Automatic Wallet Deduction</label>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">If disabled, campaigns will send without checking or deducting from tenant wallets.</p>
+          </div>
+          
+          <!-- Exchange Rate -->
+          <div class="p-4 border border-slate-100 rounded-lg bg-slate-50/50">
+            <h4 class="font-bold text-slate-800 mb-3 text-sm">Currency Exchange</h4>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Exchange Rate (USD to SAR)</label>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold text-slate-500">1 USD =</span>
+                  <input v-model="form.exchangeRateUsdToSar" type="number" step="0.01" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 block p-2 outline-none font-mono" />
+                  <span class="text-sm font-bold text-slate-500">SAR</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
         </div>
       </div>
       
@@ -214,7 +250,10 @@ const form = ref({
   authenticationBaseCost: 0.0107,
   authenticationMarkupPercent: 20,
   serviceBaseCost: 0.0150,
-  serviceMarkupPercent: 20
+  serviceMarkupPercent: 20,
+  qrMessagePrice: 0.05,
+  exchangeRateUsdToSar: 3.75,
+  enableWalletDeduction: true
 })
 
 const fetchSettings = async () => {

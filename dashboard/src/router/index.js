@@ -42,6 +42,7 @@ const routes = [
   { path: '/logs', component: Logs, meta: { requiresAuth: true } },
   { path: '/billing', component: Billing, meta: { requiresAuth: true } },
   { path: '/settings', component: Settings, meta: { requiresAuth: true } },
+  { path: '/developer', component: () => import('../views/DeveloperTools.vue'), meta: { requiresAuth: true } },
 
   // Meta Cloud Routes
   { path: '/meta-send-message', component: MetaSendMessage, meta: { requiresAuth: true } },

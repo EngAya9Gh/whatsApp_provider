@@ -28,6 +28,9 @@ model Tenant {
   whatsappPhone    String?           @map("whatsapp_phone")
   sessionStatus    SessionStatus     @default(DISCONNECTED) @map("session_status")
   webhookUrl       String?           @map("webhook_url") @db.Text
+  webhookEvents    Json?             @map("webhook_events")
+  walletBalance    Float             @default(0) @map("wallet_balance")
+  currency         String            @default("SAR")
   monthlyLimit     Int               @default(20) @map("monthly_limit")
   metaEnabled      Boolean           @default(false) @map("meta_enabled")
   createdAt        DateTime          @default(now()) @map("created_at")
@@ -155,6 +158,8 @@ model Campaign {
   interactiveType String?             @map("interactive_type")
   startDate       DateTime?           @map("start_date")
   endDate         DateTime?           @map("end_date")
+  totalCost       Float               @default(0) @map("total_cost")
+  totalMessages   Int                 @default(0) @map("total_messages")
   interactions    ButtonInteraction[]
   targets         CampaignTarget[]
   autoResponders  AutoResponder[]
