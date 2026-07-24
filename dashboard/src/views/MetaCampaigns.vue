@@ -39,37 +39,73 @@
       </div>
     </div>
 
-    <!-- Create Modal Stub -->
-    <div v-if="showCreateModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-        <h3 class="text-xl font-bold text-slate-900 mb-4">New Meta Campaign</h3>
-        <p class="text-slate-600 mb-6 text-sm">Meta campaigns require an approved template. First, make sure you have approved templates in the Meta Templates page.</p>
-        
-        <div class="mb-4">
-          <label class="block text-sm font-semibold text-slate-700 mb-2">Campaign Name</label>
-          <input type="text" v-model="form.name" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="e.g. Summer Promo 2024" />
+    <!-- Create Modal -->
+    <div v-if="showCreateModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-8 overflow-y-auto">
+      <div class="bg-white rounded-2xl w-full max-w-4xl shadow-2xl">
+        <!-- Modal Header -->
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10 rounded-t-2xl">
+          <h3 class="text-xl font-bold text-slate-900 m-0">إنشاء حملة Meta جديدة</h3>
+          <button @click="closeModal" class="text-slate-400 hover:text-slate-600 bg-transparent border-none text-2xl cursor-pointer leading-none">&times;</button>
         </div>
 
-        <div class="mb-4">
-          <label class="block text-sm font-semibold text-slate-700 mb-2">Select Approved Template</label>
-          <select v-model="form.templateName" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-            <option value="" disabled>Select a template...</option>
-            <option v-for="tpl in metaTemplates" :key="tpl.id" :value="tpl.name">{{ tpl.name }} ({{ tpl.category }})</option>
-          </select>
-          <div v-if="metaTemplates.length === 0" class="text-xs text-orange-500 mt-1">No templates found. Go to Meta Templates to sync them.</div>
-        </div>
+        <div class="flex flex-col md:flex-row min-h-[400px]">
+          <!-- Left: Instructions Panel -->
+          <div class="md:w-72 bg-gradient-to-b from-orange-500 to-orange-700 text-white p-6 md:rounded-bl-2xl flex-shrink-0">
+            <h4 class="font-extrabold text-base mb-4 border-b border-orange-400 pb-3">📋 إرشادات إرسال الحملة</h4>
+            <ul class="space-y-3 text-xs leading-relaxed">
+              <li class="flex gap-2">
+                <span class="text-orange-200 font-bold">✓</span>
+                <span><strong>ملف الأرقام (Excel/CSV):</strong> العمود الأول `A` يجب أن يحتوي على الأرقام بالصيغة الدولية (بدون + أو 00).</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="text-orange-200 font-bold">✓</span>
+                <span><strong>المتغيرات الديناميكية:</strong> إذا كان القالب يحتوي على متغيرات `{{1}}`، ضع قيمتها في العمود الثاني `B`، والمتغير `{{2}}` في العمود `C` وهكذا.</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="text-orange-200 font-bold">✓</span>
+                <span><strong>القوالب المعتمدة:</strong> يجب اختيار قالب تمت الموافقة عليه (Approved) مسبقاً من Meta.</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="text-yellow-300 font-bold">⚠</span>
+                <span><strong>حدود الإرسال:</strong> احرص على عدم تجاوز حد الإرسال اليومي الخاص بحسابك في Meta لتجنب الحظر.</span>
+              </li>
+            </ul>
+          </div>
 
-        <div class="mb-6">
-          <label class="block text-sm font-semibold text-slate-700 mb-2">Upload Excel/CSV File</label>
-          <p class="text-xs text-slate-500 mb-2">Column 1: Phone number. Column 2+: Variables (e.g. {{1}}, {{2}} in order).</p>
-          <input type="file" @change="handleFileUpload" accept=".csv, .xlsx, .xls" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-        </div>
+          <!-- Right: Form -->
+          <div class="flex-1 overflow-y-auto flex flex-col">
+            <div class="p-6 flex-1 space-y-5">
+              
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">اسم الحملة</label>
+                <input type="text" v-model="form.name" class="w-full p-2.5 border border-slate-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="مثال: عروض الصيف 2024" />
+              </div>
 
-        <div class="flex justify-end gap-3 mt-6">
-          <button @click="closeModal" class="px-4 py-2 font-bold text-slate-600 bg-transparent border-none cursor-pointer">Cancel</button>
-          <button @click="createCampaign" :disabled="isSubmitting" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold border-none cursor-pointer disabled:opacity-50 transition-colors">
-            {{ isSubmitting ? 'Creating...' : 'Create & Start' }}
-          </button>
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">اختر القالب المعتمد</label>
+                <select v-model="form.templateName" class="w-full p-2.5 border border-slate-300 rounded-xl text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
+                  <option value="" disabled>-- اختر قالباً --</option>
+                  <option v-for="tpl in metaTemplates" :key="tpl.id" :value="tpl.name">{{ tpl.name }} ({{ tpl.category }})</option>
+                </select>
+                <div v-if="metaTemplates.length === 0" class="text-xs text-orange-500 mt-1">لم يتم العثور على قوالب معتمدة. انتقل لصفحة قوالب Meta لإنشائها.</div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">رفع ملف الأرقام (Excel/CSV)</label>
+                <input type="file" @change="handleFileUpload" accept=".csv, .xlsx, .xls" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+              </div>
+
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 sticky bottom-0 md:rounded-br-2xl">
+              <button @click="closeModal" class="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors bg-transparent border-none cursor-pointer">إلغاء</button>
+              <button @click="createCampaign" :disabled="isSubmitting" class="bg-orange-500 hover:bg-orange-600 text-white px-8 py-2.5 rounded-xl font-bold border-none cursor-pointer disabled:opacity-50 transition-colors flex items-center gap-2">
+                <div v-if="isSubmitting" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                بدء الإرسال
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

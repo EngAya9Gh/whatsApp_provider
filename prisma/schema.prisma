@@ -64,10 +64,11 @@ model WhatsAppChannel {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaigns         Campaign[]
   messageLogs       MessageLog[]
   chatThreads       ChatThread[]
+  autoResponders    AutoResponder[]
 
   @@index([tenantId], map: "whatsapp_channels_tenant_id_fkey")
   @@map("whatsapp_channels")
@@ -219,29 +220,38 @@ model Invoice {
 }
 
 model AutoResponder {
-  id              String    @id @default(uuid())
-  tenantId        String    @map("tenant_id")
-  keyword         String    @db.Text
-  matchType       String    @default("EXACT") @map("match_type")
-  responseType    String    @default("TEXT") @map("response_type")
-  message         String?   @db.Text
-  mediaPath       String?   @map("media_path") @db.Text
-  mediaMime       String?   @map("media_mime")
-  isActive        Boolean   @default(true) @map("is_active")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  lat             Float?
-  lng             Float?
-  locationAddress String?   @map("location_address")
-  locationName    String?   @map("location_name")
-  endDate         DateTime? @map("end_date")
-  startDate       DateTime? @map("start_date")
-  campaignId      String?   @map("campaign_id")
-  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  campaign        Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  keyword           String    @db.Text
+  matchType         String    @default("EXACT") @map("match_type")
+  // responseType: TEXT | IMAGE | VIDEO | DOCUMENT | QR_CODE | META_TEMPLATE
+  responseType      String    @default("TEXT") @map("response_type")
+  message           String?   @db.Text
+  mediaPath         String?   @map("media_path") @db.Text
+  mediaUrl          String?   @map("media_url") @db.Text   // public URL for Meta media
+  mediaMime         String?   @map("media_mime")
+  isActive          Boolean   @default(true) @map("is_active")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  lat               Float?
+  lng               Float?
+  locationAddress   String?   @map("location_address")
+  locationName      String?   @map("location_name")
+  endDate           DateTime? @map("end_date")
+  startDate         DateTime? @map("start_date")
+  campaignId        String?   @map("campaign_id")
+  // Meta-specific: link rule to a specific Meta channel
+  channelId         String?   @map("channel_id")
+  // For META_TEMPLATE response type
+  metaTemplateName  String?   @map("meta_template_name")
+  metaTemplateLang  String?   @map("meta_template_lang") @default("ar")
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaign          Campaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  channel           WhatsAppChannel?    @relation(fields: [channelId], references: [id], onDelete: SetNull)
 
   @@index([tenantId], map: "auto_responders_tenant_id_fkey")
   @@index([campaignId], map: "auto_responders_campaign_id_fkey")
+  @@index([channelId], map: "auto_responders_channel_id_fkey")
   @@map("auto_responders")
 }
 

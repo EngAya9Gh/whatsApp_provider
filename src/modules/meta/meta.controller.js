@@ -185,14 +185,25 @@ class MetaController {
               }).catch(() => null);
 
               const rules = await prisma.autoResponder.findMany({
-                where: { tenantId: channel.tenantId, isActive: true }
+                where: {
+                  tenantId: channel.tenantId,
+                  isActive: true,
+                  OR: [
+                    { channelId: channel.id },  // rules specific to this Meta channel
+                    { channelId: null }          // global rules (no channel filter)
+                  ]
+                }
               }).catch(() => []);
 
-              // Campaign-specific rules first, then global rules
+              // Campaign-specific rules first, then global rules; channel-specific before global
               const applicableRules = rules.filter(rule => {
                 if (!rule.campaignId) return true;
                 return target && target.campaignId === rule.campaignId;
               }).sort((a, b) => {
+                // channel-specific rules before global
+                if (a.channelId && !b.channelId) return -1;
+                if (!a.channelId && b.channelId) return 1;
+                // campaign-specific before global
                 if (a.campaignId && !b.campaignId) return -1;
                 if (!a.campaignId && b.campaignId) return 1;
                 return 0;
@@ -209,14 +220,29 @@ class MetaController {
 
                 if (rule.matchType === 'EXACT' && textLower === keywordLower) isMatch = true;
                 else if (rule.matchType === 'CONTAINS' && textLower.includes(keywordLower)) isMatch = true;
+                else if (rule.matchType === 'STARTS_WITH' && textLower.startsWith(keywordLower)) isMatch = true;
 
                 if (isMatch) {
                   try {
-                    const messageService = require('../message/message.service');
-                    await messageService.sendMessage(channel.tenantId, from, rule.message || '', null, channel.id);
-                    logger.info(`[AutoResponder] Replied to ${from} — Rule: "${rule.keyword}" (Campaign: ${rule.campaignId || 'Global'})`);
+                    const metaService = require('./meta.service');
+                    const rType = rule.responseType;
+
+                    if (rType === 'META_TEMPLATE' && rule.metaTemplateName) {
+                      await metaService.sendTemplateViaApi(channel, from, rule.metaTemplateName, rule.metaTemplateLang || 'ar');
+                    } else if ((rType === 'IMAGE' || rType === 'QR_CODE') && rule.mediaUrl) {
+                      await metaService.sendImageViaApi(channel, from, rule.mediaUrl, rule.message || '');
+                    } else if (rType === 'VIDEO' && rule.mediaUrl) {
+                      await metaService.sendVideoViaApi(channel, from, rule.mediaUrl, rule.message || '');
+                    } else if (rType === 'DOCUMENT' && rule.mediaUrl) {
+                      await metaService.sendDocumentViaApi(channel, from, rule.mediaUrl, 'document', rule.message || '');
+                    } else if (rule.message) {
+                      // TEXT or fallback
+                      await metaService.sendTextViaApi(channel, from, rule.message);
+                    }
+
+                    logger.info(`[MetaAutoResponder] Replied to ${from} via ${rType} — Rule: "${rule.keyword}" (Channel: ${channel.id}, Campaign: ${rule.campaignId || 'Global'})`);
                   } catch (e) {
-                    logger.error(`[AutoResponder] Failed reply to ${from}`, e.message);
+                    logger.error(`[MetaAutoResponder] Failed reply to ${from}`, e.message);
                   }
                   break;
                 }

@@ -77,15 +77,55 @@
       </div>
     </div>
 
-    <!-- Create Modal Stub -->
-    <div v-if="showCreateModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div class="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
-          <h3 class="text-xl font-bold text-slate-900 m-0">Create Meta Template</h3>
+    <!-- Create Modal -->
+    <div v-if="showCreateModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-8 overflow-y-auto">
+      <div class="bg-white rounded-2xl w-full max-w-5xl shadow-2xl">
+        <!-- Modal Header -->
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10 rounded-t-2xl">
+          <h3 class="text-xl font-bold text-slate-900 m-0">إنشاء قالب رسالة Meta</h3>
           <button @click="showCreateModal = false" class="text-slate-400 hover:text-slate-600 bg-transparent border-none text-2xl cursor-pointer leading-none">&times;</button>
         </div>
-        
-        <div class="p-6">
+
+        <div class="flex flex-col md:flex-row min-h-[500px]">
+
+          <!-- Left: Instructions Panel -->
+          <div class="md:w-72 bg-gradient-to-b from-emerald-600 to-emerald-800 text-white p-6 md:rounded-bl-2xl flex-shrink-0">
+            <h4 class="font-extrabold text-base mb-4 border-b border-emerald-500 pb-3">📋 إرشادات إنشاء القالب</h4>
+            <ul class="space-y-3 text-xs leading-relaxed">
+              <li class="flex gap-2">
+                <span class="text-emerald-300 font-bold">✓</span>
+                <span><strong>اسم القالب:</strong> أحرف إنجليزية صغيرة وشرطات سفلية فقط، بدون مسافات. مثال: <code class="bg-emerald-700 px-1 rounded">order_confirm</code></span>
+              </li>
+              <li class="flex gap-2">
+                <span class="text-emerald-300 font-bold">✓</span>
+                <span><strong>الفئة:</strong> اختر التسويق للعروض، التنبيهات للإشعارات، المصادقة لرموز OTP.</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="text-emerald-300 font-bold">✓</span>
+                <span><strong>الرأس (Header):</strong> اختياري — يمكن أن يكون نصاً أو صورة أو فيديو أو مستنداً.</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="text-emerald-300 font-bold">✓</span>
+                <span><strong>المتغيرات:</strong> استخدم <code class="bg-emerald-700 px-1 rounded">{{1}}</code> <code class="bg-emerald-700 px-1 rounded">{{2}}</code> لإضافة نصوص ديناميكية يتم تعبئتها عند الإرسال.</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="text-emerald-300 font-bold">✓</span>
+                <span><strong>الأزرار:</strong> الرد السريع يُرسل نصاً عند الضغط، رابط الموقع يفتح متصفحاً، والاتصال يُجري مكالمة.</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="text-yellow-300 font-bold">⚠</span>
+                <span>القالب يُرسل إلى Meta للمراجعة وقد يستغرق حتى 24 ساعة قبل الاعتماد.</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="text-yellow-300 font-bold">⚠</span>
+                <span>يُرفض القالب إذا احتوى على محتوى مضلل أو ترويج غير مناسب.</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Right: Form -->
+          <div class="flex-1 overflow-y-auto max-h-[75vh]">
+            <div class="p-6">
           <div class="grid grid-cols-2 gap-4 mb-6">
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-2">Template Name</label>
@@ -145,9 +185,33 @@
             </div>
 
             <div v-else-if="form.headerType && form.headerType !== 'TEXT'">
-              <label class="block text-xs font-bold text-slate-500 mb-1">Media Link Example (Required by Meta)</label>
-              <input v-model="form.headerExample" type="url" placeholder="https://example.com/sample.png" class="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none" />
-              <p class="text-[10px] text-slate-500 mt-1">Provide a sample public URL for the media so Meta can review it.</p>
+              <!-- Tab: Upload vs URL -->
+              <div class="flex gap-2 mb-3">
+                <button type="button" @click="headerInputMode = 'upload'" class="flex-1 text-xs font-bold px-3 py-2 rounded-lg border transition-colors" :class="headerInputMode === 'upload' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'">📤 Upload File</button>
+                <button type="button" @click="headerInputMode = 'url'" class="flex-1 text-xs font-bold px-3 py-2 rounded-lg border transition-colors" :class="headerInputMode === 'url' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'">🔗 Public URL</button>
+              </div>
+
+              <!-- Upload File -->
+              <div v-if="headerInputMode === 'upload'">
+                <label class="block text-xs font-bold text-slate-500 mb-1">
+                  {{ form.headerType === 'IMAGE' ? 'Upload Image (JPG/PNG/WEBP — max 5MB)' : form.headerType === 'VIDEO' ? 'Upload Video (MP4 — max 16MB)' : 'Upload Document (PDF — max 100MB)' }}
+                </label>
+                <input type="file" @change="handleHeaderFileChange" :accept="form.headerType === 'IMAGE' ? 'image/*' : form.headerType === 'VIDEO' ? 'video/mp4,video/3gpp' : 'application/pdf'" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white" />
+                <div v-if="uploadingHeader" class="mt-2 flex items-center gap-2 text-xs text-emerald-600 font-semibold">
+                  <div class="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                  Uploading to Meta servers...
+                </div>
+                <div v-if="form.headerMediaId" class="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700 font-semibold">
+                  ✅ Uploaded! Media ID: {{ form.headerMediaId }}
+                </div>
+              </div>
+
+              <!-- Public URL -->
+              <div v-else>
+                <label class="block text-xs font-bold text-slate-500 mb-1">Media Link Example (Required by Meta)</label>
+                <input v-model="form.headerExample" type="url" placeholder="https://example.com/sample.png" class="w-full p-2 border border-slate-300 rounded-lg text-sm outline-none" />
+                <p class="text-[10px] text-slate-500 mt-1">Provide a publicly accessible URL so Meta can review the template.</p>
+              </div>
             </div>
           </div>
 
@@ -208,15 +272,18 @@
           </div>
 
         </div>
-        <div class="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-2xl">
-          <button @click="showCreateModal = false" class="px-6 py-2.5 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition-colors bg-transparent border-none cursor-pointer">Cancel</button>
-          <button @click="createTemplate" :disabled="creating" class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2.5 rounded-lg font-bold shadow-sm transition-colors disabled:opacity-50 border-none cursor-pointer flex items-center gap-2">
-            <div v-if="creating" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            Submit to Meta
-          </button>
-        </div>
-      </div>
-    </div>
+            <!-- Footer Actions -->
+            <div class="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 sticky bottom-0">
+              <button @click="showCreateModal = false" class="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors bg-transparent border-none cursor-pointer">إلغاء</button>
+              <button @click="createTemplate" :disabled="creating" class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2.5 rounded-xl font-bold shadow-sm transition-colors disabled:opacity-50 border-none cursor-pointer flex items-center gap-2">
+                <div v-if="creating" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                إرسال إلى Meta للمراجعة
+              </button>
+            </div>
+          </div><!-- end right panel -->
+        </div><!-- end two-col flex -->
+      </div><!-- end modal card -->
+    </div><!-- end modal overlay -->
   </div>
 </template>
 
@@ -238,11 +305,15 @@ const form = ref({
   headerType: '',
   headerText: '',
   headerExample: '',
+  headerMediaId: '',
   body: '',
   bodyVariables: [],
   footer: '',
   buttons: []
 })
+
+const headerInputMode = ref('upload') // 'upload' | 'url'
+const uploadingHeader = ref(false)
 
 const addButton = () => {
   if (form.value.buttons.length >= 3) {
@@ -254,6 +325,28 @@ const addButton = () => {
 
 const removeButton = (idx) => {
   form.value.buttons.splice(idx, 1);
+}
+
+// Handle header file upload to Meta
+const handleHeaderFileChange = async (e) => {
+  const file = e.target.files?.[0];
+  if (!file || !selectedChannel.value) return;
+  uploadingHeader.value = true;
+  form.value.headerMediaId = '';
+  const token = localStorage.getItem('token');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await axios.post(`/api/v1/meta/channel/${selectedChannel.value}/upload-media`, fd, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+    });
+    form.value.headerMediaId = res.data.mediaId;
+    form.value.headerExample = res.data.mediaId; // use as example
+  } catch (err) {
+    alert(err.response?.data?.message || 'Failed to upload file to Meta');
+  } finally {
+    uploadingHeader.value = false;
+  }
 }
 
 const fetchMetaChannels = async () => {
@@ -313,7 +406,8 @@ const createTemplate = async () => {
       category: form.value.category,
       headerType: form.value.headerType || undefined,
       headerText: form.value.headerType === 'TEXT' ? form.value.headerText : undefined,
-      headerExample: form.value.headerExample || undefined,
+      // Use media_id if uploaded, otherwise URL from headerExample
+      headerExample: form.value.headerMediaId || form.value.headerExample || undefined,
       body: form.value.body,
       bodyVariables: requiredVarsCount > 0 ? vars : undefined,
       footer: form.value.footer,
@@ -323,7 +417,8 @@ const createTemplate = async () => {
     })
     
     showCreateModal.value = false;
-    form.value = { name: '', language: 'en_US', category: 'UTILITY', headerType: '', headerText: '', headerExample: '', body: '', bodyVariables: [], footer: '', buttons: [] };
+    form.value = { name: '', language: 'en_US', category: 'UTILITY', headerType: '', headerText: '', headerExample: '', headerMediaId: '', body: '', bodyVariables: [], footer: '', buttons: [] };
+    headerInputMode.value = 'upload';
     fetchTemplates();
     alert('Template submitted successfully! It may take a few minutes for Meta to approve it.');
   } catch (err) {

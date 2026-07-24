@@ -271,6 +271,62 @@ class MetaService {
   }
 
   /**
+   * Send a plain text message directly via Meta Cloud API.
+   * Used by Auto Responder for within-24h replies.
+   */
+  async sendTextViaApi(channel, to, text) {
+    return this.sendMessage(channel, to, {
+      type: 'text',
+      text: { preview_url: false, body: text }
+    });
+  }
+
+  /**
+   * Send an approved Meta Template message directly via Meta Cloud API.
+   * Used by Auto Responder for out-of-24h replies.
+   */
+  async sendTemplateViaApi(channel, to, templateName, languageCode = 'ar', components = []) {
+    return this.sendMessage(channel, to, {
+      type: 'template',
+      template: {
+        name: templateName,
+        language: { code: languageCode },
+        components
+      }
+    });
+  }
+
+  /**
+   * Send an image via Meta Cloud API using a public URL.
+   */
+  async sendImageViaApi(channel, to, imageUrl, caption = '') {
+    return this.sendMessage(channel, to, {
+      type: 'image',
+      image: { link: imageUrl, caption }
+    });
+  }
+
+  /**
+   * Send a document via Meta Cloud API using a public URL.
+   */
+  async sendDocumentViaApi(channel, to, documentUrl, filename = 'document', caption = '') {
+    return this.sendMessage(channel, to, {
+      type: 'document',
+      document: { link: documentUrl, filename, caption }
+    });
+  }
+
+  /**
+   * Send a video via Meta Cloud API using a public URL.
+   */
+  async sendVideoViaApi(channel, to, videoUrl, caption = '') {
+    return this.sendMessage(channel, to, {
+      type: 'video',
+      video: { link: videoUrl, caption }
+    });
+  }
+
+  /**
    * Mark a received message as read.
    * Endpoint: POST /{version}/{phone-number-id}/messages
    * Body: { messaging_product: "whatsapp", status: "read", message_id: "wamid.xxx" }
