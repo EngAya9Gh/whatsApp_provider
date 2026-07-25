@@ -3,11 +3,16 @@ const prisma = new PrismaClient();
 const messageService = require('../message/message.service');
 
 class TemplateService {
-  async getTemplates(tenantId) {
-    return await prisma.messageTemplate.findMany({
-      where: { tenantId },
+  async getTemplates(tenantId, { page = 1, limit = 50 } = {}) {
+    const where = { tenantId };
+    const total = await prisma.messageTemplate.count({ where });
+    const data = await prisma.messageTemplate.findMany({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
       orderBy: { createdAt: 'desc' }
     });
+    return { data, total, page, totalPages: Math.ceil(total / limit) };
   }
 
   async createTemplate(tenantId, name, content, mediaPath, mediaMime) {

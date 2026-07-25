@@ -28,6 +28,13 @@
         No messages sent yet.
       </div>
     </div>
+
+    <!-- Pagination -->
+    <div v-if="totalPages > 1" style="margin-top:2rem; display:flex; justify-content:center; align-items:center; gap:1rem;">
+      <button :disabled="page === 1" @click="page--; fetchLogs()" style="padding:0.5rem 1rem; border:1px solid #e5e7eb; background:white; border-radius:6px; cursor:pointer;" :style="page === 1 ? 'opacity:0.5; cursor:not-allowed;' : ''">← Prev</button>
+      <span>Page <strong>{{ page }}</strong> of <strong>{{ totalPages }}</strong></span>
+      <button :disabled="page === totalPages" @click="page++; fetchLogs()" style="padding:0.5rem 1rem; border:1px solid #e5e7eb; background:white; border-radius:6px; cursor:pointer;" :style="page === totalPages ? 'opacity:0.5; cursor:not-allowed;' : ''">Next →</button>
+    </div>
   </div>
 </template>
 
@@ -36,17 +43,26 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
 const logs = ref([])
+const page = ref(1)
+const totalPages = ref(1)
 
-onMounted(async () => {
+const fetchLogs = async () => {
   const token = localStorage.getItem('token')
   try {
-    const res = await axios.get('/api/logs', {
+    const res = await axios.get(`/api/logs?page=${page.value}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     logs.value = res.data.data
+    if (res.data.meta) {
+      totalPages.value = res.data.meta.totalPages || 1
+    }
   } catch (err) {
     console.error('Failed to load logs', err)
   }
+}
+
+onMounted(() => {
+  fetchLogs()
 })
 </script>
 

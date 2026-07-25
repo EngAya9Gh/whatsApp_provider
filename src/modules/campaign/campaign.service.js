@@ -13,37 +13,42 @@ class CampaignService {
     const filePath = file.path;
     const fs = require('fs');
     
-    if (file.mimetype === 'text/csv') {
-      await new Promise((resolve, reject) => {
-        fs.createReadStream(filePath)
-          .pipe(csv({ headers: false })) // Disable headers to parse by index
-          .on('data', (data) => {
-            const values = Object.values(data);
-            const phone = values[0]?.toString().replace(/[^0-9]/g, '');
-            if (phone && phone.length >= 10 && phone.length <= 15) {
-              const variables = isMeta ? values.slice(1).map(v => v?.toString() || '') : [];
-              records.push({ phone, variables });
-            }
-          })
-          .on('end', resolve)
-          .on('error', reject);
+    const logger = require('../../utils/logger');
+    logger.info(`Parsing file: ${file.originalname}, mimetype: ${file.mimetype}`);
+
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv') || file.originalname.endsWith('.txt')) {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split(/\r?\n/);
+      logger.info(`CSV/TXT lines count: ${lines.length}`);
+      lines.forEach(line => {
+        if (!line.trim()) return;
+        const delimiter = line.includes(';') ? ';' : ',';
+        const parts = line.split(delimiter);
+        const phone = parts[0]?.replace(/[^0-9]/g, '');
+        if (phone && phone.length >= 8 && phone.length <= 18) {
+          const variables = isMeta ? parts.slice(1).map(v => v?.trim() || '') : [];
+          records.push({ phone, variables });
+        }
       });
     } else {
       const xlsx = require('xlsx');
       const workbook = xlsx.readFile(filePath);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+      const data = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+      logger.info(`Excel rows count: ${data.length}`);
+      if (data.length > 0) logger.info(`First row: ${JSON.stringify(data[0])}`);
       
       data.forEach(row => {
         const phone = row[0]?.toString().replace(/[^0-9]/g, '');
-        if (phone && phone.length >= 10 && phone.length <= 15) {
+        if (phone && phone.length >= 8 && phone.length <= 18) {
           const variables = isMeta ? row.slice(1).map(v => v?.toString() || '') : [];
           records.push({ phone, variables });
         }
       });
     }
     
+    logger.info(`Parsed ${records.length} valid records`);
     fs.unlink(filePath, () => {});
 
     return records;
@@ -82,7 +87,7 @@ class CampaignService {
       totalCost = totalCostSar / exchangeRate;
     }
 
-    if (settings?.data?.enableWalletDeduction !== false) {
+    if (settings?.data?.enableWalletDeduction !== false && tenant.deductBalance !== false) {
       if (tenant.walletBalance < totalCost) {
         throw { status: 400, message: `Insufficient wallet balance. Estimated cost: ${totalCost.toFixed(4)} ${tenant.currency || 'SAR'}, Available: ${tenant.walletBalance.toFixed(4)} ${tenant.currency || 'SAR'}` };
       }
@@ -283,9 +288,15 @@ class CampaignService {
     };
   }
 
-  async getCampaigns(tenantId) {
-    return await prisma.campaign.findMany({
-      where: { tenantId },
+  async getCampaigns(tenantId, { page = 1, limit = 50, campaignType } = {}) {
+    const where = { tenantId };
+    if (campaignType) where.campaignType = campaignType;
+
+    const total = await prisma.campaign.count({ where });
+    const data = await prisma.campaign.findMany({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
@@ -293,6 +304,13 @@ class CampaignService {
         }
       }
     });
+
+    return {
+      data,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
   async getCampaignStats(tenantId, campaignId) {
@@ -310,6 +328,12 @@ class CampaignService {
     const failed = campaign.targets.filter(t => t.status === 'FAILED').length;
     const pending = campaign.targets.filter(t => t.status === 'PENDING').length;
 
+    const errorBreakdown = {};
+    campaign.targets.filter(t => t.status === 'FAILED' && t.error).forEach(t => {
+      const errGroup = t.error.split(':')[0] || 'Unknown Error';
+      errorBreakdown[errGroup] = (errorBreakdown[errGroup] || 0) + 1;
+    });
+
     // Check if campaign is finished
     if (pending === 0 && campaign.status === 'RUNNING') {
       await prisma.campaign.update({
@@ -321,7 +345,8 @@ class CampaignService {
 
     return {
       status: campaign.status,
-      stats: { total, sent, failed, pending }
+      stats: { total, sent, failed, pending },
+      errorBreakdown
     };
   }
 
@@ -332,7 +357,14 @@ class CampaignService {
     if (!campaign) throw { status: 404, message: 'Campaign not found' };
 
     const where = { campaignId };
-    if (status && status !== 'ALL') where.status = status;
+    if (status && status !== 'ALL') {
+      if (['PENDING', 'SENT', 'FAILED'].includes(status)) {
+        where.status = status;
+      } else {
+        where.status = 'FAILED';
+        where.error = { startsWith: status };
+      }
+    }
     if (search) where.phone = { contains: search };
 
     const total = await prisma.campaignTarget.count({ where });
@@ -395,12 +427,50 @@ class CampaignService {
 
     return { success: true, message: 'Failed messages are being retried.' };
   }
-  async getInteractions(tenantId, campaignId, { page = 1, limit = 50, search }) {
+  async getInteractions(tenantId, campaignId, { page = 1, limit = 50, search, status }) {
     const campaign = await prisma.campaign.findUnique({ where: { id: campaignId, tenantId } });
     if (!campaign) throw { status: 404, message: 'Campaign not found' };
 
+    if (status === 'NO_RESPONSE') {
+      const whereTarget = { campaignId, tenantId, status: 'SENT', interactions: { none: {} } };
+      if (search) whereTarget.phone = { contains: search };
+      
+      const totalInteractions = await prisma.campaignTarget.count({ where: whereTarget });
+      const targets = await prisma.campaignTarget.findMany({
+        where: whereTarget,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      const interactions = targets.map(t => ({
+        id: t.id,
+        phone: t.phone,
+        buttonText: 'No Response',
+        createdAt: t.createdAt
+      }));
+
+      // Calculate stats if needed
+      let stats = null;
+      if (page === 1 && !search) {
+        const totalSent = await prisma.campaignTarget.count({ where: { campaignId, status: 'SENT' } });
+        const uniqueInteracted = await prisma.buttonInteraction.groupBy({
+          by: ['phone'], where: { campaignId, tenantId }, _count: true
+        });
+        const buttonBreakdownGroups = await prisma.buttonInteraction.groupBy({
+          by: ['buttonText'], where: { campaignId, tenantId }, _count: { buttonText: true }
+        });
+        const buttonStats = {};
+        buttonBreakdownGroups.forEach(g => { buttonStats[g.buttonText] = g._count.buttonText; });
+        stats = { total: totalSent, interacted: uniqueInteracted.length, notInteracted: totalSent - uniqueInteracted.length, buttonBreakdown: buttonStats };
+      }
+
+      return { interactions, stats, total: totalInteractions, page, totalPages: Math.ceil(totalInteractions / limit) };
+    }
+
     const where = { campaignId, tenantId };
     if (search) where.phone = { contains: search };
+    if (status && status !== 'ALL') where.buttonText = status;
 
     const totalInteractions = await prisma.buttonInteraction.count({ where });
     const interactions = await prisma.buttonInteraction.findMany({
@@ -458,7 +528,14 @@ class CampaignService {
     let csv = '';
     if (type === 'targets') {
       const where = { campaignId };
-      if (status && status !== 'ALL') where.status = status;
+      if (status && status !== 'ALL') {
+        if (['PENDING', 'SENT', 'FAILED'].includes(status)) {
+          where.status = status;
+        } else {
+          where.status = 'FAILED';
+          where.error = { startsWith: status };
+        }
+      }
       const targets = await prisma.campaignTarget.findMany({ where, orderBy: { id: 'asc' } });
       csv = 'Phone,Status,Error,SentAt\n';
       targets.forEach(t => {
@@ -466,12 +543,22 @@ class CampaignService {
 `;
       });
     } else if (type === 'interactions') {
-      const interactions = await prisma.buttonInteraction.findMany({ where: { campaignId, tenantId }, orderBy: { createdAt: 'desc' } });
-      csv = 'Phone,InteractionType,Button/Text,Time\n';
-      interactions.forEach(i => {
-        csv += `"${i.phone}","${i.interactionType}","${i.buttonText}","${i.createdAt}"
-`;
-      });
+      if (status === 'NO_RESPONSE') {
+        const whereTarget = { campaignId, tenantId, status: 'SENT', interactions: { none: {} } };
+        const targets = await prisma.campaignTarget.findMany({ where: whereTarget, orderBy: { createdAt: 'desc' } });
+        csv = 'Phone,InteractionType,Button/Text,Time\n';
+        targets.forEach(t => {
+          csv += `"${t.phone}","NONE","No Response","${t.createdAt}"\n`;
+        });
+      } else {
+        const where = { campaignId, tenantId };
+        if (status && status !== 'ALL') where.buttonText = status;
+        const interactions = await prisma.buttonInteraction.findMany({ where, orderBy: { createdAt: 'desc' } });
+        csv = 'Phone,InteractionType,Button/Text,Time\n';
+        interactions.forEach(i => {
+          csv += `"${i.phone}","${i.interactionType}","${i.buttonText}","${i.createdAt}"\n`;
+        });
+      }
     }
     return csv;
   }

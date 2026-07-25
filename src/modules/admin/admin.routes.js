@@ -35,6 +35,7 @@ router.put('/tenants/:id/plan', adminAuth, adminController.updatePlan.bind(admin
 router.put('/tenants/:id/toggle', adminAuth, adminController.toggleTenant.bind(adminController));
 router.put('/tenants/:id/settings', adminAuth, adminController.updateSettings.bind(adminController));
 router.post('/tenants/:id/meta-channel', adminAuth, adminController.addMetaChannel.bind(adminController));
+router.post('/tenants/:id/meta-channels/:channelId/test', adminAuth, adminController.testMetaConnection.bind(adminController));
 router.put('/tenants/:id/password', adminAuth, adminController.resetTenantPassword.bind(adminController));
 router.put('/tenants/:id/wallet', adminAuth, adminController.updateWalletBalance.bind(adminController));
 router.post('/tenants/:id/invoices', adminAuth, adminController.createInvoice.bind(adminController));

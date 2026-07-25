@@ -3,8 +3,14 @@ const templateService = require('./template.service');
 exports.getTemplates = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
-    const templates = await templateService.getTemplates(tenantId);
-    res.status(200).json({ success: true, data: templates });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const templates = await templateService.getTemplates(tenantId, { page, limit });
+    res.status(200).json({ 
+      success: true, 
+      data: templates.data,
+      meta: { total: templates.total, page: templates.page, totalPages: templates.totalPages }
+    });
   } catch (error) {
     next(error);
   }

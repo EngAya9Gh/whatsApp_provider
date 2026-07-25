@@ -45,6 +45,13 @@
       </div>
     </div>
 
+    <!-- Pagination -->
+    <div v-if="totalPages > 1" class="pagination" style="margin-top:2rem; display:flex; justify-content:center; align-items:center; gap:1rem;">
+      <button :disabled="page === 1" @click="page--; fetchTemplates()" class="btn-secondary" style="padding: 0.5rem 1rem;">← Prev</button>
+      <span>Page <strong>{{ page }}</strong> of <strong>{{ totalPages }}</strong></span>
+      <button :disabled="page === totalPages" @click="page++; fetchTemplates()" class="btn-secondary" style="padding: 0.5rem 1rem;">Next →</button>
+    </div>
+
     <!-- Create/Edit Modal -->
     <div v-if="showCreateModal" class="modal-overlay" @click.self="closeModal">
       <div class="modal">
@@ -95,6 +102,8 @@ const templates = ref([])
 const loading = ref(true)
 const error = ref('')
 const success = ref('')
+const page = ref(1)
+const totalPages = ref(1)
 
 const showCreateModal = ref(false)
 const saving = ref(false)
@@ -113,10 +122,13 @@ const handleFileUpload = (e) => {
 const fetchTemplates = async () => {
   loading.value = true
   try {
-    const res = await axios.get('/api/v1/templates', {
+    const res = await axios.get(`/api/v1/templates?page=${page.value}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
     templates.value = res.data.data
+    if (res.data.meta) {
+      totalPages.value = res.data.meta.totalPages || 1
+    }
   } catch (err) {
     error.value = 'Failed to load templates.'
   } finally {

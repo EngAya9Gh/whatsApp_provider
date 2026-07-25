@@ -102,6 +102,11 @@
               <label for="metaToggle" class="font-semibold text-slate-700 text-sm cursor-pointer select-none">Enable Meta Cloud Features</label>
             </div>
 
+            <div class="flex items-center gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <input type="checkbox" v-model="settingsForm.deductBalance" id="deductToggle" class="w-5 h-5 text-orange-500 bg-white border-slate-300 rounded focus:ring-orange-500 focus:ring-2 accent-orange-500 cursor-pointer" />
+              <label for="deductToggle" class="font-semibold text-slate-700 text-sm cursor-pointer select-none">Deduct Balance (خصم الرصيد) - Enable wallet deduction for campaigns</label>
+            </div>
+
             <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
               <label class="block text-sm font-semibold text-slate-700 mb-3 border-b border-slate-200 pb-2">Custom Feature Overrides</label>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -148,7 +153,10 @@
                   <div class="font-bold text-slate-800">{{ channel.displayPhoneNumber }} <span class="text-xs font-normal text-slate-500 bg-slate-200 px-2 py-0.5 rounded">{{ channel.phoneNumber }}</span></div>
                   <div class="text-xs text-slate-500 mt-1">ID: {{ channel.metaPhoneNumberId }} | WABA: {{ channel.metaWabaId }}</div>
                 </div>
-                <button @click="openMetaForm(channel)" class="text-emerald-600 font-bold text-sm bg-transparent border-none cursor-pointer hover:underline">Edit</button>
+                <div class="flex gap-3">
+                  <button @click="testMetaConnection(channel)" class="text-blue-600 font-bold text-sm bg-transparent border border-blue-600 px-3 py-1 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors">Test Connection</button>
+                  <button @click="openMetaForm(channel)" class="text-emerald-600 font-bold text-sm bg-transparent border-none cursor-pointer hover:underline">Edit</button>
+                </div>
               </div>
             </div>
             <div v-else class="text-center py-6 text-slate-500 text-sm">
@@ -460,6 +468,7 @@ const dbPlans = ref([])
 const settingsForm = ref({
   monthlyLimit: 20,
   metaEnabled: false,
+  deductBalance: true,
   customFeatures: {},
   currency: 'SAR'
 })
@@ -736,6 +745,7 @@ const fetchTenant = async () => {
     settingsForm.value = {
       monthlyLimit: data.monthlyLimit || 20,
       metaEnabled: data.metaEnabled || false,
+      deductBalance: data.deductBalance !== false,
       customFeatures: data.customFeatures || {},
       currency: data.currency || 'SAR'
     }
@@ -766,6 +776,19 @@ const openMetaForm = (channel = null) => {
     metaForm.value = { phoneNumber: '', displayPhoneNumber: '', metaPhoneNumberId: '', metaWabaId: '', metaAccessToken: '', metaAppSecret: '' }
   }
   showMetaForm.value = true
+}
+
+const testMetaConnection = async (channel) => {
+  try {
+    const token = localStorage.getItem('admin_token')
+    const res = await axios.post(`/api/admin/tenants/${route.params.id}/meta-channels/${channel.id}/test`, 
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    alert(`Success: ${res.data.message}`)
+  } catch (err) {
+    alert(`Error: ${err.response?.data?.message || 'Connection failed'}`)
+  }
 }
 
 const updatePlan = async () => {

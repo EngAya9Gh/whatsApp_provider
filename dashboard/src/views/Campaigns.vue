@@ -20,92 +20,76 @@
       No campaigns found. Start your first bulk campaign!
     </div>
 
-    <div v-else class="campaigns-grid">
-      <div v-for="campaign in campaigns" :key="campaign.id" class="campaign-card">
-        <div class="card-header">
-          <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <h3 class="campaign-name">{{ campaign.name }}</h3>
-            <span class="campaign-date">📅 {{ new Date(campaign.createdAt).toLocaleDateString() }}</span>
-          </div>
-          <span :class="['status-badge', campaign.status.toLowerCase()]">
-            <span class="status-dot"></span>
-            {{ campaign.status }}
-          </span>
-        </div>
-        
-        <div class="campaign-content">
-          <svg class="quote-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-          <p class="truncate">{{ campaign.message || 'Template Message' }}</p>
-        </div>
-        
-        <div class="campaign-stats-modern" v-if="activeStats[campaign.id] && campaign.status !== 'PENDING'">
-          <div class="progress-container">
-            <div class="progress-header">
-              <span class="progress-title">Sending Progress</span>
-              <span class="progress-percentage">
-                {{ Math.round((activeStats[campaign.id].sent / (activeStats[campaign.id].total || 1)) * 100) }}%
+    <div v-else class="table-container" style="background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden;">
+      <table class="data-table" style="width: 100%; border-collapse: collapse;">
+        <thead style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+          <tr>
+            <th style="padding: 1rem; text-align: left; font-size: 0.85rem; font-weight: 600; color: #64748B; text-transform: uppercase;">Campaign</th>
+            <th style="padding: 1rem; text-align: left; font-size: 0.85rem; font-weight: 600; color: #64748B; text-transform: uppercase;">Date</th>
+            <th style="padding: 1rem; text-align: left; font-size: 0.85rem; font-weight: 600; color: #64748B; text-transform: uppercase;">Status</th>
+            <th style="padding: 1rem; text-align: left; font-size: 0.85rem; font-weight: 600; color: #64748B; text-transform: uppercase;">Progress</th>
+            <th style="padding: 1rem; text-align: left; font-size: 0.85rem; font-weight: 600; color: #64748B; text-transform: uppercase;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="campaign in campaigns" :key="campaign.id" style="border-bottom: 1px solid #F1F5F9; transition: background 0.2s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='white'">
+            <td style="padding: 1rem;">
+              <div style="font-weight: 700; color: #0F172A; margin-bottom: 4px;">{{ campaign.name }}</div>
+              <div class="truncate" style="max-width: 200px; font-size: 0.85rem; color: #64748B;">{{ campaign.message || 'Template Message' }}</div>
+            </td>
+            <td style="padding: 1rem; color: #475569; font-size: 0.9rem;">
+              {{ new Date(campaign.createdAt).toLocaleDateString() }}
+            </td>
+            <td style="padding: 1rem;">
+              <span :class="['status-badge', campaign.status.toLowerCase()]" style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">
+                <span class="status-dot" style="width:6px; height:6px; border-radius:50%; margin-right:6px;" :style="{background: campaign.status==='COMPLETED'?'#10b981':campaign.status==='RUNNING'?'#3b82f6':'#f59e0b'}"></span>
+                {{ campaign.status }}
               </span>
-            </div>
-            <div class="progress-bar-modern">
-              <div class="progress-fill-modern" :style="{ width: (activeStats[campaign.id].sent / (activeStats[campaign.id].total || 1) * 100) + '%' }"></div>
-            </div>
-          </div>
-
-          <div class="stats-mini-grid">
-            <div class="stat-pill">
-              <span class="stat-pill-label">Total</span>
-              <span class="stat-pill-value font-mono">{{ activeStats[campaign.id].total }}</span>
-            </div>
-            <div class="stat-pill success">
-              <span class="stat-pill-label">Sent</span>
-              <span class="stat-pill-value font-mono">{{ activeStats[campaign.id].sent }}</span>
-            </div>
-            <div class="stat-pill warning">
-              <span class="stat-pill-label">Pending</span>
-              <span class="stat-pill-value font-mono">{{ activeStats[campaign.id].pending }}</span>
-            </div>
-            <div class="stat-pill danger">
-              <span class="stat-pill-label">Failed</span>
-              <span class="stat-pill-value font-mono">{{ activeStats[campaign.id].failed }}</span>
-            </div>
-          </div>
-        </div>
-        <div v-else-if="campaign.status === 'PENDING'" class="campaign-pending-state">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          <div>
-            <strong>Campaign Ready!</strong>
-            <p>Click start to begin processing targets.</p>
-          </div>
-        </div>
-
-        <div class="card-footer">
-          <div class="footer-actions-left">
-            <button v-if="campaign.status === 'PENDING'" @click="editCampaign(campaign)" class="btn-icon-soft amber" title="Edit Campaign">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="16 3 21 8 8 21 3 21 3 16 16 3"></polygon></svg>
-            </button>
-            <button v-if="campaign.status !== 'PENDING'" @click="loadStats(campaign.id)" class="btn-icon-soft blue refresh-btn" title="Refresh Statistics">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-            </button>
-          </div>
-          
-          <div class="footer-actions-right">
-            <button v-if="campaign.status === 'PENDING'" @click="startCampaign(campaign.id)" class="btn-start-modern" :disabled="startingId === campaign.id">
-              <svg v-if="startingId !== campaign.id" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-              <svg v-else class="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
-              {{ startingId === campaign.id ? 'Starting...' : 'Start Now' }}
-            </button>
-            <button v-if="activeStats[campaign.id] && activeStats[campaign.id].failed > 0" @click="retryFailed(campaign.id)" class="btn-retry-modern" :disabled="retryingId === campaign.id">
-              <svg v-if="retryingId !== campaign.id" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
-              <svg v-else class="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
-              Retry Failed
-            </button>
-            <router-link :to="`/campaigns/${campaign.id}`" class="btn-details-modern">
-              Details
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-            </router-link>
-          </div>
-        </div>
-      </div>
+            </td>
+            <td style="padding: 1rem; min-width: 200px;">
+              <div v-if="activeStats[campaign.id] && campaign.status !== 'PENDING'">
+                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 6px; font-weight: 600; color: #334155;">
+                  <span>{{ activeStats[campaign.id].sent }} / {{ activeStats[campaign.id].total }}</span>
+                  <span style="color: #FF6600;">{{ Math.round((activeStats[campaign.id].sent / (activeStats[campaign.id].total || 1)) * 100) }}%</span>
+                </div>
+                <div style="height: 6px; background: #E2E8F0; border-radius: 3px; overflow: hidden;">
+                  <div style="height: 100%; background: #FF6600; transition: width 0.3s ease;" :style="{ width: (activeStats[campaign.id].sent / (activeStats[campaign.id].total || 1) * 100) + '%' }"></div>
+                </div>
+                <div style="display: flex; gap: 12px; font-size: 0.75rem; margin-top: 6px; font-weight: 600;">
+                  <span style="color: #10B981;">Sent: {{ activeStats[campaign.id].sent }}</span>
+                  <span style="color: #EF4444;">Fail: {{ activeStats[campaign.id].failed }}</span>
+                  <span style="color: #F59E0B;">Pend: {{ activeStats[campaign.id].pending }}</span>
+                </div>
+              </div>
+              <div v-else-if="campaign.status === 'PENDING'" style="font-size: 0.85rem; color: #94A3B8; font-weight: 500;">
+                Ready to start
+              </div>
+            </td>
+            <td style="padding: 1rem;">
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button v-if="campaign.status === 'PENDING'" @click="startCampaign(campaign.id)" class="btn-start-modern" :disabled="startingId === campaign.id" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; border: none; background: #FF6600; color: white; cursor: pointer; font-weight: 600;">
+                  {{ startingId === campaign.id ? 'Starting...' : 'Start Now' }}
+                </button>
+                <button v-if="activeStats[campaign.id] && activeStats[campaign.id].failed > 0" @click="retryFailed(campaign.id)" class="btn-retry-modern" :disabled="retryingId === campaign.id" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #EF4444; background: #FEF2F2; color: #EF4444; cursor: pointer; font-weight: 600;">
+                  Retry
+                </button>
+                <button v-if="campaign.status !== 'PENDING'" @click="loadStats(campaign.id)" style="padding: 0.4rem; border: none; background: #F1F5F9; color: #64748B; border-radius: 6px; cursor: pointer;" title="Refresh Stats">
+                  🔄
+                </button>
+                <router-link :to="`/campaigns/${campaign.id}`" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid #E2E8F0; background: white; color: #334155; text-decoration: none; font-weight: 600;">
+                  Details
+                </router-link>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Pagination -->
+    <div v-if="totalPages >= 1" class="pagination" style="margin-top:2rem; display:flex; justify-content:center; align-items:center; gap:1rem;">
+      <button :disabled="page === 1" @click="page--; fetchCampaigns()" class="btn-icon-soft">← Prev</button>
+      <span>Page <strong>{{ page }}</strong> of <strong>{{ totalPages }}</strong></span>
+      <button :disabled="page === totalPages || totalPages === 0" @click="page++; fetchCampaigns()" class="btn-icon-soft">Next →</button>
     </div>
 
     <!-- Create Campaign Modal -->
@@ -245,6 +229,8 @@ const loading = ref(true)
 const error = ref('')
 const success = ref('')
 const activeStats = ref({})
+const page = ref(1)
+const totalPages = ref(1)
 let pollInterval = null
 
 const showCreateModal = ref(false)
@@ -327,11 +313,13 @@ watch(() => formData.value.channelId, async (newId) => {
 const fetchCampaigns = async () => {
   loading.value = true
   try {
-    const res = await axios.get('/api/v1/campaigns', {
+    const res = await axios.get(`/api/v1/campaigns?page=${page.value}&campaignType=BAILEYS`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
-    // Filter out META campaigns to only show BAILEYS here
-    campaigns.value = res.data.data.filter(c => c.campaignType !== 'META')
+    campaigns.value = res.data.data
+    if (res.data.meta) {
+      totalPages.value = res.data.meta.totalPages || 1
+    }
     campaigns.value.forEach(c => {
       if (c.status !== 'PENDING') loadStats(c.id)
     })

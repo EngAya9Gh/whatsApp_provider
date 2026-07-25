@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const config = require('../../config/env');
 const logger = require('../../utils/logger');
+const axios = require('axios');
 
 const prisma = new PrismaClient();
 
@@ -139,6 +140,7 @@ class AdminService {
       data: {
         monthlyLimit: data.monthlyLimit !== undefined ? data.monthlyLimit : tenant.monthlyLimit,
         metaEnabled: data.metaEnabled !== undefined ? data.metaEnabled : tenant.metaEnabled,
+        deductBalance: data.deductBalance !== undefined ? data.deductBalance : tenant.deductBalance,
         customFeatures: data.customFeatures !== undefined ? data.customFeatures : tenant.customFeatures,
         currency: data.currency !== undefined ? data.currency : tenant.currency
       }
@@ -189,6 +191,41 @@ class AdminService {
         name: name || ''
       }
     });
+  }
+
+  async testMetaConnection(tenantId, channelId) {
+    const channel = await prisma.whatsAppChannel.findFirst({
+      where: { id: channelId, tenantId, providerType: 'META_CLOUD' }
+    });
+
+    if (!channel) {
+      throw { status: 404, message: 'Meta channel not found' };
+    }
+
+    if (!channel.metaPhoneNumberId || !channel.metaAccessToken) {
+      throw { status: 400, message: 'Missing Meta configuration (Phone Number ID or Token)' };
+    }
+
+    try {
+      // Fetch channel details from Meta Graph API
+      const response = await axios.get(`https://graph.facebook.com/v18.0/${channel.metaPhoneNumberId}`, {
+        headers: {
+          'Authorization': `Bearer ${channel.metaAccessToken}`
+        }
+      });
+      
+      // If we got here, request was successful
+      return {
+        success: true,
+        message: 'Connection Successful',
+        data: response.data
+      };
+    } catch (error) {
+      throw {
+        status: 400,
+        message: error.response?.data?.error?.message || 'Connection failed'
+      };
+    }
   }
 
   async createInvoice(tenantId, amount, description, billingCycle = 'Monthly', status = 'PENDING', items = null, taxRate = 15.0, taxAmount = '0', buyerDetails = null, sellerDetails = null) {

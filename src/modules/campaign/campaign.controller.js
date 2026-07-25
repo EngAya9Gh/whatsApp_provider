@@ -127,8 +127,15 @@ exports.startCampaign = async (req, res, next) => {
 exports.getCampaigns = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
-    const campaigns = await campaignService.getCampaigns(tenantId);
-    res.status(200).json({ success: true, data: campaigns });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const campaignType = req.query.campaignType;
+    const campaigns = await campaignService.getCampaigns(tenantId, { page, limit, campaignType });
+    res.status(200).json({ 
+      success: true, 
+      data: campaigns.data, 
+      meta: { total: campaigns.total, page: campaigns.page, totalPages: campaigns.totalPages }
+    });
   } catch (error) {
     next(error);
   }

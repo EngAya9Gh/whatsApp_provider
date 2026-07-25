@@ -69,3 +69,156 @@
 6:49:05 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
 6:49:05 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
 6:49:05 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+12:49:34 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+12:49:34 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+1:05:50 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'ar' locale messages.
+1:05:50 PM [vite] (client) [console.warn] [intlify] Fall back to translate 'sidebar.standard_mode' key with 'en' locale.
+1:05:50 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+1:05:50 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'ar' locale messages.
+1:05:50 PM [vite] (client) [console.warn] [intlify] Fall back to translate 'sidebar.developer_tools' key with 'en' locale.
+1:05:50 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+1:05:50 PM [vite] (client) [console.error] Failed to fetch channels AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+1:05:50 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'ar' locale messages.
+1:05:50 PM [vite] (client) [console.warn] [intlify] Fall back to translate 'sidebar.standard_mode' key with 'en' locale.
+1:05:50 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+1:05:52 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+1:05:52 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+1:05:59 PM [vite] (client) [console.warn] [intlify] Not found 'templates.image' key in 'en' locale messages.
+1:06:01 PM [vite] (client) [console.error] Failed to fetch channels AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+1:06:22 PM [vite] (client) [console.error] Failed to fetch meta templates AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+1:06:26 PM [vite] (client) [console.error] Failed to fetch meta templates AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+1:06:30 PM [vite] (client) [console.error] AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+1:06:41 PM [vite] (client) [console.error] Failed to fetch channels AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+1:07:13 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+1:07:13 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+1:07:13 PM [vite] (client) [console.error] Failed to fetch channels AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+1:07:13 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+1:49:23 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+1:49:23 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+1:49:23 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+1:49:26 PM [vite] (client) [console.error] Failed to fetch channels AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+1:50:36 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+1:50:36 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+1:50:36 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+1:50:37 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+1:50:37 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+1:50:37 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+2:06:39 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+2:06:39 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+2:06:39 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+2:50:09 PM [vite] (client) hmr update /src/views/CampaignDetails.vue, /src/tailwind.css
+2:51:45 PM [vite] (client) hmr update /src/views/CampaignDetails.vue, /src/tailwind.css
+2:56:52 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+2:56:52 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+2:56:52 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+3:07:44 PM [vite] (client) hmr update /src/views/CampaignDetails.vue, /src/tailwind.css
+3:09:09 PM [vite] (client) hmr update /src/views/CampaignDetails.vue, /src/tailwind.css
+3:12:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+3:12:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+3:12:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+3:33:05 PM [vite] (client) [console.error] Failed to fetch channels AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+3:54:49 PM [vite] (client) hmr update /src/views/Campaigns.vue, /src/tailwind.css
+3:54:49 PM [vite] Internal server error: Invalid end tag.
+  Plugin: vite:vue
+  File: /Users/ayaghoury/whatsApp_provider/dashboard/src/views/Campaigns.vue:239:5
+  237 |        </div>
+  238 |      </div>
+  239 |      </div>
+      |       ^
+  240 |    </FeatureLock>
+  241 |  </template>
+      at createCompilerError (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:1378:17)
+      at emitError (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:3035:5)
+      at Object.onclosetag (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:2412:9)
+      at Tokenizer.stateInClosingTagName (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:799:16)
+      at Tokenizer.parse (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:1157:16)
+      at Object.baseParse (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:3074:13)
+      at Object.parse (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-dom/dist/compiler-dom.cjs.js:910:23)
+      at Object.parse$1 [as parse] (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-sfc/dist/compiler-sfc.cjs.js:1824:24)
+      at createDescriptor (file:///Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vitejs/plugin-vue/dist/index.mjs:50:42)
+      at handleHotUpdate (file:///Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vitejs/plugin-vue/dist/index.mjs:1197:25)
+3:54:49 PM [vite] (client) [console.error] [vite] Failed to reload /src/views/Campaigns.vue. This could be due to syntax errors or importing non-existent modules. (see errors above)
+3:54:49 PM [vite] Internal server error: Invalid end tag.
+  Plugin: vite:vue
+  File: /Users/ayaghoury/whatsApp_provider/dashboard/src/views/Campaigns.vue:239:5
+  237 |        </div>
+  238 |      </div>
+  239 |      </div>
+      |       ^
+  240 |    </FeatureLock>
+  241 |  </template>
+      at createCompilerError (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:1378:17)
+      at emitError (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:3035:5)
+      at Object.onclosetag (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:2412:9)
+      at Tokenizer.stateInClosingTagName (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:799:16)
+      at Tokenizer.parse (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:1157:16)
+      at Object.baseParse (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:3074:13)
+      at Object.parse (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-dom/dist/compiler-dom.cjs.js:910:23)
+      at Object.parse$1 [as parse] (/Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vue/compiler-sfc/dist/compiler-sfc.cjs.js:1824:24)
+      at createDescriptor (file:///Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vitejs/plugin-vue/dist/index.mjs:50:42)
+      at handleHotUpdate (file:///Users/ayaghoury/whatsApp_provider/dashboard/node_modules/@vitejs/plugin-vue/dist/index.mjs:1197:25)
+3:54:49 PM [vite] (client) [console.error] [vite] Failed to reload /src/views/Campaigns.vue. This could be due to syntax errors or importing non-existent modules. (see errors above)
+3:55:30 PM [vite] (client) hmr update /src/views/Campaigns.vue, /src/tailwind.css
+3:56:06 PM [vite] (client) hmr update /src/views/MetaCampaigns.vue, /src/tailwind.css
+3:59:26 PM [vite] (client) hmr update /src/views/Templates.vue, /src/tailwind.css
+4:02:54 PM [vite] (client) hmr update /src/views/Logs.vue, /src/tailwind.css
+4:11:23 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+4:11:23 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+4:11:23 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+4:11:39 PM [vite] (client) [console.error] Failed to fetch meta templates AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+4:13:31 PM [vite] (client) [console.error] Failed to fetch channels AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+4:16:10 PM [vite] (client) hmr update /src/views/Campaigns.vue, /src/tailwind.css
+4:16:53 PM [vite] (client) hmr update /src/views/MetaCampaigns.vue, /src/tailwind.css
+5:34:05 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+5:34:05 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+5:34:05 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+5:34:46 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+5:34:46 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+5:34:46 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+5:34:47 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+5:34:47 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+5:34:47 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+5:37:03 PM [vite] (client) hmr update /src/views/Campaigns.vue, /src/tailwind.css
+5:37:21 PM [vite] (client) hmr update /src/views/MetaCampaigns.vue, /src/tailwind.css
+5:42:43 PM [vite] (client) [console.error] Failed to fetch channels AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+5:42:57 PM [vite] (client) [console.error] Failed to fetch channels AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+5:45:53 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+5:45:53 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+5:45:53 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+5:45:55 PM [vite] (client) [console.warn] [Vue warn]: Failed to resolve component: AppLoader
+If this is a native custom element, make sure to exclude it from component resolution via compilerOptions.isCustomElement. 
+  at <LiveChat onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< null > > 
+  at <RouterView> 
+  at <App>
+5:45:55 PM [vite] (client) [console.error] Error fetching channels: AxiosError: Request failed with status code 403
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+5:45:56 PM [vite] (client) [console.error] Failed to load channels AxiosError: Request failed with status code 404
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)

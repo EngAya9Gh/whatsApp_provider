@@ -68,10 +68,11 @@ class AdminController {
 
   async updateSettings(req, res, next) {
     try {
-      const { monthlyLimit, metaEnabled, customFeatures, currency } = req.body;
+      const { monthlyLimit, metaEnabled, customFeatures, currency, deductBalance } = req.body;
       const tenant = await adminService.updateSettings(req.params.id, {
         monthlyLimit: parseInt(monthlyLimit),
         metaEnabled: metaEnabled === true || metaEnabled === 'true',
+        deductBalance: deductBalance !== undefined ? (deductBalance === true || deductBalance === 'true') : undefined,
         customFeatures,
         currency
       });
@@ -88,6 +89,15 @@ class AdminController {
         phoneNumber, metaPhoneNumberId, metaWabaId, metaAccessToken, metaAppSecret, displayPhoneNumber, name
       });
       res.json({ success: true, data: channel });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async testMetaConnection(req, res, next) {
+    try {
+      const result = await adminService.testMetaConnection(req.params.id, req.params.channelId);
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

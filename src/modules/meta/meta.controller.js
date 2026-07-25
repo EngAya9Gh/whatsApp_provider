@@ -303,10 +303,30 @@ class MetaController {
               }
 
               // Find and update the log entry by metaMessageId (wamid)
+              // First, fetch the message log to see if it belongs to a campaign
+              const msgLog = await prisma.messageLog.findFirst({
+                where: { metaMessageId: wamid },
+                select: { campaignId: true, phone: true }
+              });
+
               await prisma.messageLog.updateMany({
                 where: { metaMessageId: wamid },
                 data: updateData
               });
+
+              // If this message was part of a campaign and it failed, update the CampaignTarget
+              if (msgLog && msgLog.campaignId && status === 'failed') {
+                await prisma.campaignTarget.updateMany({
+                  where: { 
+                    campaignId: msgLog.campaignId, 
+                    phone: msgLog.phone 
+                  },
+                  data: { 
+                    status: 'FAILED',
+                    error: updateData.errorMessage 
+                  }
+                });
+              }
 
             } catch (statusError) {
               logger.error(`[MetaWebhook] Status update error for wamid ${wamid}`, statusError.message);

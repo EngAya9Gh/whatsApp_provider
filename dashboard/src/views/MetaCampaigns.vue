@@ -21,26 +21,53 @@
       <p class="text-slate-500 mt-2">Start your first official Meta campaign.</p>
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="campaign in campaigns" :key="campaign.id" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-        <div class="flex justify-between items-start mb-4">
-          <h3 class="font-bold text-slate-900 text-lg m-0">{{ campaign.name }}</h3>
-          <span :class="getStatusClass(campaign.status)" class="px-2.5 py-1 rounded-full text-xs font-bold border">{{ campaign.status }}</span>
-        </div>
-        <div class="text-sm text-slate-600 mb-2">
-          <strong>Category:</strong> {{ campaign.metaCategory || 'Unknown' }}
-        </div>
-        <div class="text-sm text-slate-600 mb-2">
-          <strong>Date:</strong> {{ new Date(campaign.createdAt).toLocaleDateString() }}
-        </div>
-        <div class="flex items-center justify-between text-sm text-slate-600 mb-4 bg-slate-50 p-2 rounded-lg border border-slate-100">
-          <div><strong>Messages:</strong> {{ campaign.totalMessages || 0 }}</div>
-          <div class="font-bold text-orange-600">Cost: ${{ (campaign.totalCost || 0).toFixed(4) }}</div>
-        </div>
-        <router-link :to="`/campaigns/${campaign.id}`" class="block text-center w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-bold text-sm transition-colors no-underline">
-          View Details
-        </router-link>
+    <div v-else class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200">
+              <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Campaign</th>
+              <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
+              <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Category</th>
+              <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Messages / Cost</th>
+              <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+              <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="campaign in campaigns" :key="campaign.id" class="hover:bg-slate-50 transition-colors">
+              <td class="p-4">
+                <div class="font-bold text-slate-900 text-sm mb-1">{{ campaign.name }}</div>
+              </td>
+              <td class="p-4 text-sm text-slate-600">
+                {{ new Date(campaign.createdAt).toLocaleDateString() }}
+              </td>
+              <td class="p-4 text-sm text-slate-600">
+                {{ campaign.metaCategory || 'Unknown' }}
+              </td>
+              <td class="p-4">
+                <div class="text-sm font-medium text-slate-700">{{ campaign.totalMessages || 0 }} Messages</div>
+                <div class="text-xs font-bold text-orange-600 mt-1">${{ (campaign.totalCost || 0).toFixed(4) }}</div>
+              </td>
+              <td class="p-4">
+                <span :class="getStatusClass(campaign.status)" class="px-2.5 py-1 rounded-full text-xs font-bold border">{{ campaign.status }}</span>
+              </td>
+              <td class="p-4 text-right">
+                <router-link :to="`/campaigns/${campaign.id}`" class="inline-block bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 py-1.5 px-3 rounded-lg font-bold text-xs transition-colors no-underline">
+                  View Details
+                </router-link>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="totalPages >= 1" class="flex justify-center items-center gap-4 mt-8">
+      <button :disabled="page === 1" @click="page--; fetchCampaigns()" class="px-4 py-2 border border-slate-300 rounded-lg disabled:opacity-50 hover:bg-slate-50 transition-colors font-bold text-slate-700 bg-white cursor-pointer">&larr; Prev</button>
+      <span class="text-slate-600 font-medium">Page <strong class="text-slate-900">{{ page }}</strong> of <strong class="text-slate-900">{{ totalPages }}</strong></span>
+      <button :disabled="page === totalPages || totalPages === 0" @click="page++; fetchCampaigns()" class="px-4 py-2 border border-slate-300 rounded-lg disabled:opacity-50 hover:bg-slate-50 transition-colors font-bold text-slate-700 bg-white cursor-pointer">Next &rarr;</button>
     </div>
 
     <!-- Create Modal -->
@@ -125,6 +152,8 @@ const metaTemplates = ref([])
 const loading = ref(false)
 const showCreateModal = ref(false)
 const isSubmitting = ref(false)
+const page = ref(1)
+const totalPages = ref(1)
 
 const form = ref({
   name: '',
@@ -136,10 +165,13 @@ const fetchCampaigns = async () => {
   loading.value = true;
   const token = localStorage.getItem('token')
   try {
-    const res = await axios.get('/api/v1/campaigns', {
+    const res = await axios.get(`/api/v1/campaigns?page=${page.value}&campaignType=META`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    campaigns.value = res.data.data.filter(c => c.campaignType === 'META')
+    campaigns.value = res.data.data
+    if (res.data.meta) {
+      totalPages.value = res.data.meta.totalPages || 1
+    }
   } catch (err) {
     console.error(err)
   } finally {

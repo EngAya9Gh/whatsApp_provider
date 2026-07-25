@@ -93,6 +93,19 @@
             <span class="filter-dot"></span>
             {{ status === 'ALL' ? 'All Numbers' : status }}
           </button>
+          
+          <template v-if="campaignStats && campaignStats.errorBreakdown">
+            <button 
+              v-for="(count, errStr) in campaignStats.errorBreakdown"
+              :key="errStr"
+              :class="['filter-pill', 'failed', { active: targetStatus === errStr }]"
+              @click="targetStatus = errStr; targetPage = 1; fetchTargets()"
+              title="Filter by this specific error"
+            >
+              <span class="filter-dot"></span>
+              {{ errStr }} ({{ count }})
+            </button>
+          </template>
         </div>
 
         <div class="actions-group">
@@ -189,7 +202,38 @@
       </div>
 
       <div class="filters-bar" style="margin-top: 2rem;">
-        <div class="actions-group" style="width: 100%; justify-content: space-between;">
+        <div class="quick-filters" v-if="interactionStats">
+          <button 
+            :class="['filter-pill', 'all', { active: interactionStatus === 'ALL' }]"
+            @click="interactionStatus = 'ALL'; interactionPage = 1; fetchInteractions()"
+          >
+            <span class="filter-dot"></span>
+            All Interactions
+          </button>
+          
+          <button 
+            v-if="interactionStats.notInteracted > 0"
+            :class="['filter-pill', 'no-response', { active: interactionStatus === 'NO_RESPONSE' }]"
+            @click="interactionStatus = 'NO_RESPONSE'; interactionPage = 1; fetchInteractions()"
+          >
+            <span class="filter-dot"></span>
+            No Response ({{ interactionStats.notInteracted }})
+          </button>
+
+          <template v-if="interactionStats.buttonBreakdown">
+            <button 
+              v-for="(count, btnText) in interactionStats.buttonBreakdown" 
+              :key="btnText"
+              :class="['filter-pill', 'completed', { active: interactionStatus === btnText }]"
+              @click="interactionStatus = btnText; interactionPage = 1; fetchInteractions()"
+            >
+              <span class="filter-dot"></span>
+              {{ btnText }} ({{ count }})
+            </button>
+          </template>
+        </div>
+
+        <div class="actions-group" style="flex: 1; justify-content: flex-end;">
           <div class="search-box">
             <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             <input v-model="interactionSearch" @keyup.enter="fetchInteractions" type="text" placeholder="Search phone number..." class="form-input" />
@@ -350,7 +394,8 @@ const fetchInteractions = async () => {
       params: {
         page: interactionPage.value,
         limit: 20,
-        search: interactionSearch.value
+        search: interactionSearch.value,
+        status: interactionStatus.value
       },
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
@@ -388,6 +433,9 @@ const exportData = (type) => {
   let url = `/api/v1/campaigns/${campaignId}/export?type=${type}`
   if (type === 'targets' && targetStatus.value !== 'ALL') {
     url += `&status=${targetStatus.value}`
+  }
+  if (type === 'interactions' && interactionStatus.value !== 'ALL') {
+    url += `&status=${interactionStatus.value}`
   }
   
   axios.get(url, {

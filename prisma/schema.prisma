@@ -30,6 +30,7 @@ model Tenant {
   webhookUrl       String?           @map("webhook_url") @db.Text
   webhookEvents    Json?             @map("webhook_events")
   walletBalance    Float             @default(0) @map("wallet_balance")
+  deductBalance    Boolean           @default(true) @map("deduct_balance")
   currency         String            @default("SAR")
   monthlyLimit     Int               @default(20) @map("monthly_limit")
   metaEnabled      Boolean           @default(false) @map("meta_enabled")
