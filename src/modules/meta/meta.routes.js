@@ -36,9 +36,11 @@ function captureRawBody(req, res, buf) {
  * Check if Meta Cloud API feature is enabled for this tenant.
  */
 const requireMetaEnabled = (req, res, next) => {
+  const custom = req.tenant?.customFeatures || {};
+  const hasAnyMetaFeature = Object.keys(custom).some(k => k.startsWith('META_') && custom[k] === true);
   const allowed = req.tenant && (
     req.tenant.metaEnabled === true ||
-    (req.tenant.customFeatures && req.tenant.customFeatures.META_API === true)
+    hasAnyMetaFeature
   );
   if (allowed) {
     next();

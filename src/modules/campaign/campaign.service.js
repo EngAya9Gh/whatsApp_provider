@@ -23,10 +23,23 @@ class CampaignService {
       lines.forEach(line => {
         if (!line.trim()) return;
         const delimiter = line.includes(';') ? ';' : ',';
-        const parts = line.split(delimiter);
-        const phone = parts[0]?.replace(/[^0-9]/g, '');
-        if (phone && phone.length >= 8 && phone.length <= 18) {
-          const variables = isMeta ? parts.slice(1).map(v => v?.trim() || '') : [];
+        const parts = line.split(delimiter).map(v => v.trim());
+        
+        let phone = null;
+        let phoneIndex = -1;
+        // Find the first column that looks like a phone number
+        for (let i = 0; i < parts.length; i++) {
+          const clean = parts[i].replace(/[^0-9]/g, '');
+          if (clean && clean.length >= 8 && clean.length <= 18) {
+            phone = clean;
+            phoneIndex = i;
+            break;
+          }
+        }
+
+        if (phone) {
+          // variables are all other columns (or just the ones after phone, but better to just exclude the phone itself)
+          const variables = isMeta ? parts.filter((_, idx) => idx !== phoneIndex) : [];
           records.push({ phone, variables });
         }
       });
@@ -40,9 +53,21 @@ class CampaignService {
       if (data.length > 0) logger.info(`First row: ${JSON.stringify(data[0])}`);
       
       data.forEach(row => {
-        const phone = row[0]?.toString().replace(/[^0-9]/g, '');
-        if (phone && phone.length >= 8 && phone.length <= 18) {
-          const variables = isMeta ? row.slice(1).map(v => v?.toString() || '') : [];
+        let phone = null;
+        let phoneIndex = -1;
+        
+        for (let i = 0; i < row.length; i++) {
+          const val = row[i]?.toString() || '';
+          const clean = val.replace(/[^0-9]/g, '');
+          if (clean && clean.length >= 8 && clean.length <= 18) {
+            phone = clean;
+            phoneIndex = i;
+            break;
+          }
+        }
+
+        if (phone) {
+          const variables = isMeta ? row.filter((_, idx) => idx !== phoneIndex).map(v => v?.toString() || '') : [];
           records.push({ phone, variables });
         }
       });

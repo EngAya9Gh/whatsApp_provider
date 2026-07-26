@@ -11,8 +11,8 @@
         </p>
       </div>
       <button
-        @click="showModal = true; editingRule = null; resetForm()"
-        :disabled="!selectedChannel"
+        @click="openModal()"
+        :disabled="!activeMetaChannelId"
         class="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-bold shadow transition-colors cursor-pointer border-none flex items-center gap-2"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -20,18 +20,9 @@
       </button>
     </div>
 
-    <!-- Channel Selector -->
-    <div class="bg-white border border-slate-200 rounded-2xl p-5 mb-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-4">
-      <div class="flex-1">
-        <label class="block text-sm font-bold text-slate-700 mb-1">Meta Channel</label>
-        <select v-model="selectedChannel" @change="fetchRules" class="w-full p-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none">
-          <option value="">— Select a Meta Channel —</option>
-          <option v-for="ch in channels" :key="ch.id" :value="ch.id">
-            +{{ ch.phoneNumber || ch.displayPhoneNumber }} {{ ch.name ? '(' + ch.name + ')' : '' }}
-          </option>
-        </select>
-      </div>
-      <div v-if="selectedChannel" class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 font-semibold self-end sm:self-center whitespace-nowrap">
+    <!-- Stats -->
+    <div v-if="activeMetaChannelId" class="bg-white border border-slate-200 rounded-2xl p-5 mb-6 shadow-sm flex items-center justify-between">
+      <div class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 font-semibold whitespace-nowrap">
         ✅ {{ rules.length }} rule{{ rules.length !== 1 ? 's' : '' }} configured
       </div>
     </div>
@@ -45,10 +36,10 @@
     </div>
 
     <!-- Empty State -->
-    <div v-if="!selectedChannel" class="text-center py-20 bg-white rounded-2xl border border-slate-200">
-      <div class="text-6xl mb-4">📱</div>
-      <h3 class="text-xl font-bold text-slate-700 mb-2">Select a Meta Channel</h3>
-      <p class="text-slate-400">Choose a channel above to manage its auto-reply rules.</p>
+    <div v-if="!activeMetaChannelId" class="text-center py-20 bg-white rounded-2xl border border-slate-200">
+      <div class="text-5xl mb-4 opacity-50">🤖</div>
+      <h3 class="text-xl font-bold text-slate-700">No Channel Selected</h3>
+      <p class="text-slate-500 mt-2">Please select a Meta Channel from the left sidebar to manage its Auto Replies.</p>
     </div>
 
     <!-- Loading -->
@@ -249,7 +240,7 @@
             <!-- Footer Actions -->
             <div class="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 sticky bottom-0 md:rounded-br-2xl">
               <button @click="showModal = false" class="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors bg-transparent border-none cursor-pointer">إلغاء</button>
-              <button @click="saveRule" :disabled="saving" class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2.5 rounded-xl font-bold shadow transition-colors disabled:opacity-50 border-none cursor-pointer flex items-center gap-2">
+              <button @click="saveRule" :disabled="saving || !activeMetaChannelId" class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2.5 rounded-xl font-bold shadow transition-colors disabled:opacity-50 border-none cursor-pointer flex items-center gap-2">
                 <div v-if="saving" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 {{ editingRule ? 'حفظ التعديلات' : 'إنشاء القاعدة' }}
               </button>
@@ -262,11 +253,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import axios from 'axios'
+import { useMetaChannel } from '../composables/useMetaChannel'
 
-const channels = ref([])
-const selectedChannel = ref('')
+const { activeMetaChannelId } = useMetaChannel()
 const rules = ref([])
 const metaTemplates = ref([])
 const loading = ref(false)
@@ -308,23 +299,15 @@ const responseTypeIcon = (type) => {
   return found ? found.icon : '💬'
 }
 
-const fetchChannels = async () => {
-  try {
-    const res = await axios.get('/api/v1/meta/channels')
-    channels.value = res.data.data || []
-    if (channels.value.length === 1) {
-      selectedChannel.value = channels.value[0].id
-      fetchRules()
-    }
-  } catch (e) { console.error(e) }
-}
-
 const fetchRules = async () => {
-  if (!selectedChannel.value) return
+  if (!activeMetaChannelId.value) return
   loading.value = true
   error.value = ''
+  const token = localStorage.getItem('token')
   try {
-    const res = await axios.get(`/api/v1/meta/channel/${selectedChannel.value}/autoresponders`)
+    const res = await axios.get(`/api/v1/meta/channel/${activeMetaChannelId.value}/autoresponders`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
     rules.value = res.data.data || []
   } catch (e) {
     error.value = 'Failed to load rules. Please try again.'
@@ -334,16 +317,23 @@ const fetchRules = async () => {
 }
 
 const fetchMetaTemplates = async () => {
-  if (!selectedChannel.value) return
+  if (!activeMetaChannelId.value) return
+  const token = localStorage.getItem('token')
   try {
-    const res = await axios.get(`/api/v1/meta/channel/${selectedChannel.value}/meta-templates`)
+    const res = await axios.get(`/api/v1/meta/channel/${activeMetaChannelId.value}/meta-templates`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
     const raw = res.data.data?.data || []
     metaTemplates.value = raw.filter(t => t.status === 'APPROVED')
   } catch (e) { console.error('Failed to load templates', e) }
 }
 
+watch(activeMetaChannelId, () => {
+  fetchRules()
+}, { immediate: true })
+
 watch(() => form.value.responseType, (newVal) => {
-  if (newVal === 'META_TEMPLATE' && selectedChannel.value) fetchMetaTemplates()
+  if (newVal === 'META_TEMPLATE' && activeMetaChannelId.value) fetchMetaTemplates()
 })
 
 const editRule = (rule) => {
@@ -372,6 +362,7 @@ const saveRule = async () => {
   if (form.value.responseType === 'META_TEMPLATE' && !form.value.metaTemplateKey) { modalError.value = 'Please select a template.'; return }
 
   const [metaTemplateName, metaTemplateLang] = form.value.metaTemplateKey ? form.value.metaTemplateKey.split('||') : [null, null]
+  const token = localStorage.getItem('token')
 
   const payload = {
     keyword: form.value.keyword.trim(),
@@ -389,10 +380,14 @@ const saveRule = async () => {
   saving.value = true
   try {
     if (editingRule.value) {
-      await axios.put(`/api/v1/meta/channel/${selectedChannel.value}/autoresponders/${editingRule.value.id}`, payload)
+      await axios.put(`/api/v1/meta/channel/${activeMetaChannelId.value}/autoresponders/${editingRule.value.id}`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
       success.value = 'Rule updated successfully!'
     } else {
-      await axios.post(`/api/v1/meta/channel/${selectedChannel.value}/autoresponders`, payload)
+      await axios.post(`/api/v1/meta/channel/${activeMetaChannelId.value}/autoresponders`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
       success.value = 'Rule created successfully!'
     }
     showModal.value = false
@@ -407,8 +402,11 @@ const saveRule = async () => {
 
 const deleteRule = async (id) => {
   if (!confirm('Delete this auto reply rule?')) return
+  const token = localStorage.getItem('token')
   try {
-    await axios.delete(`/api/v1/meta/channel/${selectedChannel.value}/autoresponders/${id}`)
+    await axios.delete(`/api/v1/meta/channel/${activeMetaChannelId.value}/autoresponders/${id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
     rules.value = rules.value.filter(r => r.id !== id)
     success.value = 'Rule deleted.'
     setTimeout(() => { success.value = '' }, 3000)
@@ -418,13 +416,18 @@ const deleteRule = async (id) => {
 }
 
 const toggleActive = async (rule) => {
+  const token = localStorage.getItem('token')
   try {
-    await axios.patch(`/api/v1/meta/channel/${selectedChannel.value}/autoresponders/${rule.id}/active`, { isActive: !rule.isActive })
+    await axios.patch(`/api/v1/meta/channel/${activeMetaChannelId.value}/autoresponders/${rule.id}/active`, { isActive: !rule.isActive }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
     rule.isActive = !rule.isActive
   } catch (e) {
     error.value = 'Failed to toggle rule status.'
   }
 }
 
-onMounted(fetchChannels)
+onMounted(() => {
+  // We rely on the watch to fetch rules when activeMetaChannelId changes
+})
 </script>

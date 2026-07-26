@@ -36,7 +36,8 @@ class MetaTemplateService {
         `${GRAPH_API_BASE}/${channel.metaWabaId}/message_templates`,
         {
           params,
-          headers: { 'Authorization': `Bearer ${channel.metaAccessToken}` }
+          headers: { 'Authorization': `Bearer ${channel.metaAccessToken}` },
+          timeout: 8000
         }
       );
       return res.data;

@@ -144,9 +144,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import axios from 'axios'
+import { useMetaChannel } from '../composables/useMetaChannel'
 
+const { activeMetaChannelId } = useMetaChannel()
 const campaigns = ref([])
 const metaTemplates = ref([])
 const loading = ref(false)
@@ -165,7 +167,12 @@ const fetchCampaigns = async () => {
   loading.value = true;
   const token = localStorage.getItem('token')
   try {
-    const res = await axios.get(`/api/v1/campaigns?page=${page.value}&campaignType=META`, {
+    // Optionally filter campaigns by activeMetaChannelId if backend supports it
+    let url = `/api/v1/campaigns?page=${page.value}&campaignType=META`
+    if (activeMetaChannelId.value) {
+      url += `&channelId=${activeMetaChannelId.value}`
+    }
+    const res = await axios.get(url, {
       headers: { Authorization: `Bearer ${token}` }
     })
     campaigns.value = res.data.data
@@ -179,13 +186,21 @@ const fetchCampaigns = async () => {
   }
 }
 
+watch(activeMetaChannelId, () => {
+  fetchCampaigns()
+  if (showCreateModal.value) {
+    fetchTemplates()
+  }
+})
+
 const fetchTemplates = async () => {
+  if (!activeMetaChannelId.value) return;
   const token = localStorage.getItem('token')
   try {
-    const res = await axios.get('/api/v1/meta/templates', {
+    const res = await axios.get(`/api/v1/meta/channel/${activeMetaChannelId.value}/meta-templates`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    metaTemplates.value = res.data.data.filter(t => t.status === 'APPROVED')
+    metaTemplates.value = (res.data.data?.data || []).filter(t => t.status === 'APPROVED')
   } catch (err) {
     console.error('Failed to fetch meta templates', err)
   }
@@ -202,10 +217,12 @@ const getStatusClass = (status) => {
 }
 
 const openModal = () => {
-  showCreateModal.value = true
-  if (metaTemplates.value.length === 0) {
-    fetchTemplates()
+  if (!activeMetaChannelId.value) {
+    alert('Please select a Meta channel from the sidebar first.')
+    return
   }
+  showCreateModal.value = true
+  fetchTemplates()
 }
 
 const closeModal = () => {
@@ -219,14 +236,19 @@ const createCampaign = async () => {
     return
   }
   
+  if (!activeMetaChannelId.value) {
+    alert('Please select a Meta channel from the sidebar first.')
+    return
+  }
+  
   isSubmitting.value = true
   const token = localStorage.getItem('token')
   const formData = new FormData()
   formData.append('name', form.value.name)
   formData.append('campaignType', 'META')
   formData.append('templateName', form.value.templateName)
+  formData.append('channelId', activeMetaChannelId.value) // Pass the selected channel
   
-  // We need the Meta Category. We can find it from the selected template.
   const tpl = metaTemplates.value.find(t => t.name === form.value.templateName)
   if (tpl) {
     formData.append('metaCategory', tpl.category)

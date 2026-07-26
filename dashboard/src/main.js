@@ -5,6 +5,16 @@ import router from './router'
 import i18n from './i18n'
 import axios from 'axios'
 
+// Global error tracking for debugging
+window.onerror = function (msg, url, lineNo, columnNo, error) {
+  fetch('http://localhost:8888/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'window.onerror', msg, url, lineNo, columnNo, stack: error?.stack })
+  }).catch(e => {})
+  return false;
+};
+
 // Global request interceptor to include Authorization header
 axios.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
@@ -32,6 +42,14 @@ axios.interceptors.response.use(
 const app = createApp(App)
 app.use(router)
 app.use(i18n)
+
+app.config.errorHandler = (err, instance, info) => {
+  fetch('http://localhost:8888/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'vue.errorHandler', msg: err.message, info, stack: err.stack })
+  }).catch(e => {})
+}
 
 app.config.globalProperties.$hasFeature = (feature) => {
   try {

@@ -30,12 +30,15 @@ class MetaProfileController {
       const url = `${GRAPH_API_BASE}/${channel.metaPhoneNumberId}/whatsapp_business_profile`;
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${channel.metaAccessToken}` },
-        params: { fields: 'about,address,description,email,profile_picture_url,websites,vertical,messaging_product' }
+        params: { fields: 'about,address,description,email,profile_picture_url,websites,vertical,messaging_product' },
+        timeout: 8000
       });
-      res.json({ success: true, data: response.data.data?.[0] || response.data });
+      const profileData = response.data.data?.[0] || response.data || {};
+      res.json({ success: true, data: profileData });
     } catch (err) {
       logger.error('[MetaProfile] getProfile error', err.response?.data || err.message);
-      next(err.response?.data || err);
+      const msg = err.response?.data?.error?.message || err.message || 'Failed to fetch business profile from Meta';
+      res.status(400).json({ success: false, message: msg, data: {} });
     }
   }
 

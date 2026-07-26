@@ -5,29 +5,20 @@
         <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Meta Templates</h2>
         <p class="text-slate-500 font-medium text-lg">Manage official WhatsApp message templates directly with Meta.</p>
       </div>
-      <button v-if="selectedChannel" @click="showCreateModal = true" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-sm transition-all hover:-translate-y-0.5 border-none cursor-pointer">
-        + Create Template
+      <button v-if="activeMetaChannelId" @click="showCreateModal = true" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-sm transition-all hover:-translate-y-0.5 border-none cursor-pointer">
+        + إنشاء قالب
       </button>
     </div>
 
-    <!-- Meta Channel Selector -->
-    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8 flex items-center gap-4">
-      <div class="font-bold text-slate-700">Select Meta Channel:</div>
-      <select v-model="selectedChannel" @change="fetchTemplates" class="flex-1 max-w-md p-2.5 border border-slate-300 rounded-lg bg-slate-50 font-mono text-slate-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none">
-        <option value="" disabled>-- Select a channel --</option>
-        <option v-for="channel in metaChannels" :key="channel.id" :value="channel.id">
-          {{ channel.displayPhoneNumber }} ({{ channel.name || 'Meta Cloud' }})
-        </option>
-      </select>
-    </div>
-
-    <div v-if="!selectedChannel" class="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+    <div v-if="!activeMetaChannelId" class="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
       <div class="text-4xl mb-4">📱</div>
       <h3 class="text-xl font-bold text-slate-700">No Channel Selected</h3>
-      <p class="text-slate-500 mt-2">Please select a Meta Cloud channel from the dropdown above to view its templates.</p>
+      <p class="text-slate-500 mt-2">Please select a Meta Cloud channel from the left sidebar to view its templates.</p>
     </div>
 
     <div v-else>
+      <div v-if="error" class="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl font-semibold text-sm mb-6">⚠️ {{ error }}</div>
+
       <div v-if="loading" class="text-center py-12">
         <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent"></div>
         <p class="mt-4 text-slate-500 font-medium">Loading templates from Meta...</p>
@@ -275,7 +266,7 @@
             <!-- Footer Actions -->
             <div class="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 sticky bottom-0">
               <button @click="showCreateModal = false" class="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors bg-transparent border-none cursor-pointer">إلغاء</button>
-              <button @click="createTemplate" :disabled="creating" class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2.5 rounded-xl font-bold shadow-sm transition-colors disabled:opacity-50 border-none cursor-pointer flex items-center gap-2">
+              <button @click="submitTemplate" :disabled="creating" class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2.5 rounded-xl font-bold shadow-sm transition-colors disabled:opacity-50 border-none cursor-pointer flex items-center gap-2">
                 <div v-if="creating" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 إرسال إلى Meta للمراجعة
               </button>
@@ -288,15 +279,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import axios from 'axios'
+import { useMetaChannel } from '../composables/useMetaChannel'
 
-const metaChannels = ref([])
-const selectedChannel = ref('')
+const { activeMetaChannelId } = useMetaChannel()
 const templates = ref([])
-const loading = ref(false)
+const loading = ref(true)
 const showCreateModal = ref(false)
 const creating = ref(false)
+const error = ref('')
 
 const form = ref({
   name: '',
@@ -330,14 +322,14 @@ const removeButton = (idx) => {
 // Handle header file upload to Meta
 const handleHeaderFileChange = async (e) => {
   const file = e.target.files?.[0];
-  if (!file || !selectedChannel.value) return;
+  if (!file || !activeMetaChannelId.value) return;
   uploadingHeader.value = true;
   form.value.headerMediaId = '';
   const token = localStorage.getItem('token');
   try {
     const fd = new FormData();
     fd.append('file', file);
-    const res = await axios.post(`/api/v1/meta/channel/${selectedChannel.value}/upload-media`, fd, {
+    const res = await axios.post(`/api/v1/meta/channel/${activeMetaChannelId.value}/upload-media`, fd, {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
     });
     form.value.headerMediaId = res.data.mediaId;
@@ -349,82 +341,79 @@ const handleHeaderFileChange = async (e) => {
   }
 }
 
-const fetchMetaChannels = async () => {
-  const token = localStorage.getItem('token')
-  try {
-    const res = await axios.get('/api/v1/meta/channels', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    metaChannels.value = res.data.data || []
-    if (metaChannels.value.length === 1) {
-      selectedChannel.value = metaChannels.value[0].id
-      fetchTemplates()
-    }
-  } catch (err) {
-    console.error('Failed to fetch channels', err)
-  }
-}
-
 const fetchTemplates = async () => {
-  if (!selectedChannel.value) return;
+  if (!activeMetaChannelId.value) {
+    templates.value = [];
+    loading.value = false;
+    return;
+  }
   loading.value = true;
+  error.value = '';
   const token = localStorage.getItem('token')
   try {
-    const res = await axios.get(`/api/v1/meta/channel/${selectedChannel.value}/meta-templates`, {
-      headers: { Authorization: `Bearer ${token}` }
+    const res = await axios.get(`/api/v1/meta/channel/${activeMetaChannelId.value}/meta-templates`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 5000
     })
-    // Meta returns templates in an object { data: [...] }
-    templates.value = res.data.data?.data || []
+    const rawData = res.data.data?.data || res.data.data || []
+    templates.value = Array.isArray(rawData) ? rawData : []
   } catch (err) {
     console.error('Failed to fetch templates', err)
-    alert('Failed to load templates from Meta. Please check your token.')
+    error.value = err.response?.data?.message || 'Failed to load templates from Meta. Please check your Meta Access Token.';
+    templates.value = []
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
-const createTemplate = async () => {
-  if (!form.value.name || !form.value.body) {
-    alert('Name and body are required');
-    return;
-  }
+watch(activeMetaChannelId, () => {
+  fetchTemplates()
+}, { immediate: true })
 
-  // Ensure variables length matches count
-  const requiredVarsCount = countVariables(form.value.body);
-  const vars = form.value.bodyVariables.slice(0, requiredVarsCount);
-  if (requiredVarsCount > 0 && vars.filter(v => v).length !== requiredVarsCount) {
-    alert('Please provide example values for all variables.');
-    return;
-  }
+const countVariables = (text) => {
+  const matches = text.match(/\{\{(\d+)\}\}/g)
+  if (!matches) return 0
+  const numbers = matches.map(m => parseInt(m.replace(/[^0-9]/g, '')))
+  return Math.max(...numbers)
+}
 
-  creating.value = true;
+const submitTemplate = async () => {
+  if (!activeMetaChannelId.value) return;
+  if (!form.value.name) return alert('Name required')
+  if (!form.value.body) return alert('Body required')
+  
+  creating.value = true
   const token = localStorage.getItem('token')
   try {
-    await axios.post(`/api/v1/meta/channel/${selectedChannel.value}/meta-templates`, {
+    await axios.post(`/api/v1/meta/channel/${activeMetaChannelId.value}/meta-templates`, {
       name: form.value.name,
       language: form.value.language,
       category: form.value.category,
       headerType: form.value.headerType || undefined,
       headerText: form.value.headerType === 'TEXT' ? form.value.headerText : undefined,
-      // Use media_id if uploaded, otherwise URL from headerExample
-      headerExample: form.value.headerMediaId || form.value.headerExample || undefined,
+      headerExample: form.value.headerType ? form.value.headerExample : undefined,
+      headerMediaId: (form.value.headerType !== 'TEXT' && headerInputMode.value === 'upload') ? form.value.headerMediaId : undefined,
       body: form.value.body,
-      bodyVariables: requiredVarsCount > 0 ? vars : undefined,
-      footer: form.value.footer,
+      bodyVariables: form.value.bodyVariables.filter(Boolean),
+      footer: form.value.footer || undefined,
       buttons: form.value.buttons.length > 0 ? form.value.buttons : undefined
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })
     
-    showCreateModal.value = false;
-    form.value = { name: '', language: 'en_US', category: 'UTILITY', headerType: '', headerText: '', headerExample: '', headerMediaId: '', body: '', bodyVariables: [], footer: '', buttons: [] };
-    headerInputMode.value = 'upload';
-    fetchTemplates();
-    alert('Template submitted successfully! It may take a few minutes for Meta to approve it.');
+    showCreateModal.value = false
+    form.value = {
+      name: '', language: 'en_US', category: 'UTILITY',
+      headerType: '', headerText: '', headerExample: '', headerMediaId: '',
+      body: '', bodyVariables: [], footer: '', buttons: []
+    }
+    fetchTemplates()
+    alert('Template submitted to Meta successfully!')
   } catch (err) {
-    alert(err.response?.data?.error?.message || 'Failed to create template');
+    console.error(err)
+    alert(err.response?.data?.message || err.response?.data?.error?.message || 'Failed to submit template')
   } finally {
-    creating.value = false;
+    creating.value = false
   }
 }
 
@@ -433,7 +422,7 @@ const deleteTemplate = async (name) => {
   
   const token = localStorage.getItem('token')
   try {
-    await axios.delete(`/api/v1/meta/channel/${selectedChannel.value}/meta-templates/${name}`, {
+    await axios.delete(`/api/v1/meta/channel/${activeMetaChannelId.value}/meta-templates/${name}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     fetchTemplates()
@@ -456,17 +445,7 @@ const getStatusClass = (status) => {
   }
 }
 
-const countVariables = (text) => {
-  const matches = text.match(/{{(\d+)}}/g);
-  if (!matches) return 0;
-  // find highest number
-  let max = 0;
-  matches.forEach(m => {
-    const num = parseInt(m.replace(/[{}]/g, ''));
-    if (num > max) max = num;
-  });
-  return max;
-}
+
 
 watch(() => form.value.body, (newBody) => {
   const count = countVariables(newBody);

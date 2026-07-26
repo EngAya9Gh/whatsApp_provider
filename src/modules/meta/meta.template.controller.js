@@ -40,7 +40,9 @@ class MetaTemplateController {
 
       res.status(200).json({ success: true, data });
     } catch (error) {
-      next(error);
+      logger.error('[MetaTemplateController] listTemplates error', error.response?.data || error.message);
+      const msg = error.response?.data?.error?.message || error.message || 'Failed to list Meta templates';
+      res.status(400).json({ success: false, message: msg, data: { data: [] } });
     }
   }
 

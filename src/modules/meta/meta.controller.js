@@ -420,12 +420,13 @@ class MetaController {
         select: {
           id: true,
           providerType: true,
-          phoneNumber: true,      // display phone number
-          metaPhoneNumberId: true, // Meta's internal phone number ID
-          metaWabaId: true,        // WhatsApp Business Account ID
+          phoneNumber: true,
+          displayPhoneNumber: true,
+          name: true,
+          metaPhoneNumberId: true,
+          metaWabaId: true,
           status: true,
           createdAt: true
-          // metaAccessToken is intentionally excluded (sensitive)
         }
       });
       res.status(200).json({ success: true, data: channels });

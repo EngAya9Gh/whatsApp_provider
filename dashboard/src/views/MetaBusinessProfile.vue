@@ -7,23 +7,10 @@
       <p class="text-slate-500 font-medium">تحكم في معلومات نشاطك التجاري التي تظهر لعملائك على واتساب.</p>
     </div>
 
-    <!-- Channel Selector -->
-    <div class="bg-white border border-slate-200 rounded-2xl p-5 mb-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-4">
-      <div class="flex-1">
-        <label class="block text-sm font-bold text-slate-700 mb-1">اختر القناة</label>
-        <select v-model="selectedChannel" @change="loadProfile" class="w-full p-2.5 border border-slate-300 rounded-xl text-sm outline-none focus:border-emerald-500">
-          <option value="">— اختر قناة Meta Cloud —</option>
-          <option v-for="ch in channels" :key="ch.id" :value="ch.id">
-            {{ ch.displayPhoneNumber || ch.phoneNumber }} {{ ch.name ? '(' + ch.name + ')' : '' }}
-          </option>
-        </select>
-      </div>
-    </div>
-
-    <div v-if="!selectedChannel" class="text-center py-20 bg-white rounded-2xl border border-slate-200">
-      <div class="text-6xl mb-4">📱</div>
-      <h3 class="text-xl font-bold text-slate-700 mb-2">اختر قناة أولاً</h3>
-      <p class="text-slate-400">اختر قناة Meta Cloud من القائمة أعلاه لعرض وتعديل ملف أعمالها.</p>
+    <div v-if="!activeMetaChannelId" class="text-center py-20 bg-white rounded-2xl border border-slate-200">
+      <div class="text-5xl mb-4 opacity-50">🏢</div>
+      <h3 class="text-xl font-bold text-slate-700">No Channel Selected</h3>
+      <p class="text-slate-500 mt-2">Please select a Meta Cloud channel from the left sidebar to view its profile.</p>
     </div>
 
     <div v-else-if="loading" class="text-center py-20">
@@ -76,9 +63,9 @@
           <h3 class="text-base font-bold text-slate-800 mb-4">📸 صورة البروفايل</h3>
           <div class="flex items-center gap-5">
             <div class="relative">
-              <img v-if="profile.profile_picture_url" :src="profile.profile_picture_url" class="w-20 h-20 rounded-full object-cover border-4 border-emerald-100 shadow" />
+              <img v-if="profile?.profile_picture_url" :src="profile.profile_picture_url" class="w-20 h-20 rounded-full object-cover border-4 border-emerald-100 shadow" />
               <div v-else class="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-3xl font-bold shadow">
-                {{ (profile.about || '?')[0] }}
+                {{ ((profile && profile.about) || '?')[0] }}
               </div>
               <div v-if="uploadingPhoto" class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
                 <div class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -100,14 +87,14 @@
           <div>
             <label class="block text-sm font-bold text-slate-700 mb-1">عن النشاط <span class="text-slate-400 font-normal text-xs">(يظهر تحت الاسم — 139 حرف أقصى)</span></label>
             <input v-model="form.about" type="text" maxlength="139" placeholder="مثال: نوفر أفضل خدمات التوصيل السريع..." class="w-full p-2.5 border border-slate-300 rounded-xl text-sm outline-none focus:border-emerald-500" />
-            <p class="text-xs text-slate-400 mt-1 text-left">{{ form.about?.length || 0 }}/139</p>
+            <p class="text-xs text-slate-400 mt-1 text-left">{{ (form?.about || '').length }}/139</p>
           </div>
 
           <!-- Description -->
           <div>
             <label class="block text-sm font-bold text-slate-700 mb-1">وصف النشاط <span class="text-slate-400 font-normal text-xs">(512 حرف أقصى)</span></label>
             <textarea v-model="form.description" rows="3" maxlength="512" placeholder="وصف تفصيلي عن خدماتك ومنتجاتك..." class="w-full p-2.5 border border-slate-300 rounded-xl text-sm outline-none focus:border-emerald-500 resize-none"></textarea>
-            <p class="text-xs text-slate-400 mt-1 text-left">{{ form.description?.length || 0 }}/512</p>
+            <p class="text-xs text-slate-400 mt-1 text-left">{{ (form?.description || '').length }}/512</p>
           </div>
 
           <!-- Email & Address in grid -->
@@ -171,11 +158,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import axios from 'axios'
+import { useMetaChannel } from '../composables/useMetaChannel'
 
-const channels = ref([])
-const selectedChannel = ref('')
+const { activeMetaChannelId } = useMetaChannel()
 const loading = ref(false)
 const saving = ref(false)
 const uploadingPhoto = ref(false)
@@ -188,54 +175,62 @@ const form = ref({
   website1: '', website2: '', vertical: ''
 })
 
-const fetchChannels = async () => {
-  try {
-    const res = await axios.get('/api/v1/meta/channels')
-    channels.value = res.data.data || []
-    if (channels.value.length === 1) {
-      selectedChannel.value = channels.value[0].id
-      loadProfile()
-    }
-  } catch (e) { console.error(e) }
-}
+
 
 const loadProfile = async () => {
-  if (!selectedChannel.value) return
+  if (!activeMetaChannelId.value) {
+    loading.value = false
+    return
+  }
   loading.value = true
   error.value = ''
+  const token = localStorage.getItem('token')
   try {
-    const res = await axios.get(`/api/v1/meta/channel/${selectedChannel.value}/profile`)
-    const p = res.data.data || {}
+    const res = await axios.get(`/api/v1/meta/channel/${activeMetaChannelId.value}/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 5000
+    })
+    const raw = res.data.data
+    const p = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {}
     profile.value = p
     form.value = {
       about: p.about || '',
       description: p.description || '',
       email: p.email || '',
       address: p.address || '',
-      website1: (p.websites || [])[0] || '',
-      website2: (p.websites || [])[1] || '',
+      website1: Array.isArray(p.websites) ? p.websites[0] || '' : '',
+      website2: Array.isArray(p.websites) ? p.websites[1] || '' : '',
       vertical: p.vertical || ''
     }
   } catch (e) {
-    error.value = 'تعذّر تحميل البيانات من Meta. تحقق من صحة الـ Access Token.'
+    error.value = e.response?.data?.message || 'تعذّر تحميل البيانات من Meta. تحقق من صحة الـ Access Token.'
   } finally {
     loading.value = false
   }
 }
 
+// We watch the active channel globally
+watch(activeMetaChannelId, () => {
+  loadProfile()
+}, { immediate: true })
+
 const saveProfile = async () => {
   saving.value = true
   error.value = ''
   success.value = ''
+  const token = localStorage.getItem('token')
   try {
     const websites = [form.value.website1, form.value.website2].filter(Boolean)
-    await axios.put(`/api/v1/meta/channel/${selectedChannel.value}/profile`, {
+    await axios.put(`/api/v1/meta/channel/${activeMetaChannelId.value}/profile`, {
+      messaging_product: 'whatsapp',
       about: form.value.about || undefined,
       description: form.value.description || undefined,
       email: form.value.email || undefined,
       address: form.value.address || undefined,
       websites: websites.length ? websites : undefined,
       vertical: form.value.vertical || undefined
+    }, {
+        headers: { Authorization: `Bearer ${token}` }
     })
     success.value = 'تم حفظ التغييرات بنجاح! ستظهر للعملاء خلال بضع دقائق.'
     setTimeout(() => { success.value = '' }, 5000)
@@ -251,11 +246,15 @@ const handlePhotoUpload = async (e) => {
   if (!file) return
   uploadingPhoto.value = true
   error.value = ''
+  const token = localStorage.getItem('token')
   try {
     const fd = new FormData()
     fd.append('photo', file)
-    await axios.post(`/api/v1/meta/channel/${selectedChannel.value}/profile/photo`, fd, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    await axios.post(`/api/v1/meta/channel/${activeMetaChannelId.value}/profile/photo`, fd, {
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data' 
+      }
     })
     success.value = 'تم رفع الصورة بنجاح! قد تستغرق بضع دقائق حتى تظهر.'
     setTimeout(() => { success.value = '' }, 5000)
@@ -268,5 +267,7 @@ const handlePhotoUpload = async (e) => {
   }
 }
 
-onMounted(fetchChannels)
+onMounted(() => {
+  // relying on watch
+})
 </script>

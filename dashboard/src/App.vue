@@ -46,6 +46,7 @@
         <!-- META CLOUD -->
         <template v-if="$hasFeature('META_API') || $hasFeature('META_CAMPAIGN') || $hasFeature('META_AUTORESPONDER')">
           <div class="nav-section-title mt-4 text-emerald-600">Meta Cloud</div>
+          <GlobalMetaSelector />
           <router-link v-if="$hasFeature('META_SEND_MESSAGE')" to="/meta-send-message" class="nav-item" active-class="active">
             <span class="nav-icon">📨</span>
             <span class="nav-label">Send Message</span>
@@ -118,6 +119,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { setLanguage } from './i18n'
+import GlobalMetaSelector from './components/GlobalMetaSelector.vue'
 
 const router = useRouter()
 const route = useRoute()
