@@ -313,9 +313,10 @@ class CampaignService {
     };
   }
 
-  async getCampaigns(tenantId, { page = 1, limit = 50, campaignType } = {}) {
+  async getCampaigns(tenantId, { page = 1, limit = 50, campaignType, channelId } = {}) {
     const where = { tenantId };
     if (campaignType) where.campaignType = campaignType;
+    if (channelId) where.channelId = channelId;
 
     const total = await prisma.campaign.count({ where });
     const data = await prisma.campaign.findMany({

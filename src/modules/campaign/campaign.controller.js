@@ -130,7 +130,8 @@ exports.getCampaigns = async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const campaignType = req.query.campaignType;
-    const campaigns = await campaignService.getCampaigns(tenantId, { page, limit, campaignType });
+    const channelId = req.query.channelId;
+    const campaigns = await campaignService.getCampaigns(tenantId, { page, limit, campaignType, channelId });
     res.status(200).json({ 
       success: true, 
       data: campaigns.data, 

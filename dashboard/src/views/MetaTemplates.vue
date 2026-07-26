@@ -5,9 +5,14 @@
         <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Meta Templates</h2>
         <p class="text-slate-500 font-medium text-lg">Manage official WhatsApp message templates directly with Meta.</p>
       </div>
-      <button v-if="activeMetaChannelId" @click="showCreateModal = true" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-sm transition-all hover:-translate-y-0.5 border-none cursor-pointer">
-        + إنشاء قالب
-      </button>
+      <div v-if="activeMetaChannelId" class="flex gap-3">
+        <button @click="showLibraryModal = true" class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all hover:-translate-y-0.5 cursor-pointer flex items-center gap-2">
+          📚 مكتبة القوالب
+        </button>
+        <button @click="showCreateModal = true" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-sm transition-all hover:-translate-y-0.5 border-none cursor-pointer">
+          + إنشاء قالب
+        </button>
+      </div>
     </div>
 
     <div v-if="!activeMetaChannelId" class="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
@@ -63,6 +68,44 @@
             <button @click="deleteTemplate(template.name)" class="flex-1 bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-lg text-sm font-bold transition-colors border-none cursor-pointer">
               Delete
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Library Modal -->
+    <div v-if="showLibraryModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-8 overflow-y-auto">
+      <div class="bg-white rounded-2xl w-full max-w-6xl shadow-2xl flex flex-col max-h-[85vh]">
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl">
+          <h3 class="text-xl font-bold text-slate-900 m-0">📚 مكتبة القوالب (Template Library)</h3>
+          <button @click="showLibraryModal = false" class="text-slate-400 hover:text-slate-600 bg-transparent border-none text-2xl cursor-pointer leading-none">&times;</button>
+        </div>
+        <div class="p-6 bg-slate-50 flex-1 overflow-y-auto">
+          <!-- Filter -->
+          <div class="flex gap-3 mb-6">
+            <button @click="libraryFilter = 'ALL'" :class="libraryFilter === 'ALL' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'" class="px-4 py-2 rounded-full text-sm font-bold transition-colors border-none cursor-pointer">الكل (All)</button>
+            <button @click="libraryFilter = 'UTILITY'" :class="libraryFilter === 'UTILITY' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'" class="px-4 py-2 rounded-full text-sm font-bold transition-colors border-none cursor-pointer">🔔 Utility</button>
+            <button @click="libraryFilter = 'MARKETING'" :class="libraryFilter === 'MARKETING' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'" class="px-4 py-2 rounded-full text-sm font-bold transition-colors border-none cursor-pointer">📢 Marketing</button>
+            <button @click="libraryFilter = 'AUTHENTICATION'" :class="libraryFilter === 'AUTHENTICATION' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'" class="px-4 py-2 rounded-full text-sm font-bold transition-colors border-none cursor-pointer">🔐 Auth</button>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div v-for="tpl in filteredLibrary" :key="tpl.id" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col hover:shadow-md transition-shadow cursor-pointer" @click="selectLibraryTemplate(tpl)">
+              <div class="mb-4 pb-4 border-b border-slate-100">
+                <h4 class="font-bold text-slate-900 mb-1 text-lg">{{ tpl.title }}</h4>
+                <div class="text-xs text-slate-500 font-medium">{{ tpl.description }}</div>
+              </div>
+              <div class="bg-[#efeae2] p-4 rounded-xl flex-1 relative overflow-hidden">
+                <p class="text-[13px] text-slate-800 whitespace-pre-wrap font-sans leading-relaxed m-0 relative z-10">{{ tpl.formState.bodyText }}</p>
+                <div v-if="tpl.formState.buttons && tpl.formState.buttons.length" class="mt-3 pt-3 border-t border-slate-300/30 flex flex-col gap-2 relative z-10">
+                  <div v-for="btn in tpl.formState.buttons" class="text-center text-[#00a884] font-bold text-sm bg-white/60 py-1.5 rounded-lg">{{ btn.text }}</div>
+                </div>
+              </div>
+              <div class="mt-4 flex justify-between items-center text-emerald-600 text-sm font-bold">
+                <span>استخدام هذا القالب</span>
+                <span>→</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -275,15 +318,42 @@
         </div><!-- end two-col flex -->
       </div><!-- end modal card -->
     </div><!-- end modal overlay -->
+
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import axios from 'axios'
 import { useMetaChannel } from '../composables/useMetaChannel'
+import { metaTemplateLibrary } from '../data/metaTemplateLibrary'
 
-const { activeMetaChannelId } = useMetaChannel()
+const { metaChannels, activeMetaChannelId, fetchMetaChannels } = useMetaChannel()
+
+const showLibraryModal = ref(false)
+const libraryFilter = ref('ALL')
+const filteredLibrary = computed(() => {
+  if (libraryFilter.value === 'ALL') return metaTemplateLibrary;
+  return metaTemplateLibrary.filter(t => t.category === libraryFilter.value);
+})
+
+const selectLibraryTemplate = (tpl) => {
+  form.value = {
+    name: tpl.formState.name,
+    language: tpl.formState.language,
+    category: tpl.formState.category,
+    headerType: tpl.formState.headerType || '',
+    headerText: tpl.formState.headerText || '',
+    headerExample: '',
+    headerMediaId: '',
+    body: tpl.formState.bodyText,
+    bodyVariables: [...(tpl.formState.bodyExamples || [])],
+    footer: tpl.formState.footerText || '',
+    buttons: tpl.formState.buttons ? JSON.parse(JSON.stringify(tpl.formState.buttons)) : []
+  }
+  showLibraryModal.value = false
+  showCreateModal.value = true
+}
 const templates = ref([])
 const loading = ref(true)
 const showCreateModal = ref(false)

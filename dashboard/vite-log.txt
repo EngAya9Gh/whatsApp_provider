@@ -3567,3 +3567,32 @@ AggregateError [ECONNREFUSED]:
 2:49:21 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
     at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
     at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+3:01:11 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+3:06:35 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+3:06:35 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+3:06:35 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+3:06:38 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+3:06:52 PM [vite] (client) [console.error] Failed to load channels AxiosError: Request failed with status code 404
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+3:08:29 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+3:08:29 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+3:08:29 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+3:09:00 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+3:09:02 PM [vite] (client) [console.error] Failed to fetch meta templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+4:54:04 PM [vite] (client) hmr update /src/views/MetaTemplates.vue, /src/tailwind.css
+4:55:05 PM [vite] (client) hmr update /src/views/MetaTemplates.vue, /src/tailwind.css
+4:59:52 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+5:00:28 PM [vite] (client) [console.error] AxiosError: Request failed with status code 500
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
