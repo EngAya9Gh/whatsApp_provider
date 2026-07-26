@@ -3631,3 +3631,20 @@ AggregateError [ECONNREFUSED]:
 7:07:05 PM [vite] (client) [console.error] AxiosError: Request failed with status code 400
     at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
     at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+7:23:12 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+7:24:38 PM [vite] (client) hmr update /src/views/MetaTemplates.vue, /src/tailwind.css
+7:28:56 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+7:28:56 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+7:28:56 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+7:28:57 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+7:30:01 PM [vite] (client) hmr update /src/views/MetaTemplates.vue, /src/tailwind.css
+7:32:13 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+7:32:13 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+7:32:13 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+7:32:16 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)

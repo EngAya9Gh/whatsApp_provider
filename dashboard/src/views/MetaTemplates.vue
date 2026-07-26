@@ -89,21 +89,55 @@
             <button @click="libraryFilter = 'AUTHENTICATION'" :class="libraryFilter === 'AUTHENTICATION' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'" class="px-4 py-2 rounded-full text-sm font-bold transition-colors border-none cursor-pointer">🔐 Auth</button>
           </div>
           
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <div v-for="tpl in filteredLibrary" :key="tpl.id" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col hover:shadow-md transition-shadow cursor-pointer" @click="selectLibraryTemplate(tpl)">
-              <div class="mb-4 pb-4 border-b border-slate-100">
-                <h4 class="font-bold text-slate-900 mb-1 text-lg">{{ tpl.title }}</h4>
-                <div class="text-xs text-slate-500 font-medium">{{ tpl.description }}</div>
-              </div>
-              <div class="bg-[#efeae2] p-4 rounded-xl flex-1 relative overflow-hidden">
-                <p class="text-[13px] text-slate-800 whitespace-pre-wrap font-sans leading-relaxed m-0 relative z-10">{{ tpl.formState.bodyText }}</p>
-                <div v-if="tpl.formState.buttons && tpl.formState.buttons.length" class="mt-3 pt-3 border-t border-slate-300/30 flex flex-col gap-2 relative z-10">
-                  <div v-for="btn in tpl.formState.buttons" class="text-center text-[#00a884] font-bold text-sm bg-white/60 py-1.5 rounded-lg">{{ btn.text }}</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div v-for="tpl in filteredLibrary" :key="tpl.id" 
+                 class="group bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden flex flex-col hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer relative" 
+                 @click="selectLibraryTemplate(tpl)">
+                 
+              <!-- Category Badge & Gradient Header -->
+              <div class="h-32 p-5 relative flex items-start justify-between"
+                   :class="tpl.formState.category === 'MARKETING' ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : tpl.formState.category === 'AUTHENTICATION' ? 'bg-gradient-to-br from-slate-700 to-slate-900' : 'bg-gradient-to-br from-emerald-500 to-teal-600'">
+                <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-30"></div>
+                
+                <span class="relative z-10 px-3 py-1 rounded-full text-xs font-black bg-white/20 text-white backdrop-blur-md shadow-sm border border-white/10 uppercase tracking-wide">
+                  {{ tpl.formState.category }}
+                </span>
+                <div class="relative z-10 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-xl shadow-sm border border-white/10">
+                  {{ tpl.formState.category === 'MARKETING' ? '📢' : tpl.formState.category === 'AUTHENTICATION' ? '🔐' : '🔔' }}
                 </div>
               </div>
-              <div class="mt-4 flex justify-between items-center text-emerald-600 text-sm font-bold">
-                <span>استخدام هذا القالب</span>
-                <span>→</span>
+
+              <!-- Main Content Area -->
+              <div class="p-6 flex-1 flex flex-col -mt-8 relative z-20">
+                <div class="bg-white rounded-2xl p-5 shadow-lg border border-slate-100 flex-1 flex flex-col">
+                  <h4 class="font-extrabold text-slate-900 mb-2 text-xl tracking-tight leading-tight">{{ tpl.title }}</h4>
+                  <p class="text-sm text-slate-500 font-medium mb-4 line-clamp-2 leading-relaxed">{{ tpl.description }}</p>
+                  
+                  <!-- WhatsApp Preview Mockup -->
+                  <div class="bg-[#efeae2] p-4 rounded-2xl flex-1 relative overflow-hidden mt-auto border border-slate-200/50 shadow-inner">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-teal-400"></div>
+                    
+                    <!-- Dummy Image for Marketing -->
+                    <div v-if="tpl.formState.headerType === 'IMAGE'" class="w-full h-32 mb-3 rounded-xl bg-slate-200 overflow-hidden shadow-sm relative border border-slate-300/50">
+                      <img src="https://images.unsplash.com/photo-1557821552-171051530d93?w=400&q=80" alt="Placeholder" class="w-full h-full object-cover" />
+                      <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent"></div>
+                      <span class="absolute bottom-2 left-2 text-[10px] text-white font-bold px-2 py-0.5 bg-black/40 rounded backdrop-blur-sm">Image Placeholder</span>
+                    </div>
+                    
+                    <p class="text-[13px] text-slate-800 whitespace-pre-wrap font-sans leading-relaxed m-0 relative z-10 font-medium">{{ tpl.formState.bodyText }}</p>
+                    <div v-if="tpl.formState.buttons && tpl.formState.buttons.length" class="mt-4 pt-3 border-t border-slate-300/40 flex flex-col gap-2 relative z-10">
+                      <div v-for="btn in tpl.formState.buttons" class="text-center text-[#00a884] font-black text-[13px] bg-white shadow-sm py-2 rounded-xl transition-transform group-hover:scale-[1.02]">{{ btn.text }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Call to action -->
+              <div class="px-6 pb-6 pt-2">
+                <div class="w-full flex justify-center items-center gap-2 bg-slate-900 text-white text-sm font-bold py-3 rounded-xl shadow-md group-hover:bg-emerald-600 group-hover:shadow-emerald-500/30 transition-all duration-300">
+                  <span>استخدام هذا القالب</span>
+                  <span class="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
               </div>
             </div>
           </div>
