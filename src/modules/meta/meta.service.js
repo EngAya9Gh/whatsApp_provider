@@ -177,6 +177,33 @@ class MetaService {
   }
 
   /**
+   * Send WhatsApp Flow interactive message.
+   */
+  async sendFlow(channel, phone, flowId, flowCta, flowBody, flowFooter, flowScreen = null, flowData = {}) {
+    const interactive = {
+      type: 'flow',
+      body: { text: flowBody || 'Please complete the flow' },
+      action: {
+        name: 'flow',
+        parameters: {
+          flow_message_version: "3",
+          flow_token: `token_${Date.now()}`,
+          flow_id: flowId,
+          flow_cta: flowCta || 'Open Flow',
+          flow_action: flowScreen ? 'navigate' : 'navigate',
+          flow_action_payload: {
+            screen: flowScreen || 'START_SCREEN',
+            data: flowData
+          }
+        }
+      }
+    };
+    if (flowFooter) interactive.footer = { text: flowFooter };
+
+    return this.sendMessage(channel, phone, { type: 'interactive', interactive });
+  }
+
+  /**
    * Send interactive list message.
    * Sections: [{ title, rows: [{ id, title, description? }] }]
    * Limits: section title 24 chars, row title 24 chars, row description 72 chars, button text 20 chars

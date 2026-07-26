@@ -104,3 +104,15 @@ exports.sendMetaTemplate = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.sendFlow = async (req, res, next) => {
+  try {
+    const { phone, flowId, flowCta, flowBody, flowFooter, flowScreen, channelId, channel_id } = req.body;
+    const tenantId = req.tenant.id;
+    const resolvedChannelId = channelId || channel_id;
+    const result = await messageService.sendFlowMessage(tenantId, phone, flowId, flowCta, flowBody, flowFooter, flowScreen, resolvedChannelId);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};

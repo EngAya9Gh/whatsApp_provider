@@ -63,6 +63,10 @@
             <span class="nav-icon">🤖</span>
             <span class="nav-label">Meta Auto Reply</span>
           </router-link>
+          <router-link to="/meta-flows" class="nav-item" active-class="active">
+            <span class="nav-icon">🧩</span>
+            <span class="nav-label">WhatsApp Flows</span>
+          </router-link>
           <router-link to="/meta-business-profile" class="nav-item" active-class="active">
             <span class="nav-icon">🏢</span>
             <span class="nav-label">Business Profile</span>

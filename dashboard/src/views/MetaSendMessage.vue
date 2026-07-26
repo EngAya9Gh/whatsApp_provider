@@ -18,6 +18,9 @@
                 <input type="radio" v-model="messageType" value="meta_template" /> Meta Template
               </label>
               <label class="radio-label">
+                <input type="radio" v-model="messageType" value="meta_flow" /> WhatsApp Flow
+              </label>
+              <label class="radio-label">
                 <input type="radio" v-model="messageType" value="text" /> Free-form Text (24h Window)
               </label>
             </div>
@@ -44,6 +47,26 @@
             <label>{{ $t('send_message.message') || 'Message Content' }}</label>
             <textarea v-model="textContent" rows="4" placeholder="Hello, this is a custom message..." required class="form-input"></textarea>
             <small class="hint">Note: You can only send free-form text if the user has messaged you within the last 24 hours.</small>
+          </div>
+
+          <!-- Flow Input -->
+          <div v-if="messageType === 'meta_flow'" class="form-group">
+            <label>Select Meta Flow</label>
+            <div v-if="metaFlows.length === 0" style="color: #64748B; font-size: 0.85rem; margin-bottom: 0.5rem;">
+              Fetching published flows...
+            </div>
+            <select v-model="selectedFlowId" required class="form-input">
+              <option value="" disabled>Choose a published flow...</option>
+              <option v-for="flow in metaFlows" :key="flow.id" :value="flow.id">
+                {{ flow.name }}
+              </option>
+            </select>
+            
+            <label class="mt-4 block mb-1">Button Text (Call to Action)</label>
+            <input type="text" v-model="flowCta" required class="form-input" placeholder="e.g. Open Form" />
+            
+            <label class="mt-4 block mb-1">Initial Screen (Optional)</label>
+            <input type="text" v-model="flowScreen" class="form-input" placeholder="e.g. START_SCREEN" />
           </div>
 
           <div v-if="messageType === 'meta_template'" class="form-group">
@@ -134,6 +157,12 @@ const selectedTemplateId = ref('')
 const templateVariables = ref([])
 const variableValues = ref({})
 
+// Flow refs
+const metaFlows = ref([])
+const selectedFlowId = ref('')
+const flowCta = ref('Open Form')
+const flowScreen = ref('')
+
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
@@ -156,8 +185,17 @@ watch(channelId, async (newId) => {
         metaTemplates.value = res.data.data.data
       }
     } catch(e) {}
+    
+    try {
+      metaFlows.value = []
+      const flowRes = await axios.get(`/api/v1/meta/channel/${newId}/flows`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      })
+      let flowsArray = flowRes.data.data?.data || flowRes.data.data || []
+      metaFlows.value = flowsArray.filter(f => f.status === 'PUBLISHED')
+    } catch(e) {}
   } else {
-    if (messageType.value === 'meta_template') messageType.value = 'text'
+    if (messageType.value === 'meta_template' || messageType.value === 'meta_flow') messageType.value = 'text'
   }
 })
 
@@ -242,6 +280,15 @@ const handleSend = async () => {
         phone: phone.value,
         message: textContent.value,
         channel_id: channelId.value
+      }, config)
+    } else if (messageType.value === 'meta_flow') {
+      if (!selectedFlowId.value) throw new Error('Please select a published flow')
+      res = await axios.post('/api/v1/message/send-flow', {
+        phone: phone.value,
+        flowId: selectedFlowId.value,
+        flowCta: flowCta.value,
+        flowScreen: flowScreen.value,
+        channelId: channelId.value
       }, config)
     } else if (messageType.value === 'buttons') {
       const validButtons = buttonsList.value.filter(b => b.text.trim())

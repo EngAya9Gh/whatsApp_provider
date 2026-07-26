@@ -149,4 +149,17 @@ router.get('/channel/:channelId/profile', metaProfileController.getProfile.bind(
 router.put('/channel/:channelId/profile', metaProfileController.updateProfile.bind(metaProfileController));
 router.post('/channel/:channelId/profile/photo', uploadPhoto.single('photo'), metaProfileController.uploadPhoto.bind(metaProfileController));
 
+
+// ────────────────────────────────────────────────────────────────────────────
+// WhatsApp Flows — Create, Manage, Publish Interactive Flows
+// ────────────────────────────────────────────────────────────────────────────
+const metaFlowController = require('./meta.flow.controller');
+const uploadFlowJson = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // Max 10MB JSON
+
+router.get('/channel/:channelId/flows', metaFlowController.listFlows);
+router.post('/channel/:channelId/flows', metaFlowController.createFlow);
+router.post('/channel/:channelId/flows/:flowId/assets', uploadFlowJson.single('file'), metaFlowController.uploadFlowJson);
+router.post('/channel/:channelId/flows/:flowId/publish', metaFlowController.publishFlow);
+router.delete('/channel/:channelId/flows/:flowId', metaFlowController.deleteFlow);
+
 module.exports = router;

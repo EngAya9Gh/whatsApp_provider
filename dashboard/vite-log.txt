@@ -3596,3 +3596,38 @@ AggregateError [ECONNREFUSED]:
 5:00:28 PM [vite] (client) [console.error] AxiosError: Request failed with status code 500
     at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
     at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+6:40:14 PM [vite] (client) page reload src/router/index.js
+6:40:14 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:40:14 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:40:15 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:40:15 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+6:40:17 PM [vite] (client) page reload src/router/index.js
+6:40:17 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:40:17 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:40:17 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:40:18 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+6:41:55 PM [vite] (client) hmr update /src/App.vue, /src/tailwind.css
+6:41:55 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+6:41:55 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+6:47:47 PM [vite] (client) hmr update /src/views/MetaSendMessage.vue, /src/tailwind.css
+6:48:14 PM [vite] (client) hmr update /src/views/MetaSendMessage.vue, /src/tailwind.css
+7:01:03 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+7:01:03 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+7:01:03 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+7:01:03 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+7:06:27 PM [vite] (client) hmr update /src/views/MetaFlows.vue, /src/tailwind.css
+7:06:29 PM [vite] (client) [console.error] AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+7:07:03 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+7:07:03 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+7:07:03 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+7:07:05 PM [vite] (client) [console.error] AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)

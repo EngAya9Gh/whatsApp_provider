@@ -20,5 +20,6 @@ router.post('/send-buttons', upload.single('image'), messageController.sendButto
 router.post('/send-list', messageController.sendList);
 router.post('/send-location', messageController.sendLocation);
 router.post('/send-meta-template', messageController.sendMetaTemplate);
+router.post('/send-flow', messageController.sendFlow);
 
 module.exports = router;

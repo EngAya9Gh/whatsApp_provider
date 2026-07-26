@@ -114,6 +114,28 @@ class MessageService {
     }
   }
 
+  async sendFlowMessage(tenantId, phone, flowId, flowCta, flowBody, flowFooter, flowScreen = null, channelId = null) {
+    const canSend = await billingService.checkLimit(tenantId);
+    if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
+
+    const channel = await this._getChannel(channelId);
+    try {
+      if (channel && channel.providerType === 'META_CLOUD') {
+        await metaService.sendFlow(channel, phone, flowId, flowCta, flowBody, flowFooter, flowScreen);
+      } else {
+        throw new Error('WhatsApp Flows are only supported on Meta Cloud channels.');
+      }
+      
+      await prisma.messageLog.create({ data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'SENT' } });
+      await billingService.incrementUsage(tenantId, 'sent');
+      return { success: true, message: 'Flow message sent successfully' };
+    } catch (error) {
+      await prisma.messageLog.create({ data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'FAILED', errorMessage: error.message || 'Failed' } });
+      await billingService.incrementUsage(tenantId, 'failed');
+      throw error;
+    }
+  }
+
   async sendListMessage(tenantId, phone, title, body, buttonText, sections, channelId = null) {
     const canSend = await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };

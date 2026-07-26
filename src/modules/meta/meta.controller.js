@@ -120,6 +120,9 @@ class MetaController {
               } else if (interactionType === 'list_reply') {
                 buttonId = msg.interactive.list_reply.id;
                 buttonText = msg.interactive.list_reply.title;
+              } else if (interactionType === 'nfm_reply') {
+                buttonId = 'FLOW_SUBMIT';
+                buttonText = msg.interactive.nfm_reply.response_json || 'Flow Submitted';
               }
 
               if (buttonId) {

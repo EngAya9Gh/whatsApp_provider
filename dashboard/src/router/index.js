@@ -24,6 +24,7 @@ import MetaAutoReply from '../views/MetaAutoReply.vue'
 import MetaSendMessage from '../views/MetaSendMessage.vue'
 import MetaChatbot from '../views/MetaChatbot.vue'
 import MetaBusinessProfile from '../views/MetaBusinessProfile.vue'
+import MetaFlows from '../views/MetaFlows.vue'
 
 const routes = [
   { path: '/login', component: Login, meta: { guest: true } },
@@ -51,6 +52,7 @@ const routes = [
   { path: '/meta-chatbot', component: MetaChatbot, meta: { requiresAuth: true } },
   { path: '/meta-autoreply', component: MetaAutoReply, meta: { requiresAuth: true } },
   { path: '/meta-business-profile', component: MetaBusinessProfile, meta: { requiresAuth: true } },
+  { path: '/meta-flows', component: MetaFlows, meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({
