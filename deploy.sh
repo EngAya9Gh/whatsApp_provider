@@ -2,7 +2,7 @@
 
 echo "Starting Deployment..."
 
-# 1. Update source code (uncomment if needed)
+# 1. Update source code
 git pull origin main
 
 # 2. Install dependencies for root (backend)
@@ -12,8 +12,8 @@ npm install
 # 3. Update database schema & generate Prisma client
 echo "Updating Database..."
 npx prisma generate
-npx prisma db push
-npx prisma db seed
+# Use migrate deploy (safe for production — never drops data, uses migration files)
+npx prisma migrate deploy
 
 # 4. Build Client Dashboard
 echo "Building Client Dashboard..."
@@ -31,8 +31,6 @@ cd ..
 
 # 6. Restart Backend Server
 echo "Restarting Backend Server..."
-# If you are using pm2, uncomment the next line:
 pm2 restart all
 
-echo "Deployment Complete! "
-echo "Note: If you run your server manually without PM2, please stop and start it again so it loads the new database schema."
+echo "Deployment Complete! ✅"
