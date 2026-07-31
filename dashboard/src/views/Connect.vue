@@ -91,8 +91,58 @@
           <small class="block text-slate-400 mt-4 font-medium">* You can change the Verify Token in your .env file (META_VERIFY_TOKEN)</small>
         </div>
   
-        <hr class="border-t border-slate-100 my-6" />
-  
+        <!-- ─── Embedded Signup Button ─── -->
+        <div class="my-6 rounded-2xl overflow-hidden border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50">
+          <div class="p-6">
+            <div class="flex flex-col md:flex-row items-start md:items-center gap-5">
+              <!-- Icon -->
+              <div class="w-14 h-14 rounded-2xl bg-[#1877f2] flex items-center justify-center shrink-0 shadow-lg shadow-blue-300/40">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
+              </div>
+
+              <!-- Text -->
+              <div class="flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                  <h4 class="text-xl font-extrabold text-slate-900 m-0">Connect with Embedded Signup</h4>
+                  <span class="px-2 py-0.5 bg-blue-600 text-white text-[10px] font-black rounded-full uppercase tracking-wide">NEW</span>
+                </div>
+                <p class="text-slate-600 text-sm font-medium leading-relaxed m-0">
+                  اربط حساب WhatsApp Business الخاص بعميلك في دقيقتين عبر نافذة Facebook الرسمية — بدون نسخ ولصق أي بيانات.
+                </p>
+              </div>
+
+              <!-- Button -->
+              <button
+                @click="launchEmbeddedSignup"
+                class="shrink-0 flex items-center gap-3 bg-[#1877f2] hover:bg-[#166fe5] text-white px-6 py-3 rounded-xl font-bold text-base shadow-lg shadow-blue-400/30 hover:shadow-blue-400/50 transition-all hover:-translate-y-0.5 border-none cursor-pointer"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
+                Continue with Facebook
+              </button>
+            </div>
+
+            <!-- Status Feedback -->
+            <div v-if="embeddedSignupStatus" class="mt-4 flex items-center gap-3 p-3 rounded-xl text-sm font-semibold"
+                 :class="{
+                   'bg-blue-100 text-blue-800': embeddedSignupStatus === 'loading',
+                   'bg-green-100 text-green-800': embeddedSignupStatus === 'success',
+                   'bg-red-100 text-red-700': embeddedSignupStatus === 'error'
+                 }">
+              <div v-if="embeddedSignupStatus === 'loading'" class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0"></div>
+              <span v-else-if="embeddedSignupStatus === 'success'">✅</span>
+              <span v-else-if="embeddedSignupStatus === 'error'">⚠️</span>
+              {{ embeddedSignupMessage }}
+            </div>
+          </div>
+        </div>
+
+        <hr class="border-t border-slate-100 my-4" />
+
+        <!-- Channels list -->
         <div v-if="metaChannels.length > 0" class="flex flex-col gap-4 mb-6">
           <div v-for="channel in metaChannels" :key="channel.id" class="flex justify-between items-center p-4 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 transition-colors">
             <div class="flex items-center gap-3">
@@ -106,8 +156,8 @@
             </button>
           </div>
         </div>
-        <div v-if="metaChannels.length === 0" class="text-slate-500 mt-6 font-medium text-sm">
-          No Meta Cloud numbers configured. Please contact your administrator to set up official Meta APIs.
+        <div v-if="metaChannels.length === 0" class="text-slate-500 mb-6 font-medium text-sm">
+          No Meta Cloud numbers configured yet — use the button above to connect a new number.
         </div>
       </div>
     </div>
@@ -120,34 +170,137 @@ import axios from 'axios'
 import { io } from 'socket.io-client'
 import QrcodeVue from 'qrcode.vue'
 
-// Standard Web QR State
+// ─── Config ───────────────────────────────────────────────────
+const FB_APP_ID = import.meta.env.VITE_FB_APP_ID || ''
+const FB_CONFIG_ID = import.meta.env.VITE_FB_CONFIG_ID || ''
+
+// ─── QR Session State ────────────────────────────────────────
 const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
-const isMetaEnabled = ref(tenant.allowedFeatures && tenant.allowedFeatures.includes('META_API'))
+const isMetaEnabled = ref(tenant.metaEnabled || (tenant.allowedFeatures && tenant.allowedFeatures.includes('META_API')))
 const status = ref(tenant.sessionStatus || 'DISCONNECTED')
 const phone = ref(tenant.whatsappPhone || '')
 const qrCode = ref('')
 const loading = ref(false)
 let socket = null
 
-const goToUpgrade = () => {
-  window.location.href = '/' // Or routing to a billing page
+const goToUpgrade = () => { window.location.href = '/' }
+
+// ─── Meta State ───────────────────────────────────────────────
+const metaChannels = ref([])
+const baseUrl = ref(window.location.origin)
+const embeddedSignupStatus = ref('') // '', 'loading', 'success', 'error'
+const embeddedSignupMessage = ref('')
+
+// ─── Facebook SDK ─────────────────────────────────────────────
+const loadFbSdk = () => {
+  if (document.getElementById('facebook-jssdk')) return
+  const script = document.createElement('script')
+  script.id = 'facebook-jssdk'
+  script.async = true
+  script.defer = true
+  script.crossOrigin = 'anonymous'
+  script.src = 'https://connect.facebook.net/en_US/sdk.js'
+  document.head.appendChild(script)
+
+  window.fbAsyncInit = function () {
+    window.FB.init({
+      appId: FB_APP_ID,
+      autoLogAppEvents: true,
+      xfbml: true,
+      version: 'v22.0'
+    })
+  }
 }
 
-// Meta State
-const metaChannels = ref([])
-const showMetaForm = ref(false)
-const baseUrl = ref(window.location.origin)
-const metaLoading = ref(false)
-const metaForm = ref({
-  phoneNumber: '',
-  metaPhoneNumberId: '',
-  metaWabaId: '',
-  metaAccessToken: '',
-  metaAppSecret: ''
-})
+// ─── Message event listener (captures IDs from popup) ─────────
+const handleFbMessage = (event) => {
+  if (!event.origin.endsWith('facebook.com')) return
+  try {
+    const data = JSON.parse(event.data)
+    if (data.type === 'WA_EMBEDDED_SIGNUP') {
+      if (data.event === 'FINISH' || data.event === 'FINISH_ONLY_WABA') {
+        // Store temporarily; the code exchange happens in fbLoginCallback
+        window._embeddedSignupData = data.data
+        console.log('[EmbeddedSignup] Received IDs:', data.data)
+      } else if (data.event === 'CANCEL') {
+        embeddedSignupStatus.value = 'error'
+        embeddedSignupMessage.value = `Signup cancelled at step: ${data.data?.current_step || 'unknown'}`
+      } else if (data.event === 'ERROR') {
+        embeddedSignupStatus.value = 'error'
+        embeddedSignupMessage.value = `Error: ${data.data?.error_message || 'Unknown error'}`
+      }
+    }
+  } catch {
+    // non-JSON messages from facebook, ignore
+  }
+}
 
+// ─── Callback after FB.login() completes ──────────────────────
+const fbLoginCallback = async (response) => {
+  if (response.authResponse) {
+    const code = response.authResponse.code
+    const signupData = window._embeddedSignupData || {}
+    const phone_number_id = signupData.phone_number_id
+    const waba_id = signupData.waba_id
+
+    if (!phone_number_id || !waba_id) {
+      embeddedSignupStatus.value = 'error'
+      embeddedSignupMessage.value = 'Could not capture phone_number_id or waba_id from Meta. Please try again.'
+      return
+    }
+
+    embeddedSignupStatus.value = 'loading'
+    embeddedSignupMessage.value = 'Saving your WhatsApp channel...'
+
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.post('/api/v1/meta/embedded-signup/exchange', {
+        code, phone_number_id, waba_id
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      embeddedSignupStatus.value = 'success'
+      embeddedSignupMessage.value = `✅ Connected! Phone: +${res.data.channel.phoneNumber}`
+      fetchMetaChannels()
+      delete window._embeddedSignupData
+    } catch (err) {
+      embeddedSignupStatus.value = 'error'
+      embeddedSignupMessage.value = err.response?.data?.message || 'Failed to save channel. Please try again.'
+    }
+  } else {
+    embeddedSignupStatus.value = 'error'
+    embeddedSignupMessage.value = 'Facebook login cancelled or failed.'
+  }
+}
+
+// ─── Launch the Embedded Signup Popup ─────────────────────────
+const launchEmbeddedSignup = () => {
+  if (!window.FB) {
+    embeddedSignupStatus.value = 'error'
+    embeddedSignupMessage.value = 'Facebook SDK not loaded yet. Please wait a moment and try again.'
+    return
+  }
+  if (!FB_APP_ID || !FB_CONFIG_ID) {
+    embeddedSignupStatus.value = 'error'
+    embeddedSignupMessage.value = 'VITE_FB_APP_ID or VITE_FB_CONFIG_ID is not configured in .env'
+    return
+  }
+  embeddedSignupStatus.value = ''
+  embeddedSignupMessage.value = ''
+  delete window._embeddedSignupData
+
+  window.FB.login(fbLoginCallback, {
+    config_id: FB_CONFIG_ID,
+    response_type: 'code',
+    override_default_response_type: true,
+    extras: { setup: {} }
+  })
+}
+
+// ─── Standard Meta Channels CRUD ──────────────────────────────
 const fetchMetaChannels = async () => {
-  if (!isMetaEnabled.value) return; // Skip fetching if not enabled
+  if (!isMetaEnabled.value) return
   const token = localStorage.getItem('token')
   try {
     const res = await axios.get('/api/v1/meta/channels', {
@@ -160,7 +313,7 @@ const fetchMetaChannels = async () => {
 }
 
 const deleteMetaChannel = async (id) => {
-  if (!confirm('Are you sure you want to remove this Meta connection?')) return;
+  if (!confirm('Are you sure you want to remove this Meta connection?')) return
   const token = localStorage.getItem('token')
   try {
     await axios.delete(`/api/v1/meta/channel/${id}`, {
@@ -172,16 +325,11 @@ const deleteMetaChannel = async (id) => {
   }
 }
 
+// ─── Socket + QR ──────────────────────────────────────────────
 const initSocket = () => {
   socket = io('/', { path: '/socket.io' })
-  socket.on('connect', () => {
-    socket.emit('join-tenant', tenant.id)
-  })
-  
-  socket.on('qr', (data) => {
-    qrCode.value = data.qr
-  })
-  
+  socket.on('connect', () => { socket.emit('join-tenant', tenant.id) })
+  socket.on('qr', (data) => { qrCode.value = data.qr })
   socket.on('status', (data) => {
     status.value = data.status
     if (data.phone) phone.value = data.phone
@@ -195,56 +343,42 @@ const initSocket = () => {
 }
 
 onMounted(async () => {
+  loadFbSdk()
+  window.addEventListener('message', handleFbMessage)
+
   const token = localStorage.getItem('token')
   try {
-    const res = await axios.get('/api/whatsapp/status', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const res = await axios.get('/api/whatsapp/status', { headers: { Authorization: `Bearer ${token}` } })
     status.value = res.data.data.sessionStatus
     phone.value = res.data.data.whatsappPhone
-    
-    if (status.value === 'CONNECTING') {
-      initSocket()
-    }
-  } catch (err) {
-    console.error('Failed to get status')
-  }
+    if (status.value === 'CONNECTING') initSocket()
+  } catch (err) { console.error('Failed to get status') }
 
   fetchMetaChannels()
 })
 
 onUnmounted(() => {
   if (socket) socket.disconnect()
+  window.removeEventListener('message', handleFbMessage)
 })
 
 const connect = async () => {
   loading.value = true
   const token = localStorage.getItem('token')
   try {
-    await axios.post('/api/whatsapp/connect', {}, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    await axios.post('/api/whatsapp/connect', {}, { headers: { Authorization: `Bearer ${token}` } })
     status.value = 'CONNECTING'
     initSocket()
-  } catch (err) {
-    console.error('Failed to connect', err)
-  } finally {
-    loading.value = false
-  }
+  } catch (err) { console.error('Failed to connect', err) } finally { loading.value = false }
 }
 
 const disconnect = async () => {
   const token = localStorage.getItem('token')
   try {
-    await axios.post('/api/whatsapp/disconnect', {}, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    await axios.post('/api/whatsapp/disconnect', {}, { headers: { Authorization: `Bearer ${token}` } })
     status.value = 'DISCONNECTED'
     phone.value = ''
     if (socket) socket.disconnect()
-  } catch (err) {
-    console.error('Failed to disconnect', err)
-  }
+  } catch (err) { console.error('Failed to disconnect', err) }
 }
 </script>
-

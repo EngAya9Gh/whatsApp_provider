@@ -3648,3 +3648,32 @@ AggregateError [ECONNREFUSED]:
 7:32:16 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
     at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
     at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+8:44:54 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+8:44:54 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+8:44:54 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+8:44:55 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+9:57:10 AM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+9:57:10 AM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+9:57:10 AM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+9:57:15 AM [vite] (client) [console.error] Failed to fetch templates AxiosError: timeout of 5000ms exceeded
+    at XMLHttpRequest.handleTimeout (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2270:11)
+10:39:54 AM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+10:39:54 AM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+10:39:54 AM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+10:39:55 AM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+11:22:16 AM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+11:22:16 AM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+11:22:16 AM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+11:22:18 AM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)
+4:05:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+4:05:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.developer_tools' key in 'en' locale messages.
+4:05:19 PM [vite] (client) [console.warn] [intlify] Not found 'sidebar.standard_mode' key in 'en' locale messages.
+4:05:21 PM [vite] (client) [console.error] Failed to fetch templates AxiosError: Request failed with status code 400
+    at settle (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:1838:14)
+    at XMLHttpRequest.onloadend (http://localhost:5173/node_modules/.vite/deps/axios.js?v=9e0a45e2:2231:4)

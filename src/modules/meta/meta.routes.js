@@ -72,6 +72,13 @@ router.post(
 // Protected Channel Routes — called by our dashboard (requires JWT auth)
 // ────────────────────────────────────────────────────────────────────────────
 router.use(authMiddleware);
+
+// ────────────────────────────────────────────────────────────────────────────
+// Embedded Signup — Only requires JWT auth, no Meta feature flag needed
+// ────────────────────────────────────────────────────────────────────────────
+const embeddedSignupController = require('./meta.embedded-signup.controller');
+router.post('/embedded-signup/exchange', embeddedSignupController.exchangeCode);
+
 router.use(requireMetaEnabled);
 
 router.post('/channel', metaController.addChannel.bind(metaController));
