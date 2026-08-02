@@ -2,73 +2,74 @@
   <div class="app-root">
     <!-- Sidebar -->
     <aside v-if="showSidebar" class="sidebar">
+      <!-- Logo -->
       <a href="/" target="_blank" class="sidebar-logo">
-        <img src="/logo.svg" alt="wakeel.." class="logo-img" />
+        <img src="/logo.svg" alt="wakeel" class="logo-img" />
       </a>
 
       <nav class="sidebar-nav">
         <!-- GENERAL -->
         <div class="nav-section-title">General</div>
         <router-link to="/dashboard" class="nav-item" exact-active-class="active">
-          <span class="nav-icon">📊</span>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
           <span class="nav-label">{{ $t('sidebar.dashboard') }}</span>
         </router-link>
         <router-link to="/connect" class="nav-item" active-class="active">
-          <span class="nav-icon">📱</span>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
           <span class="nav-label">Connections</span>
         </router-link>
         <router-link to="/live-chat" class="nav-item" active-class="active">
-          <span class="nav-icon">💬</span>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           <span class="nav-label">Live Chat</span>
         </router-link>
 
         <!-- STANDARD (QR WEB) -->
         <template v-if="$hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('SEND_MESSAGE') || $hasFeature('BAILEYS_CAMPAIGN') || $hasFeature('TEMPLATES') || $hasFeature('BAILEYS_AUTORESPONDER')">
-          <div class="nav-section-title mt-4">{{ $t('sidebar.standard_mode') !== 'sidebar.standard_mode' ? $t('sidebar.standard_mode') : 'Standard Mode' }}</div>
-        <router-link v-if="$hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('SEND_MESSAGE')" to="/send-message" class="nav-item" active-class="active">
-          <span class="nav-icon">📨</span>
-          <span class="nav-label">{{ $t('sidebar.send_message') }}</span>
-        </router-link>
-        <router-link v-if="$hasFeature('BAILEYS_CAMPAIGN')" to="/campaigns" class="nav-item" active-class="active">
-          <span class="nav-icon">📢</span>
-          <span class="nav-label">{{ $t('sidebar.campaigns') }}</span>
-        </router-link>
-        <router-link v-if="$hasFeature('TEMPLATES')" to="/templates" class="nav-item" active-class="active">
-          <span class="nav-icon">📋</span>
-          <span class="nav-label">{{ $t('sidebar.templates') }}</span>
-        </router-link>
-        <router-link v-if="$hasFeature('BAILEYS_AUTORESPONDER')" to="/chatbot" class="nav-item" active-class="active">
-          <span class="nav-icon">🤖</span>
-          <span class="nav-label">Auto Responder</span>
-        </router-link>
+          <div class="nav-section-title mt-4">Standard Mode</div>
+          <router-link v-if="$hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('SEND_MESSAGE')" to="/send-message" class="nav-item" active-class="active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <span class="nav-label">{{ $t('sidebar.send_message') }}</span>
+          </router-link>
+          <router-link v-if="$hasFeature('BAILEYS_CAMPAIGN')" to="/campaigns" class="nav-item" active-class="active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+            <span class="nav-label">{{ $t('sidebar.campaigns') }}</span>
+          </router-link>
+          <router-link v-if="$hasFeature('TEMPLATES')" to="/templates" class="nav-item" active-class="active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span class="nav-label">{{ $t('sidebar.templates') }}</span>
+          </router-link>
+          <router-link v-if="$hasFeature('BAILEYS_AUTORESPONDER')" to="/chatbot" class="nav-item" active-class="active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+            <span class="nav-label">Auto Responder</span>
+          </router-link>
         </template>
 
         <!-- META CLOUD -->
         <template v-if="$hasFeature('META_API') || $hasFeature('META_CAMPAIGN') || $hasFeature('META_AUTORESPONDER')">
-          <div class="nav-section-title mt-4 text-emerald-600">Meta Cloud</div>
+          <div class="nav-section-title mt-4" style="color:#25D366">Meta Cloud</div>
           <GlobalMetaSelector />
           <router-link v-if="$hasFeature('META_SEND_MESSAGE')" to="/meta-send-message" class="nav-item" active-class="active">
-            <span class="nav-icon">📨</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             <span class="nav-label">Send Message</span>
           </router-link>
           <router-link v-if="$hasFeature('META_TEMPLATES')" to="/meta-templates" class="nav-item" active-class="active">
-            <span class="nav-icon">📝</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <span class="nav-label">Meta Templates</span>
           </router-link>
           <router-link v-if="$hasFeature('META_CAMPAIGN')" to="/meta-campaigns" class="nav-item" active-class="active">
-            <span class="nav-icon">📢</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
             <span class="nav-label">Meta Campaigns</span>
           </router-link>
           <router-link v-if="$hasFeature('META_AUTORESPONDER')" to="/meta-chatbot" class="nav-item" active-class="active">
-            <span class="nav-icon">🤖</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>
             <span class="nav-label">Meta Auto Reply</span>
           </router-link>
           <router-link to="/meta-flows" class="nav-item" active-class="active">
-            <span class="nav-icon">🧩</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
             <span class="nav-label">WhatsApp Flows</span>
           </router-link>
           <router-link to="/meta-business-profile" class="nav-item" active-class="active">
-            <span class="nav-icon">🏢</span>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             <span class="nav-label">Business Profile</span>
           </router-link>
         </template>
@@ -76,37 +77,40 @@
         <!-- SYSTEM -->
         <div class="nav-section-title mt-4">System</div>
         <router-link to="/keys" class="nav-item" active-class="active">
-          <span class="nav-icon">🔑</span>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
           <span class="nav-label">{{ $t('sidebar.api_keys') }}</span>
         </router-link>
         <router-link to="/logs" class="nav-item" active-class="active">
-          <span class="nav-icon">📋</span>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           <span class="nav-label">{{ $t('sidebar.message_logs') }}</span>
         </router-link>
         <router-link to="/billing" class="nav-item" active-class="active">
-          <span class="nav-icon">💳</span>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
           <span class="nav-label">{{ $t('sidebar.billing') }}</span>
         </router-link>
         <router-link to="/settings" class="nav-item" active-class="active">
-          <span class="nav-icon">⚙️</span>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span class="nav-label">{{ $t('sidebar.settings') }}</span>
         </router-link>
         <router-link to="/developer" class="nav-item" active-class="active">
-          <span class="nav-icon">🛠️</span>
-          <span class="nav-label">{{ $t('sidebar.developer_tools', 'Developer Tools') }}</span>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span class="nav-label">Developer Tools</span>
         </router-link>
       </nav>
 
+      <!-- Footer -->
       <div class="sidebar-footer">
         <div class="user-info">
           <div class="user-avatar">{{ userInitial }}</div>
           <div class="user-details">
             <div class="user-name">{{ tenant?.name || 'Account' }}</div>
-            <div class="user-plan">{{ tenant?.plan || 'FREE' }}</div>
+            <div class="user-plan-badge" :class="planClass">{{ tenant?.plan || 'FREE' }}</div>
           </div>
         </div>
         <button @click="toggleLang" class="lang-btn" title="Change Language">{{ currentLang === 'en' ? 'ع' : 'EN' }}</button>
-        <button @click="logout" class="logout-btn" title="Logout">↩</button>
+        <button @click="logout" class="logout-btn" title="Logout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
       </div>
     </aside>
 
@@ -138,6 +142,15 @@ loadTenant()
 
 const showSidebar = computed(() => !route.meta.guest && !route.meta.hideSidebar && route.path !== '/' && !!localStorage.getItem('token'))
 const userInitial = computed(() => (tenant.value?.name || 'U')[0].toUpperCase())
+
+const planClass = computed(() => {
+  const plan = tenant.value?.plan || 'FREE'
+  if (plan === 'ENTERPRISE') return 'badge-enterprise'
+  if (plan === 'PRO') return 'badge-pro'
+  if (plan === 'ADVANCED') return 'badge-advanced'
+  if (plan === 'STARTER') return 'badge-starter'
+  return 'badge-free'
+})
 
 const toggleLang = () => {
   const newLang = currentLang.value === 'en' ? 'ar' : 'en'
@@ -287,7 +300,18 @@ body {
   box-shadow: 0 4px 12px var(--brand-primary-glow);
 }
 
-.nav-icon { font-size: 1.1rem; width: 20px; text-align: center; }
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.nav-item:hover .nav-icon,
+.nav-item.active .nav-icon {
+  opacity: 1;
+}
 .nav-label { font-size: 0.875rem; }
 
 /* ── Sidebar Footer ── */
@@ -330,13 +354,21 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.user-plan {
-  color: #64748B;
-  font-size: 0.7rem;
-  font-weight: 500;
+.user-plan-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 2px;
 }
+.badge-free    { background: rgba(100,116,139,0.2); color: #94A3B8; }
+.badge-starter { background: rgba(59,130,246,0.2); color: #60A5FA; }
+.badge-advanced{ background: rgba(168,85,247,0.2); color: #C084FC; }
+.badge-pro     { background: rgba(251,191,36,0.2); color: #FCD34D; }
+.badge-enterprise { background: rgba(255,102,0,0.2); color: #FF6600; }
 
 .lang-btn {
   background: rgba(255,255,255,0.07);
