@@ -291,7 +291,7 @@
               <div v-if="form.body.includes('{{1}}')" class="form-section">
                 <label>Variable Examples (Required)</label>
                 <div class="flex gap-2 mb-2" v-for="n in countVariables(form.body)" :key="n">
-                  <span class="var-badge">{{'{{' + n + '}}'}}</span>
+                  <span class="var-badge" v-text="'{{' + n + '}}'"></span>
                   <input v-model="form.bodyVariables[n-1]" type="text" placeholder="Sample value" class="input-std flex-1" />
                 </div>
               </div>
