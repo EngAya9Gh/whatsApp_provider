@@ -14,18 +14,18 @@
             </svg>
           </div>
           <div>
-            <h1 class="hero-title">Meta Templates</h1>
-            <p class="hero-sub">Manage official WhatsApp message templates directly with Meta.</p>
+            <h1 class="hero-title">{{ isAr ? 'قوالب ميتا' : 'Meta Templates' }}</h1>
+            <p class="hero-sub">{{ isAr ? 'إدارة قوالب رسائل الواتساب الرسمية مع ميتا مباشرة.' : 'Manage official WhatsApp message templates directly with Meta.' }}</p>
           </div>
         </div>
         
         <div class="hero-actions" v-if="activeMetaChannelId">
           <button @click="showLibraryModal = true" class="btn-secondary">
-            📚 مكتبة القوالب
+            📚 {{ isAr ? 'مكتبة القوالب' : 'Template Library' }}
           </button>
           <button @click="showCreateModal = true" class="btn-create">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Create Template
+            {{ isAr ? 'إنشاء قالب' : 'Create Template' }}
           </button>
         </div>
       </div>
@@ -34,17 +34,17 @@
       <div class="hero-stats" v-if="templates.length > 0">
         <div class="hstat">
           <span class="hstat-val">{{ templates.length }}</span>
-          <span class="hstat-lbl">Total</span>
+          <span class="hstat-lbl">{{ isAr ? 'الإجمالي' : 'Total' }}</span>
         </div>
         <div class="hstat-sep"></div>
         <div class="hstat">
           <span class="hstat-val approved">{{ templates.filter(t => t.status === 'APPROVED').length }}</span>
-          <span class="hstat-lbl">Approved</span>
+          <span class="hstat-lbl">{{ isAr ? 'معتمد' : 'Approved' }}</span>
         </div>
         <div class="hstat-sep"></div>
         <div class="hstat">
           <span class="hstat-val pending">{{ templates.filter(t => t.status === 'PENDING' || t.status === 'IN_APPEAL').length }}</span>
-          <span class="hstat-lbl">Pending</span>
+          <span class="hstat-lbl">{{ isAr ? 'قيد المراجعة' : 'Pending' }}</span>
         </div>
       </div>
     </div>
@@ -353,7 +353,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { useMetaChannel } from '../composables/useMetaChannel'
 import { metaTemplateLibrary } from '../data/metaTemplateLibrary'
@@ -385,6 +386,8 @@ const selectLibraryTemplate = (tpl) => {
   showCreateModal.value = true
 }
 
+const { locale } = useI18n()
+const isAr = computed(() => locale.value === 'ar')
 const templates = ref([])
 const loading = ref(true)
 const showCreateModal = ref(false)
@@ -595,7 +598,7 @@ onMounted(() => {
   box-shadow: 0 8px 24px rgba(16,185,129,0.3);
 }
 .hero-title { font-size: 2rem; font-weight: 900; color: #fff; margin: 0 0 0.3rem; letter-spacing: -0.03em; }
-.hero-sub { font-size: 0.9rem; color: #94A3B8; margin: 0; font-weight: 500; }
+.hero-sub { font-size: 0.9rem; color: #64748B; margin: 0; font-weight: 500; }
 .hero-actions { display: flex; gap: 1rem; }
 
 .hero-stats {
@@ -607,7 +610,7 @@ onMounted(() => {
 .hstat-val { font-size: 1.75rem; font-weight: 900; color: #fff; line-height: 1; }
 .hstat-val.approved { color: #10B981; }
 .hstat-val.pending { color: #F59E0B; }
-.hstat-lbl { font-size: 0.7rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.06em; }
+.hstat-lbl { font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.06em; }
 .hstat-sep { width: 1px; height: 40px; background: rgba(255,255,255,0.08); flex-shrink: 0; }
 
 .btn-create {
@@ -683,7 +686,7 @@ onMounted(() => {
 .modal-header.bg-grad { background: linear-gradient(to right, #0F172A, #1E293B); border-bottom: none; }
 .modal-header h3 { font-size: 1.25rem; font-weight: 800; margin: 0; color: #0F172A; }
 .modal-header.bg-grad h3 { color: white; }
-.btn-close { background: transparent; border: none; font-size: 2rem; color: #94A3B8; cursor: pointer; line-height: 0.5; transition: color 0.2s; }
+.btn-close { background: transparent; border: none; font-size: 2rem; color: #64748B; cursor: pointer; line-height: 0.5; transition: color 0.2s; }
 .btn-close:hover { color: #0F172A; }
 .modal-header.bg-grad .btn-close { color: rgba(255,255,255,0.5); }
 .modal-header.bg-grad .btn-close:hover { color: white; }
@@ -691,7 +694,7 @@ onMounted(() => {
 
 /* Library Modal Specifics */
 .lib-sidebar { width: 200px; background: #F8FAFC; border-right: 1px solid #E2E8F0; padding: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; flex-shrink: 0; }
-.lib-sidebar h4 { font-size: 0.8rem; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem; }
+.lib-sidebar h4 { font-size: 0.8rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem; }
 .lib-filter-btn { background: transparent; border: none; padding: 0.75rem 1rem; text-align: left; border-radius: 10px; font-size: 0.85rem; font-weight: 700; color: #64748B; cursor: pointer; transition: all 0.2s; }
 .lib-filter-btn:hover { background: #F1F5F9; color: #0F172A; }
 .lib-filter-btn.active { background: #10B981; color: white; box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
@@ -715,7 +718,7 @@ onMounted(() => {
 .lib-wa-txt { font-size: 0.75rem; color: #111B21; mragin: 0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .lib-wa-btns { margin-top: 0.75rem; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .lib-wa-btn-mock { background: white; color: #00a884; font-size: 0.7rem; font-weight: 800; text-align: center; padding: 0.4rem; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-.lib-card-footer { padding: 1rem 1.5rem; background: #0F172A; color: white; text-align: center; font-size: 0.85rem; font-weight: 700; transition: background 0.2s; }
+.lib-card-footer { padding: 1rem 1.5rem; background: #FFFFFF; color: white; text-align: center; font-size: 0.85rem; font-weight: 700; transition: background 0.2s; }
 .lib-card:hover .lib-card-footer { background: #10B981; }
 
 /* Create Modal Specifics */
@@ -754,11 +757,11 @@ onMounted(() => {
 .tab-sm { flex: 1; background: white; border: 1px solid #CBD5E1; padding: 0.6rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; color: #64748B; cursor: pointer; transition: all 0.2s; }
 .tab-sm.active { background: #10B981; border-color: #10B981; color: white; }
 
-.form-hint { font-size: 0.75rem; color: #94A3B8; font-weight: 500; margin: 0; }
+.form-hint { font-size: 0.75rem; color: #64748B; font-weight: 500; margin: 0; }
 .var-badge { background: #E2E8F0; color: #334155; padding: 0 0.75rem; border-radius: 8px; font-family: monospace; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 
 .btn-sm { background: white; border: 1px solid #CBD5E1; padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800; color: #334155; cursor: pointer; transition: all 0.2s; }
-.btn-sm:hover { background: #F8FAFC; border-color: #94A3B8; }
+.btn-sm:hover { background: #F8FAFC; border-color: #64748B; }
 .btn-builder-card { background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; position: relative; margin-bottom: 0.75rem; }
 .btn-remove-sm { position: absolute; top: 0.5rem; right: 0.5rem; background: #FEF2F2; color: #EF4444; border: none; width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 800; cursor: pointer; }
 .form-group-sm { display: flex; flex-direction: column; gap: 0.3rem; }

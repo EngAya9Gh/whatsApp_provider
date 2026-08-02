@@ -8,7 +8,20 @@
     "api_keys": "API Keys",
     "message_logs": "Message Logs",
     "billing": "Billing",
-    "settings": "Settings"
+    "settings": "Settings",
+    "connections": "Connections",
+    "live_chat": "Live Chat",
+    "standard_mode": "Standard Mode",
+    "auto_responder": "Auto Responder",
+    "meta_cloud": "Meta Cloud",
+    "meta_send_message": "Send Message",
+    "meta_templates": "Meta Templates",
+    "meta_campaigns": "Meta Campaigns",
+    "meta_chatbot": "Meta Auto Reply",
+    "meta_flows": "WhatsApp Flows",
+    "meta_business_profile": "Business Profile",
+    "system": "System",
+    "developer_tools": "Developer Tools"
   },
   "login": {
     "welcome_back": "Welcome back",

@@ -14,7 +14,7 @@
             </svg>
           </div>
           <div>
-            <h1 class="hero-title">Meta Campaigns</h1>
+            <h1 class="hero-title">{{ isAr ? 'حملات ميتا' : 'Meta Campaigns' }}</h1>
             <p class="hero-sub">Send via official Meta/WhatsApp API with 100% delivery reliability</p>
           </div>
         </div>
@@ -323,6 +323,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { useMetaChannel } from '../composables/useMetaChannel'
 
@@ -330,6 +331,8 @@ const { activeMetaChannelId } = useMetaChannel()
 const campaigns = ref([])
 const metaTemplates = ref([])
 const loading = ref(false)
+const { locale } = useI18n()
+const isAr = computed(() => locale.value === 'ar')
 const showCreateModal = ref(false)
 const isSubmitting = ref(false)
 const page = ref(1)

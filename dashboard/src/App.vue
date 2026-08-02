@@ -16,16 +16,16 @@
         </router-link>
         <router-link to="/connect" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          <span class="nav-label">Connections</span>
+          <span class="nav-label">{{ $t('sidebar.connections') }}</span>
         </router-link>
         <router-link to="/live-chat" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span class="nav-label">Live Chat</span>
+          <span class="nav-label">{{ $t('sidebar.live_chat') }}</span>
         </router-link>
 
         <!-- STANDARD (QR WEB) -->
         <template v-if="$hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('SEND_MESSAGE') || $hasFeature('BAILEYS_CAMPAIGN') || $hasFeature('TEMPLATES') || $hasFeature('BAILEYS_AUTORESPONDER')">
-          <div class="nav-section-title mt-4">Standard Mode</div>
+          <div class="nav-section-title mt-4">{{ $t('sidebar.standard_mode') }}</div>
           <router-link v-if="$hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('SEND_MESSAGE')" to="/send-message" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             <span class="nav-label">{{ $t('sidebar.send_message') }}</span>
@@ -40,42 +40,42 @@
           </router-link>
           <router-link v-if="$hasFeature('BAILEYS_AUTORESPONDER')" to="/chatbot" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
-            <span class="nav-label">Auto Responder</span>
+            <span class="nav-label">{{ $t('sidebar.auto_responder') }}</span>
           </router-link>
         </template>
 
         <!-- META CLOUD -->
         <template v-if="$hasFeature('META_API') || $hasFeature('META_CAMPAIGN') || $hasFeature('META_AUTORESPONDER')">
-          <div class="nav-section-title mt-4" style="color:#25D366">Meta Cloud</div>
+          <div class="nav-section-title mt-4" style="color:#25D366">{{ $t('sidebar.meta_cloud') }}</div>
           <GlobalMetaSelector />
           <router-link v-if="$hasFeature('META_SEND_MESSAGE')" to="/meta-send-message" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            <span class="nav-label">Send Message</span>
+            <span class="nav-label">{{ $t('sidebar.meta_send_message') }}</span>
           </router-link>
           <router-link v-if="$hasFeature('META_TEMPLATES')" to="/meta-templates" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <span class="nav-label">Meta Templates</span>
+            <span class="nav-label">{{ $t('sidebar.meta_templates') }}</span>
           </router-link>
           <router-link v-if="$hasFeature('META_CAMPAIGN')" to="/meta-campaigns" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
-            <span class="nav-label">Meta Campaigns</span>
+            <span class="nav-label">{{ $t('sidebar.meta_campaigns') }}</span>
           </router-link>
           <router-link v-if="$hasFeature('META_AUTORESPONDER')" to="/meta-chatbot" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>
-            <span class="nav-label">Meta Auto Reply</span>
+            <span class="nav-label">{{ $t('sidebar.meta_chatbot') }}</span>
           </router-link>
           <router-link to="/meta-flows" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            <span class="nav-label">WhatsApp Flows</span>
+            <span class="nav-label">{{ $t('sidebar.meta_flows') }}</span>
           </router-link>
           <router-link to="/meta-business-profile" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            <span class="nav-label">Business Profile</span>
+            <span class="nav-label">{{ $t('sidebar.meta_business_profile') }}</span>
           </router-link>
         </template>
 
         <!-- SYSTEM -->
-        <div class="nav-section-title mt-4">System</div>
+        <div class="nav-section-title mt-4">{{ $t('sidebar.system') }}</div>
         <router-link to="/keys" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
           <span class="nav-label">{{ $t('sidebar.api_keys') }}</span>
@@ -94,7 +94,7 @@
         </router-link>
         <router-link to="/developer" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-          <span class="nav-label">Developer Tools</span>
+          <span class="nav-label">{{ $t('sidebar.developer_tools') }}</span>
         </router-link>
       </nav>
 

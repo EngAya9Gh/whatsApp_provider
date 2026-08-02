@@ -8,7 +8,20 @@
     "api_keys": "مفاتيح API",
     "message_logs": "سجل الرسائل",
     "billing": "الفواتير",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "connections": "الربط والاتصال",
+    "live_chat": "المحادثة المباشرة",
+    "standard_mode": "النمط العادي (QR)",
+    "auto_responder": "الرد الآلي",
+    "meta_cloud": "ميتا كلاود الرسمي",
+    "meta_send_message": "إرسال رسالة",
+    "meta_templates": "قوالب ميتا",
+    "meta_campaigns": "حملات ميتا",
+    "meta_chatbot": "الرد الآلي ميتا",
+    "meta_flows": "نماذج واتساب (Flows)",
+    "meta_business_profile": "ملف الأعمال",
+    "system": "النظام",
+    "developer_tools": "أدوات المطورين"
   },
   "login": {
     "welcome_back": "أهلاً بعودتك",
