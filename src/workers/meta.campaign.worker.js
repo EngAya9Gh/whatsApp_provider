@@ -8,6 +8,33 @@ const prisma = new PrismaClient();
 const metaCampaignQueue = new Queue('meta-campaign-queue', { connection: redisConfig });
 const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || 'v21.0';
 
+/**
+ * Fetches the correct language code for a given template name from Meta API.
+ * This avoids mismatches between what we store and what Meta actually has.
+ */
+async function getTemplateLang(channel, templateName) {
+  try {
+    if (!channel.metaWabaId || !channel.metaAccessToken) return 'ar';
+    const res = await axios.get(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${channel.metaWabaId}/message_templates`,
+      {
+        params: { name: templateName, fields: 'name,language,status', limit: 5 },
+        headers: { Authorization: `Bearer ${channel.metaAccessToken}` }
+      }
+    );
+    const tpl = (res.data?.data || []).find(t => t.name === templateName && t.status === 'APPROVED');
+    if (tpl?.language) {
+      logger.info(`[MetaCampaign] Template "${templateName}" language: ${tpl.language}`);
+      return tpl.language;
+    }
+    logger.warn(`[MetaCampaign] Could not find approved template "${templateName}" in Meta, defaulting to 'ar'`);
+    return 'ar';
+  } catch (e) {
+    logger.warn(`[MetaCampaign] Failed to fetch template language: ${e.message}, defaulting to 'ar'`);
+    return 'ar';
+  }
+}
+
 const worker = new Worker('meta-campaign-queue', async (job) => {
   const { campaignId, targetId, tenantId, channelId, phone, variables, templateName, templateLanguage, metaCategory } = job.data;
   
@@ -21,7 +48,11 @@ const worker = new Worker('meta-campaign-queue', async (job) => {
       throw new Error('Meta channel configuration is missing or invalid.');
     }
 
-    // 2. Prepare the parameters array for Meta
+    // 2. Get the correct language from Meta API (or use passed language as fallback)
+    const langCode = templateLanguage || await getTemplateLang(channel, templateName);
+    logger.info(`[MetaCampaign] Sending template "${templateName}" (lang: ${langCode}) to ${phone}, variables: ${JSON.stringify(variables)}`);
+
+    // 3. Prepare the parameters array for Meta
     const parameters = variables.map(v => ({
       type: 'text',
       text: v.toString()
@@ -35,11 +66,7 @@ const worker = new Worker('meta-campaign-queue', async (job) => {
       });
     }
 
-    // Use the language stored with the template, fallback to 'ar'
-    const langCode = templateLanguage || 'ar';
-    logger.info(`[MetaCampaign] Sending template "${templateName}" (lang: ${langCode}) to ${phone}, variables: ${JSON.stringify(variables)}`);
-
-    // 3. Prepare Axios Payload
+    // 4. Prepare Axios Payload
     const payload = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
@@ -47,14 +74,12 @@ const worker = new Worker('meta-campaign-queue', async (job) => {
       type: 'template',
       template: {
         name: templateName,
-        language: {
-          code: langCode
-        },
+        language: { code: langCode },
         components
       }
     };
 
-    // 4. Send to Meta API
+    // 5. Send to Meta API
     const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${channel.metaPhoneNumberId}/messages`;
     const response = await axios.post(url, payload, {
       headers: {
