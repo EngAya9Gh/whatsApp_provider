@@ -248,6 +248,8 @@
           <a href="#pricing">{{ $i18n.locale === 'ar' ? 'الأسعار' : 'Pricing' }}</a>
           <router-link to="/register">{{ $i18n.locale === 'ar' ? 'إنشاء حساب' : 'Sign Up' }}</router-link>
           <router-link to="/login">{{ $i18n.locale === 'ar' ? 'تسجيل الدخول' : 'Sign In' }}</router-link>
+          <router-link to="/privacy">{{ $i18n.locale === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy' }}</router-link>
+          <router-link to="/terms">{{ $i18n.locale === 'ar' ? 'شروط الخدمة' : 'Terms of Service' }}</router-link>
         </div>
       </div>
       <div class="footer-bottom">

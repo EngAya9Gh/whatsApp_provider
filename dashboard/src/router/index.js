@@ -12,6 +12,8 @@ import Chatbot from '../views/Chatbot.vue'
 import Landing from '../views/Landing.vue'
 import InvoiceView from '../views/InvoiceView.vue'
 import LiveChat from '../views/LiveChat.vue'
+import PrivacyPolicy from '../views/PrivacyPolicy.vue'
+import TermsOfService from '../views/TermsOfService.vue'
 
 import MessageSend from '../views/MessageSend.vue'
 import Templates from '../views/Templates.vue'
@@ -30,6 +32,8 @@ const routes = [
   { path: '/login', component: Login, meta: { guest: true } },
   { path: '/register', component: Register, meta: { guest: true } },
   { path: '/', component: Landing },
+  { path: '/privacy', component: PrivacyPolicy, meta: { hideSidebar: true } },
+  { path: '/terms', component: TermsOfService, meta: { hideSidebar: true } },
   { path: '/invoice/:id', component: InvoiceView, meta: { hideSidebar: true } },
   { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/connect', component: Connect, meta: { requiresAuth: true } },

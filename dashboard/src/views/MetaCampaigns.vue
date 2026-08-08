@@ -525,7 +525,7 @@ onUnmounted(() => { if (pollInterval) clearInterval(pollInterval) })
 
 
 /* ALERTS */
-.mc-alert { display: flex; align-items: center; gap: 10px; padding: 1rem 1.5rem; border-radius: 14px; font-weight: 600; font-size: 0.9rem; margin: 1.5rem 2.5rem 0; }
+.mc-alert { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; align-items: center; gap: 10px; padding: 1rem 1.5rem; border-radius: 14px; font-weight: 600; font-size: 0.95rem; box-shadow: 0 10px 25px rgba(0,0,0,0.15); width: max-content; max-width: 90%; }
 .mc-alert.error { background: #FEF2F2; color: #DC2626; border: 1px solid #FEE2E2; }
 .mc-alert.success { background: #F0FDF4; color: #16A34A; border: 1px solid #DCFCE7; }
 .slide-fade-enter-active, .slide-fade-leave-active { transition: all 0.3s; }
