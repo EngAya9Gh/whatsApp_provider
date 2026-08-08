@@ -3,9 +3,9 @@
 
     <!-- ══ TOP BAR ══ -->
     <div class="top-bar">
-      <button @click="$router.push(campaign?.campaignType === 'META' ? '/meta-campaigns' : '/campaigns')" class="btn-back">
+      <button @click="goBack" class="btn-back">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-        {{ campaign?.campaignType === 'META' ? 'Back to Meta Campaigns' : 'Back to Campaigns' }}
+        {{ isMetaCampaign ? 'Back to Meta Campaigns' : 'Back to Campaigns' }}
       </button>
       <div class="top-bar-center" v-if="campaign">
         <span class="topbar-name">{{ campaign.name }}</span>
@@ -431,6 +431,16 @@ const switchTab = (tab) => {
   activeTab.value = tab
   if (tab === 'targets') fetchTargets()
   else fetchInteractions()
+}
+
+const isMetaCampaign = computed(() => campaign.value?.campaignType === 'META' || campaign.value?.campaignType === 'META_CLOUD')
+
+const goBack = () => {
+  if (isMetaCampaign.value) {
+    router.push('/meta-campaigns')
+  } else {
+    router.push('/campaigns')
+  }
 }
 
 onMounted(async () => {
