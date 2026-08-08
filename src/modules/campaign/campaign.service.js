@@ -83,6 +83,7 @@ class CampaignService {
           records.push({ phone, variables });
         }
       }
+    }
     
     logger.info(`Parsed ${records.length} valid records`);
     fs.unlink(filePath, () => {});
