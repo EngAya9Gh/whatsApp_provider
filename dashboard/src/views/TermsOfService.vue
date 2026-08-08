@@ -96,13 +96,24 @@
 <style scoped>
 .legal-page-container {
   min-height: 100vh;
-  background-color: #f9fafb;
+  background-color: #0B1121;
+  background-image: 
+    radial-gradient(circle at 15% 20%, rgba(255, 102, 0, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(16, 185, 129, 0.12) 0%, transparent 40%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
   font-family: 'Tajawal', 'Inter', sans-serif;
+  padding-bottom: 4rem;
 }
 .legal-nav {
-  background-color: white;
-  padding: 1rem 2rem;
-  border-bottom: 1px solid #e5e7eb;
+  background-color: rgba(11, 17, 33, 0.85);
+  backdrop-filter: blur(16px);
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 .back-link {
   display: inline-flex;
@@ -111,16 +122,22 @@
   color: #FF6600;
   text-decoration: none;
   font-weight: 700;
+  transition: opacity 0.3s ease;
 }
 .back-link:hover {
-  text-decoration: underline;
+  opacity: 0.8;
 }
 .legal-content {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 3rem 1.5rem;
+  max-width: 900px;
+  margin: 4rem auto 0;
+  padding: 4rem 3.5rem;
+  background: white;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 40px rgba(255, 102, 0, 0.05);
   color: #1f2937;
-  line-height: 1.8;
+  line-height: 1.9;
+  position: relative;
 }
 .legal-content h1 {
   font-size: 2.5rem;
@@ -138,10 +155,11 @@
 }
 .legal-content section {
   margin-bottom: 2.5rem;
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  padding-bottom: 1.5rem;
+  border-bottom: 1px dashed #e5e7eb;
+}
+.legal-content section:last-of-type {
+  border-bottom: none;
 }
 .legal-content h2 {
   font-size: 1.5rem;
@@ -158,12 +176,19 @@
   padding-left: 1.5rem;
 }
 .legal-content li {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 .legal-footer {
   text-align: center;
   margin-top: 3rem;
   color: #6b7280;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+@media (max-width: 768px) {
+  .legal-content {
+    margin: 2rem 1rem 0;
+    padding: 2rem 1.5rem;
+  }
 }
 </style>
