@@ -96,6 +96,7 @@
 <style scoped>
 .legal-page-container {
   min-height: 100vh;
+  width: 100%;
   background-color: #0B1121;
   background-image: 
     radial-gradient(circle at 15% 20%, rgba(255, 102, 0, 0.12) 0%, transparent 40%),
