@@ -48,15 +48,20 @@ class CampaignService {
       const workbook = xlsx.readFile(filePath);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const data = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+      // Use raw: true to get actual numbers (avoids scientific notation like 9.66535E+11)
+      const data = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: true, defval: '' });
       logger.info(`Excel rows count: ${data.length}`);
       if (data.length > 0) logger.info(`First row: ${JSON.stringify(data[0])}`);
       
       // Check if first row is header
       let startIndex = 0;
       if (data.length > 0) {
-        const firstCell = data[0][0]?.toString().replace(/[^0-9]/g, '');
-        if (!firstCell || firstCell.length < 8) {
+        const firstCell = data[0][0];
+        const firstCellStr = typeof firstCell === 'number'
+          ? firstCell.toFixed(0)
+          : (firstCell?.toString() || '');
+        const firstCellDigits = firstCellStr.replace(/[^0-9]/g, '');
+        if (!firstCellDigits || firstCellDigits.length < 8) {
           startIndex = 1; // Skip header row
         }
       }
@@ -65,15 +70,28 @@ class CampaignService {
         const row = data[i];
         if (!row || row.length === 0) continue;
 
-        let phone = row[0]?.toString() || '';
+        // ✅ Fix: if cell is a number (Excel stores phone as number), use toFixed(0)
+        // to avoid scientific notation (e.g. 9.66535E+11 → 966535278722)
+        const rawPhone = row[0];
+        let phone = '';
+        if (typeof rawPhone === 'number') {
+          phone = rawPhone.toFixed(0); // e.g. 966535278722
+        } else {
+          phone = (rawPhone?.toString() || '');
+        }
         phone = phone.replace(/[^0-9]/g, '');
 
-        if (phone && phone.length >= 8 && phone.length <= 18) {
+        logger.info(`[parseFile] Row ${i}: raw="${rawPhone}", parsed phone="${phone}"`);
+
+        if (phone && phone.length >= 8 && phone.length <= 15) {
           const variables = [];
           if (isMeta) {
             // Read exactly from Column B (index 1) onwards
             for (let j = 1; j < row.length; j++) {
-              variables.push(row[j]?.toString() || '');
+              const cellVal = row[j];
+              // Also handle numbers in variable columns
+              const varStr = typeof cellVal === 'number' ? cellVal.toFixed(0) : (cellVal?.toString() || '');
+              variables.push(varStr);
             }
             // Trim trailing empty variables
             while (variables.length > 0 && variables[variables.length - 1] === '') {
@@ -81,6 +99,8 @@ class CampaignService {
             }
           }
           records.push({ phone, variables });
+        } else if (phone) {
+          logger.warn(`[parseFile] Row ${i}: phone "${phone}" invalid length ${phone.length}, skipping`);
         }
       }
     }
