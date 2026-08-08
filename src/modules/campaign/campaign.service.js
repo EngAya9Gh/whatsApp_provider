@@ -52,26 +52,37 @@ class CampaignService {
       logger.info(`Excel rows count: ${data.length}`);
       if (data.length > 0) logger.info(`First row: ${JSON.stringify(data[0])}`);
       
-      data.forEach(row => {
-        let phone = null;
-        let phoneIndex = -1;
-        
-        for (let i = 0; i < row.length; i++) {
-          const val = row[i]?.toString() || '';
-          const clean = val.replace(/[^0-9]/g, '');
-          if (clean && clean.length >= 8 && clean.length <= 18) {
-            phone = clean;
-            phoneIndex = i;
-            break;
-          }
+      // Check if first row is header
+      let startIndex = 0;
+      if (data.length > 0) {
+        const firstCell = data[0][0]?.toString().replace(/[^0-9]/g, '');
+        if (!firstCell || firstCell.length < 8) {
+          startIndex = 1; // Skip header row
         }
+      }
 
-        if (phone) {
-          const variables = isMeta ? row.filter((_, idx) => idx !== phoneIndex).map(v => v?.toString() || '') : [];
+      for (let i = startIndex; i < data.length; i++) {
+        const row = data[i];
+        if (!row || row.length === 0) continue;
+
+        let phone = row[0]?.toString() || '';
+        phone = phone.replace(/[^0-9]/g, '');
+
+        if (phone && phone.length >= 8 && phone.length <= 18) {
+          const variables = [];
+          if (isMeta) {
+            // Read exactly from Column B (index 1) onwards
+            for (let j = 1; j < row.length; j++) {
+              variables.push(row[j]?.toString() || '');
+            }
+            // Trim trailing empty variables
+            while (variables.length > 0 && variables[variables.length - 1] === '') {
+              variables.pop();
+            }
+          }
           records.push({ phone, variables });
         }
-      });
-    }
+      }
     
     logger.info(`Parsed ${records.length} valid records`);
     fs.unlink(filePath, () => {});
