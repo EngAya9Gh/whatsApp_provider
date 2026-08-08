@@ -84,10 +84,10 @@ app.use((err, req, res, next) => {
   if (err && typeof err === 'object' && !(err instanceof Error)) {
     const status = err.status || err.code || 400;
     const message = err.message || (err.error && err.error.message) || JSON.stringify(err);
-    logger.error('[API Error]', JSON.stringify(err));
+    logger.error(err, '[API Error]');
     return res.status(typeof status === 'number' ? status : 400).json({ error: { message } });
   }
-  logger.error(err?.stack || err?.message || err);
+  logger.error(err, 'Unhandled Error');
   res.status(err?.status || 500).json({
     error: {
       message: err?.message || 'Internal Server Error',

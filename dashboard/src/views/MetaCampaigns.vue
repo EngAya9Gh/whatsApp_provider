@@ -477,7 +477,8 @@ const createCampaign = async () => {
     }
     closeModal(); fetchCampaigns()
   } catch (err) {
-    showAlert(err.response?.data?.error || (isAr.value ? 'فشل إنشاء الحملة.' : 'Failed to create campaign.'), 'error')
+    const errorMsg = err.response?.data?.error?.message || err.response?.data?.error || (isAr.value ? 'فشل إنشاء الحملة.' : 'Failed to create campaign.');
+    showAlert(errorMsg, 'error')
   } finally { isSubmitting.value = false }
 }
 
@@ -488,7 +489,8 @@ const launchCampaign = async (campaignId) => {
     showAlert(isAr.value ? 'تم إطلاق الحملة بنجاح! 🚀' : 'Campaign launched successfully! 🚀')
     fetchCampaigns()
   } catch (err) {
-    showAlert(err.response?.data?.error || (isAr.value ? 'فشل إطلاق الحملة.' : 'Failed to launch campaign.'), 'error')
+    const errorMsg = err.response?.data?.error?.message || err.response?.data?.error || (isAr.value ? 'فشل إطلاق الحملة.' : 'Failed to launch campaign.');
+    showAlert(errorMsg, 'error')
   } finally { launchingId.value = null }
 }
 
