@@ -360,10 +360,11 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 
 const route = useRoute()
+const router = useRouter()
 const campaignId = route.params.id
 
 const loading = ref(true)
