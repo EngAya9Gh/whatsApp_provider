@@ -187,7 +187,7 @@
               </div>
               <div class="guide-items">
                 <div class="guide-item"><div class="guide-num">1</div><div><strong>{{ isAr ? 'ملف الأرقام' : 'Phone Numbers File' }}</strong><p>{{ isAr ? 'العمود A: الصيغة الدولية بدون +' : 'Column A: International format (no +)' }}</p></div></div>
-                <div class="guide-item"><div class="guide-num">2</div><div><strong>{{ isAr ? 'المتغيرات' : 'Dynamic Variables' }}</strong><p v-if="isAr">{{ '{{1}}' }} → العمود B، {{ '{{2}}' }} → العمود C</p><p v-else>{{ '{{1}}' }} → Column B, {{ '{{2}}' }} → Column C</p></div></div>
+                <div class="guide-item"><div class="guide-num">2</div><div><strong>{{ isAr ? 'المتغيرات' : 'Dynamic Variables' }}</strong><p v-if="isAr"><span v-pre>{{1}}</span> → العمود B، <span v-pre>{{2}}</span> → العمود C</p><p v-else><span v-pre>{{1}}</span> → Column B, <span v-pre>{{2}}</span> → Column C</p></div></div>
                 <div class="guide-item"><div class="guide-num">3</div><div><strong>{{ isAr ? 'القوالب المعتمدة' : 'Approved Templates Only' }}</strong><p>{{ isAr ? 'يُرسل ميتا القوالب المعتمدة فقط' : 'Only APPROVED templates are delivered' }}</p></div></div>
                 <div class="guide-separator"></div>
                 <div class="guide-launch-info">
