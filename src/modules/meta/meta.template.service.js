@@ -22,6 +22,39 @@ class MetaTemplateService {
    * Optional filters: status, name
    */
   async listTemplates(channel, options = {}) {
+    // 🔴 MOCK MODE FOR TESTING 🔴
+    // if (channel.metaAccessToken && channel.metaAccessToken.includes('password')) {
+    //   logger.info('[MetaTemplateService] Returning MOCK templates for testing mode.');
+    //   return {
+    //     data: [
+    //       {
+    //         id: 'mock-1',
+    //         name: 'summer_sale_2025',
+    //         language: 'ar',
+    //         status: 'APPROVED',
+    //         category: 'MARKETING',
+    //         components: [{ type: 'BODY', text: 'مرحباً {{1}}! خصم 50% بمناسبة الصيف. كود الخصم: {{2}}' }]
+    //       },
+    //       {
+    //         id: 'mock-2',
+    //         name: 'order_update',
+    //         language: 'en_US',
+    //         status: 'APPROVED',
+    //         category: 'UTILITY',
+    //         components: [{ type: 'BODY', text: 'Hi {{1}}, your order {{2}} has been shipped.' }]
+    //       },
+    //       {
+    //         id: 'mock-3',
+    //         name: 'welcome_message',
+    //         language: 'ar',
+    //         status: 'PENDING',
+    //         category: 'MARKETING',
+    //         components: [{ type: 'BODY', text: 'أهلاً بك في متجرنا يا {{1}}!' }]
+    //       }
+    //     ]
+    //   };
+    // }
+
     const params = {
       limit: options.limit || 100,
       fields: 'id,name,status,category,language,components,quality_score,rejected_reason'
@@ -83,6 +116,12 @@ class MetaTemplateService {
       components,
       ...(allow_category_change !== undefined && { allow_category_change })
     };
+
+    // 🔴 MOCK MODE FOR TESTING 🔴
+    // if (channel.metaAccessToken && channel.metaAccessToken.includes('password')) {
+    //   logger.info(`[MetaTemplateService] MOCK Template created: ${cleanName}`);
+    //   return { id: 'mock-' + Date.now(), status: 'PENDING' };
+    // }
 
     try {
       const res = await axios.post(

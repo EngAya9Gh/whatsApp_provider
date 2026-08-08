@@ -7,44 +7,37 @@
       <div class="hero-content">
         <div class="hero-left">
           <div class="hero-icon-wrap">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/>
               <circle cx="10" cy="13" r="2"/><line x1="10" y1="17" x2="14" y2="17"/>
             </svg>
           </div>
           <div>
-            <h1 class="hero-title">{{ isAr ? 'قوالب ميتا' : 'Meta Templates' }}</h1>
-            <p class="hero-sub">{{ isAr ? 'إدارة قوالب رسائل الواتساب الرسمية مع ميتا مباشرة.' : 'Manage official WhatsApp message templates directly with Meta.' }}</p>
+            <div class="hero-title-row">
+              <h1 class="hero-title">{{ isAr ? 'قوالب ميتا' : 'Meta Templates' }}</h1>
+              <div class="hero-stats-inline" v-if="templates.length > 0">
+                <span class="hstat-chip">{{ templates.length }} {{ isAr ? 'قالب' : 'total' }}</span>
+                <span class="hstat-chip approved">{{ templates.filter(t => t.status === 'APPROVED').length }} {{ isAr ? 'معتمد' : 'approved' }}</span>
+                <span class="hstat-chip pending" v-if="templates.filter(t => t.status === 'PENDING' || t.status === 'IN_APPEAL').length > 0">{{ templates.filter(t => t.status === 'PENDING' || t.status === 'IN_APPEAL').length }} {{ isAr ? 'قيد المراجعة' : 'pending' }}</span>
+              </div>
+            </div>
+            <p class="hero-sub">{{ isAr ? 'إدارة قوالب رسائل الواتساب الرسمية مع ميتا' : 'Manage official WhatsApp message templates with Meta' }}</p>
           </div>
         </div>
         
         <div class="hero-actions" v-if="activeMetaChannelId">
+          <button @click="fetchTemplates" :disabled="loading" class="btn-refresh" :title="isAr ? 'تحديث من ميتا' : 'Sync from Meta'">
+            <svg :class="loading ? 'spin-icon' : ''" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            {{ isAr ? 'تحديث' : 'Sync' }}
+          </button>
           <button @click="showLibraryModal = true" class="btn-secondary">
             📚 {{ isAr ? 'مكتبة القوالب' : 'Template Library' }}
           </button>
           <button @click="showCreateModal = true" class="btn-create">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             {{ isAr ? 'إنشاء قالب' : 'Create Template' }}
           </button>
-        </div>
-      </div>
-      
-      <!-- Stats Strip -->
-      <div class="hero-stats" v-if="templates.length > 0">
-        <div class="hstat">
-          <span class="hstat-val">{{ templates.length }}</span>
-          <span class="hstat-lbl">{{ isAr ? 'الإجمالي' : 'Total' }}</span>
-        </div>
-        <div class="hstat-sep"></div>
-        <div class="hstat">
-          <span class="hstat-val approved">{{ templates.filter(t => t.status === 'APPROVED').length }}</span>
-          <span class="hstat-lbl">{{ isAr ? 'معتمد' : 'Approved' }}</span>
-        </div>
-        <div class="hstat-sep"></div>
-        <div class="hstat">
-          <span class="hstat-val pending">{{ templates.filter(t => t.status === 'PENDING' || t.status === 'IN_APPEAL').length }}</span>
-          <span class="hstat-lbl">{{ isAr ? 'قيد المراجعة' : 'Pending' }}</span>
         </div>
       </div>
     </div>
@@ -55,6 +48,11 @@
         <div v-if="error" class="tpl-alert error">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           {{ error }}
+        </div>
+      </transition>
+      <transition name="slide-fade">
+        <div v-if="successMsg" class="tpl-alert success">
+          {{ successMsg }}
         </div>
       </transition>
 
@@ -116,9 +114,15 @@
           </div>
 
           <div class="card-footer">
-            <button @click="deleteTemplate(template.name)" class="btn-delete" title="Delete from Meta">
+            <div class="card-footer-left">
+              <span v-if="template.status === 'PENDING' || template.status === 'IN_APPEAL'" class="pending-hint">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {{ isAr ? 'قيد مراجعة ميتا...' : 'Under Meta review...' }}
+              </span>
+            </div>
+            <button @click="deleteTemplate(template.name)" class="btn-delete" :title="isAr ? 'حذف من ميتا' : 'Delete from Meta'">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-              Delete
+              {{ isAr ? 'حذف' : 'Delete' }}
             </button>
           </div>
         </div>
@@ -393,6 +397,7 @@ const loading = ref(true)
 const showCreateModal = ref(false)
 const creating = ref(false)
 const error = ref('')
+const successMsg = ref('')
 
 const form = ref({
   name: '',
@@ -510,10 +515,19 @@ const submitTemplate = async () => {
       body: '', bodyVariables: [], footer: '', buttons: []
     }
     fetchTemplates()
-    alert('Template submitted to Meta successfully!')
+    successMsg.value = isAr.value
+      ? '✅ تم إرسال القالب إلى ميتا بنجاح! سيظهر بحالة "قيد المراجعة" حتى تعتمده ميتا (قد يستغرق ذلك دقائق أو ساعات). اضغط زر تحديث لمزامنة الحالة.'
+      : '✅ Template submitted to Meta! It will appear as "PENDING" until Meta reviews and approves it. This may take minutes to hours. Use the Sync button to refresh statuses.'
+    setTimeout(() => { successMsg.value = '' }, 12000)
   } catch (err) {
     console.error(err)
-    alert(err.response?.data?.message || err.response?.data?.error?.message || 'Failed to submit template')
+    const msg = err.response?.data?.message
+      || err.response?.data?.error
+      || err.response?.data?.meta_error?.message
+      || err.message
+      || 'Failed to submit template to Meta'
+    error.value = msg
+    setTimeout(() => { error.value = '' }, 10000)
   } finally {
     creating.value = false
   }
@@ -576,7 +590,7 @@ onMounted(() => {
 /* ═══ HERO ═══ */
 .hero-header {
   background: linear-gradient(135deg, #022c22 0%, #064e3b 50%, #022c22 100%);
-  padding: 2.5rem 2.5rem 0;
+  padding: 1.75rem 2.5rem;
   position: relative; overflow: hidden;
 }
 .hero-glow {
@@ -588,44 +602,57 @@ onMounted(() => {
   display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;
   position: relative; z-index: 1; flex-wrap: wrap;
 }
-.hero-left { display: flex; align-items: center; gap: 1.25rem; }
+.hero-left { display: flex; align-items: center; gap: 1rem; }
 .hero-icon-wrap {
-  width: 56px; height: 56px;
+  width: 44px; height: 44px;
   background: linear-gradient(135deg, #10B981, #059669);
-  border-radius: 18px;
+  border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
   color: white; flex-shrink: 0;
-  box-shadow: 0 8px 24px rgba(16,185,129,0.3);
+  box-shadow: 0 6px 18px rgba(16,185,129,0.3);
 }
-.hero-title { font-size: 2rem; font-weight: 900; color: #fff; margin: 0 0 0.3rem; letter-spacing: -0.03em; }
-.hero-sub { font-size: 0.9rem; color: #64748B; margin: 0; font-weight: 500; }
-.hero-actions { display: flex; gap: 1rem; }
+.hero-title-row { display: flex; align-items: center; gap: 0.875rem; flex-wrap: wrap; margin-bottom: 0.2rem; }
+.hero-title { font-size: 1.5rem; font-weight: 900; color: #fff; margin: 0; letter-spacing: -0.02em; }
+.hero-sub { font-size: 0.82rem; color: #64748B; margin: 0; font-weight: 500; }
+.hero-actions { display: flex; gap: 0.75rem; align-items: center; }
 
-.hero-stats {
-  display: flex; align-items: center; margin-top: 2rem;
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-bottom: none; border-radius: 16px 16px 0 0;
-  padding: 1.25rem 2rem; position: relative; z-index: 1;
+/* Inline chip stats */
+.hero-stats-inline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hstat-chip {
+  display: inline-flex; align-items: center;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 0.72rem; font-weight: 700;
+  background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8);
+  border: 1px solid rgba(255,255,255,0.15);
 }
-.hstat { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; padding: 0 2rem; flex: 1; }
-.hstat-val { font-size: 1.75rem; font-weight: 900; color: #fff; line-height: 1; }
-.hstat-val.approved { color: #10B981; }
-.hstat-val.pending { color: #F59E0B; }
-.hstat-lbl { font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.06em; }
-.hstat-sep { width: 1px; height: 40px; background: rgba(255,255,255,0.08); flex-shrink: 0; }
+.hstat-chip.approved { background: rgba(16,185,129,0.15); color: #34D399; border-color: rgba(16,185,129,0.2); }
+.hstat-chip.pending  { background: rgba(245,158,11,0.15); color: #FBBF24; border-color: rgba(245,158,11,0.2); }
+
+/* Refresh button */
+.btn-refresh {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.9);
+  border: 1px solid rgba(255,255,255,0.18);
+  padding: 0.65rem 1.1rem; border-radius: 12px;
+  font-weight: 700; font-size: 0.82rem; cursor: pointer;
+  transition: all 0.2s; backdrop-filter: blur(8px); font-family: inherit;
+}
+.btn-refresh:hover:not(:disabled) { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); }
+.btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-create {
-  display: inline-flex; align-items: center; gap: 8px;
+  display: inline-flex; align-items: center; gap: 7px;
   background: linear-gradient(135deg, #10B981, #059669); color: white;
-  padding: 0.85rem 1.5rem; border: none; border-radius: 14px;
-  font-weight: 800; font-size: 0.9rem; cursor: pointer; transition: all 0.25s;
-  box-shadow: 0 6px 20px rgba(16,185,129,0.3); font-family: inherit;
+  padding: 0.65rem 1.25rem; border: none; border-radius: 12px;
+  font-weight: 800; font-size: 0.85rem; cursor: pointer; transition: all 0.25s;
+  box-shadow: 0 4px 14px rgba(16,185,129,0.3); font-family: inherit;
 }
-.btn-create:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(16,185,129,0.4); }
+.btn-create:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(16,185,129,0.4); }
 .btn-create:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-secondary {
-  background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);
-  padding: 0.85rem 1.5rem; border-radius: 14px; font-weight: 800; font-size: 0.9rem;
-  cursor: pointer; transition: all 0.25s; backdrop-filter: blur(8px);
+  background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.2);
+  padding: 0.65rem 1.1rem; border-radius: 12px; font-weight: 700; font-size: 0.82rem;
+  cursor: pointer; transition: all 0.25s; backdrop-filter: blur(8px); font-family: inherit;
 }
 .btn-secondary:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); }
 
@@ -759,6 +786,15 @@ onMounted(() => {
 
 .form-hint { font-size: 0.75rem; color: #64748B; font-weight: 500; margin: 0; }
 .var-badge { background: #E2E8F0; color: #334155; padding: 0 0.75rem; border-radius: 8px; font-family: monospace; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+
+.tpl-alert { display: flex; align-items: flex-start; gap: 10px; padding: 1rem 1.25rem; border-radius: 14px; font-size: 0.875rem; font-weight: 600; margin-bottom: 1.5rem; line-height: 1.5; }
+.tpl-alert.error   { background: #FEF2F2; color: #DC2626; border: 1px solid #FEE2E2; }
+.tpl-alert.success { background: #F0FDF4; color: #15803D; border: 1px solid #DCFCE7; }
+
+.card-footer { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-top: 1px solid #F1F5F9; gap: 1rem; }
+.card-footer-left { flex: 1; }
+.pending-hint { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: #D97706; font-weight: 600; }
+.pending-hint svg { flex-shrink: 0; color: #D97706; }
 
 .btn-sm { background: white; border: 1px solid #CBD5E1; padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800; color: #334155; cursor: pointer; transition: all 0.2s; }
 .btn-sm:hover { background: #F8FAFC; border-color: #64748B; }

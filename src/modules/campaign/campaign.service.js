@@ -218,6 +218,12 @@ class CampaignService {
       throw { status: 400, message: 'Campaign is already running or completed' };
     }
 
+    // Calculate base delay if campaign has a future startDate
+    const now = Date.now();
+    const scheduledAt = campaign.startDate ? new Date(campaign.startDate).getTime() : null;
+    const baseDelay = scheduledAt && scheduledAt > now ? scheduledAt - now : 0;
+    const isScheduled = baseDelay > 0;
+
     // Add Jobs to BullMQ
     let jobs = [];
     if (campaign.campaignType === 'META') {
@@ -234,7 +240,7 @@ class CampaignService {
           templateName: campaign.message,
           metaCategory: campaign.metaCategory
         },
-        opts: { delay: index * 1000 } // Stagger by 1 sec
+        opts: { delay: baseDelay + (index * 1000) } // Stagger by 1 sec after base delay
       }));
       if (jobs.length > 0) await metaCampaignQueue.addBulk(jobs);
     } else {
@@ -259,7 +265,7 @@ class CampaignService {
           opts: {
             removeOnComplete: true,
             removeOnFail: false,
-            delay: index * randomDelay
+            delay: baseDelay + (index * randomDelay)
           }
         };
       });
@@ -298,10 +304,13 @@ class CampaignService {
       }
     }
 
+    // If scheduled for future, set SCHEDULED status. Otherwise RUNNING.
+    const newStatus = isScheduled ? 'SCHEDULED' : 'RUNNING';
+
     await prisma.campaign.update({
       where: { id: campaign.id },
       data: { 
-        status: 'RUNNING',
+        status: newStatus,
         totalCost,
         totalMessages
       }
@@ -309,9 +318,14 @@ class CampaignService {
 
     return {
       success: true,
-      message: 'Campaign started successfully. Messages are being sent gradually.'
+      status: newStatus,
+      scheduledAt: isScheduled ? new Date(scheduledAt).toISOString() : null,
+      message: isScheduled
+        ? `Campaign scheduled successfully. Messages will be sent at ${new Date(scheduledAt).toLocaleString()}.`
+        : 'Campaign started successfully. Messages are being sent gradually.'
     };
   }
+
 
   async getCampaigns(tenantId, { page = 1, limit = 50, campaignType, channelId } = {}) {
     const where = { tenantId };

@@ -80,11 +80,18 @@ app.get('/api/health/logs', (req, res) => {
 
 // Error handling middleware (should be last)
 app.use((err, req, res, next) => {
-  logger.error(err.stack);
-  res.status(err.status || 500).json({
+  // Handle plain objects (e.g. from Meta API errors passed via throw)
+  if (err && typeof err === 'object' && !(err instanceof Error)) {
+    const status = err.status || err.code || 400;
+    const message = err.message || (err.error && err.error.message) || JSON.stringify(err);
+    logger.error('[API Error]', JSON.stringify(err));
+    return res.status(typeof status === 'number' ? status : 400).json({ error: { message } });
+  }
+  logger.error(err?.stack || err?.message || err);
+  res.status(err?.status || 500).json({
     error: {
-      message: err.message || 'Internal Server Error',
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+      message: err?.message || 'Internal Server Error',
+      ...(process.env.NODE_ENV === 'development' && { stack: err?.stack })
     }
   });
 });

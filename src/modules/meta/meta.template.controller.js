@@ -105,7 +105,19 @@ class MetaTemplateController {
         message: 'Template submitted for Meta review. Status will update within minutes to 24 hours.'
       });
     } catch (error) {
-      next(error);
+      logger.error('[MetaTemplateController] createTemplate error', error.response?.data || error);
+      // Extract meaningful message from Meta API error
+      const metaMsg = error?.error?.message
+        || error?.response?.data?.error?.message
+        || error?.message
+        || 'Failed to create template on Meta';
+      const status = error?.status || error?.response?.status || 400;
+      return res.status(typeof status === 'number' ? status : 400).json({
+        success: false,
+        error: metaMsg,
+        message: metaMsg,
+        meta_error: error?.error || null
+      });
     }
   }
 
