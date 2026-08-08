@@ -107,10 +107,16 @@ class MetaTemplateController {
     } catch (error) {
       logger.error('[MetaTemplateController] createTemplate error', error.response?.data || error);
       // Extract meaningful message from Meta API error
-      const metaMsg = error?.error?.message
+      let metaMsg = error?.error?.message
         || error?.response?.data?.error?.message
         || error?.message
         || 'Failed to create template on Meta';
+      
+      const metaErr = error?.response?.data?.error;
+      if (metaErr?.error_user_title || metaErr?.error_user_msg) {
+        metaMsg = `${metaMsg} - ${metaErr.error_user_title || ''} ${metaErr.error_user_msg || ''}`.trim();
+      }
+      
       const status = error?.status || error?.response?.status || 400;
       return res.status(typeof status === 'number' ? status : 400).json({
         success: false,

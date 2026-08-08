@@ -373,9 +373,11 @@ const filteredLibrary = computed(() => {
 })
 
 const selectLibraryTemplate = (tpl) => {
+  const randomSuffix = Math.floor(Math.random() * 10000);
+  
   form.value = {
-    name: tpl.formState.name,
-    language: tpl.formState.language,
+    name: `${tpl.formState.name}_${randomSuffix}`,
+    language: tpl.formState.language || 'en_US',
     category: tpl.formState.category,
     headerType: tpl.formState.headerType || '',
     headerText: tpl.formState.headerText || '',
