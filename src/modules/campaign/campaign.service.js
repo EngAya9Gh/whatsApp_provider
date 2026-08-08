@@ -471,26 +471,40 @@ class CampaignService {
       data: { status: 'PENDING', error: null }
     });
 
-    // Add Jobs to BullMQ
-    const jobs = campaign.targets.map(target => ({
-      name: 'send-campaign-msg',
-      data: {
-        tenantId,
-        phone: target.phone,
-        message: campaign.message,
-        templateId: campaign.templateId,
-        mediaPath: campaign.mediaPath,
-        mediaMime: campaign.mediaMime,
-        targetId: target.id
-      },
-      opts: {
-        removeOnComplete: true,
-        removeOnFail: false
-      }
-    }));
-    
-    if (jobs.length > 0) {
-      await campaignQueue.addBulk(jobs);
+    // Add Jobs to BullMQ - route to correct queue based on campaign type
+    if (campaign.campaignType === 'META') {
+      const { metaCampaignQueue } = require('../../workers/meta.campaign.worker');
+      const jobs = campaign.targets.map(target => ({
+        name: 'send-meta-campaign-message',
+        data: {
+          campaignId: campaign.id,
+          targetId: target.id,
+          tenantId: campaign.tenantId,
+          channelId: campaign.channelId,
+          phone: target.phone,
+          variables: target.variables ? JSON.parse(target.variables) : [],
+          templateName: campaign.message,
+          templateLanguage: campaign.templateId || null, // templateId stores language for META
+          metaCategory: campaign.metaCategory
+        },
+        opts: { removeOnComplete: true, removeOnFail: false }
+      }));
+      if (jobs.length > 0) await metaCampaignQueue.addBulk(jobs);
+    } else {
+      const jobs = campaign.targets.map(target => ({
+        name: 'send-campaign-msg',
+        data: {
+          tenantId,
+          phone: target.phone,
+          message: campaign.message,
+          templateId: campaign.templateId,
+          mediaPath: campaign.mediaPath,
+          mediaMime: campaign.mediaMime,
+          targetId: target.id
+        },
+        opts: { removeOnComplete: true, removeOnFail: false }
+      }));
+      if (jobs.length > 0) await campaignQueue.addBulk(jobs);
     }
 
     await prisma.campaign.update({
