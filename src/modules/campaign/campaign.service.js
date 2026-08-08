@@ -111,7 +111,7 @@ class CampaignService {
     return records;
   }
 
-  async createCampaign({ tenantId, name, message, templateId, file, image, buttons, interactiveType, startDate, endDate, campaignType, channelId, metaCategory }) {
+  async createCampaign({ tenantId, name, message, templateId, templateLanguage, file, image, buttons, interactiveType, startDate, endDate, campaignType, channelId, metaCategory }) {
     const isMeta = campaignType === 'META';
     // 1. Parse phones and variables from file
     const records = await this.parseFile(file, isMeta);
@@ -165,7 +165,7 @@ class CampaignService {
         channelId: channelId || null,
         name,
         message: message || null,
-        templateId: templateId || null,
+        templateId: templateLanguage ? `${templateLanguage}` : (templateId || null), // store templateLanguage in templateId for META
         mediaPath: image ? image.path : null,
         mediaMime: image ? image.mimetype : null,
         buttons: buttons ? JSON.stringify(buttons) : null,
@@ -270,6 +270,7 @@ class CampaignService {
           phone: target.phone,
           variables: target.variables ? JSON.parse(target.variables) : [],
           templateName: campaign.message,
+          templateLanguage: campaign.templateId || 'ar', // templateId stores the language for META
           metaCategory: campaign.metaCategory
         },
         opts: { delay: baseDelay + (index * 1000) } // Stagger by 1 sec after base delay

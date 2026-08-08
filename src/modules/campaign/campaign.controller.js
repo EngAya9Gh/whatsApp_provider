@@ -3,7 +3,7 @@ const campaignService = require('./campaign.service');
 exports.createCampaign = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
-    const { name, message, templateId, templateName, interactiveType, startDate, endDate, campaignType, channelId, metaCategory } = req.body;
+    const { name, message, templateId, templateName, templateLanguage, interactiveType, startDate, endDate, campaignType, channelId, metaCategory } = req.body;
     const file = req.files?.file?.[0];
     const image = req.files?.image?.[0];
 
@@ -55,6 +55,7 @@ exports.createCampaign = async (req, res, next) => {
       name,
       message: campaignType === 'META' ? templateName : message,
       templateId,
+      templateLanguage: templateLanguage || 'ar',
       file,
       image,
       buttons,

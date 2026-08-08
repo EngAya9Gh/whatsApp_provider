@@ -6,9 +6,10 @@ const redisConfig = require('../config/redis');
 
 const prisma = new PrismaClient();
 const metaCampaignQueue = new Queue('meta-campaign-queue', { connection: redisConfig });
+const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || 'v21.0';
 
 const worker = new Worker('meta-campaign-queue', async (job) => {
-  const { campaignId, targetId, tenantId, channelId, phone, variables, templateName, metaCategory } = job.data;
+  const { campaignId, targetId, tenantId, channelId, phone, variables, templateName, templateLanguage, metaCategory } = job.data;
   
   try {
     // 1. Fetch the Meta Channel details to get the Access Token & Phone ID
@@ -34,6 +35,10 @@ const worker = new Worker('meta-campaign-queue', async (job) => {
       });
     }
 
+    // Use the language stored with the template, fallback to 'ar'
+    const langCode = templateLanguage || 'ar';
+    logger.info(`[MetaCampaign] Sending template "${templateName}" (lang: ${langCode}) to ${phone}, variables: ${JSON.stringify(variables)}`);
+
     // 3. Prepare Axios Payload
     const payload = {
       messaging_product: 'whatsapp',
@@ -43,14 +48,14 @@ const worker = new Worker('meta-campaign-queue', async (job) => {
       template: {
         name: templateName,
         language: {
-          code: 'ar' // Defaulting to Arabic or can be dynamic later
+          code: langCode
         },
         components
       }
     };
 
     // 4. Send to Meta API
-    const url = `https://graph.facebook.com/v18.0/${channel.metaPhoneNumberId}/messages`;
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${channel.metaPhoneNumberId}/messages`;
     const response = await axios.post(url, payload, {
       headers: {
         'Authorization': `Bearer ${channel.metaAccessToken}`,

@@ -457,7 +457,12 @@ const createCampaign = async () => {
   formData.append('templateName', form.value.templateName)
   formData.append('channelId', activeMetaChannelId.value)
   const tpl = metaTemplates.value.find(t => t.name === form.value.templateName)
-  if (tpl) formData.append('metaCategory', tpl.category)
+  if (tpl) {
+    formData.append('metaCategory', tpl.category)
+    // Send the template language so the worker uses correct language code
+    const langCode = tpl.language || (tpl.components?.[0]?.language) || 'ar'
+    formData.append('templateLanguage', langCode)
+  }
   formData.append('file', form.value.file)
   if (form.value.launchMode === 'schedule' && form.value.scheduledAt) {
     formData.append('startDate', new Date(form.value.scheduledAt).toISOString())
