@@ -115,7 +115,7 @@
               <h3 class="card-name">{{ campaign.name }}</h3>
               <div class="card-meta">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                {{ new Date(campaign.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) }}
+                {{ new Date(campaign.createdAt).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
               </div>
             </div>
             <span :class="['status-badge', `badge-${campaign.status.toLowerCase()}`]">
