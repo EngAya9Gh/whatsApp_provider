@@ -54,14 +54,20 @@ class MetaController {
         const metaPhoneNumberId = metadata?.phone_number_id;
 
         // Find the channel this webhook belongs to
+        logger.info(`[MetaWebhook] 🔍 Looking for channel with phone_number_id: "${metaPhoneNumberId}"`);
         const channel = await prisma.whatsAppChannel.findFirst({
           where: { metaPhoneNumberId, status: 'CONNECTED' }
         }).catch(() => null);
 
         if (!channel) {
-          logger.warn(`[MetaWebhook] Unknown phone_number_id: ${metaPhoneNumberId}`);
+          // Log ALL channels to help debug mismatch
+          const allChannels = await prisma.whatsAppChannel.findMany({
+            select: { id: true, metaPhoneNumberId: true, status: true, displayPhoneNumber: true }
+          }).catch(() => []);
+          logger.warn(`[MetaWebhook] ⚠️ Unknown phone_number_id: "${metaPhoneNumberId}". All channels: ${JSON.stringify(allChannels)}`);
           continue;
         }
+        logger.info(`[MetaWebhook] ✅ Found channel: ${channel.id} for phone_number_id: ${metaPhoneNumberId}`);
 
         // --- HMAC Signature Verification (Per-Channel) ---
         // Verify signature ONLY if the channel has a metaAppSecret configured
@@ -92,18 +98,21 @@ class MetaController {
         // ─────────────────────────────────────────────────────────────
         if (change.value.messages) {
           const contacts = change.value.contacts || [];
+          logger.info(`[MetaWebhook] 📨 Received ${change.value.messages.length} incoming message(s) for channel ${channel.id} (phone_number_id: ${metaPhoneNumberId})`);
 
           for (const msg of change.value.messages) {
             const from = msg.from; // sender's WhatsApp phone number
             const contactName = contacts.find(c => c.wa_id === from)?.profile?.name || null;
+            logger.info(`[MetaWebhook] 💬 Message from: ${from} | type: ${msg.type} | id: ${msg.id} | contact: ${contactName}`);
 
             // Forward to Live Chat service
             try {
               await chatService.handleIncomingMessage(
                 channel.tenantId, channel.id, from, contactName, msg
               );
+              logger.info(`[MetaWebhook] ✅ Live chat saved message from ${from} to channel ${channel.id}`);
             } catch (chatError) {
-              logger.error('[MetaWebhook] Live chat error', chatError.message);
+              logger.error(`[MetaWebhook] ❌ Live chat error for msg from ${from}: ${chatError.message}`, chatError);
             }
 
             // Parse message text/button payload for AutoResponder
