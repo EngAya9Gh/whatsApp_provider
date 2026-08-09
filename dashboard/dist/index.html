@@ -5,29 +5,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WhatsApp SaaS Dashboard</title>
-    <script>
-      window.addEventListener('error', (event) => {
-        fetch('http://localhost:8888/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: event.message, filename: event.filename, lineno: event.lineno, colno: event.colno })
-        });
-      });
-      window.addEventListener('unhandledrejection', (event) => {
-        fetch('http://localhost:8888/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: event.reason?.message || event.reason })
-        });
-      });
-    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
       body { margin: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f9fafb; color: #111827; }
     </style>
-    <script type="module" crossorigin src="/assets/index-CiWaDaA6.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DQ6xuRVL.css">
+    <script type="module" crossorigin src="/assets/index-ClT_Lfyk.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DyqkIoDy.css">
   </head>
   <body>
     <div id="app"></div>
