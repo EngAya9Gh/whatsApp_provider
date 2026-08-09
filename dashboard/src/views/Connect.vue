@@ -240,42 +240,46 @@ const handleFbMessage = (event) => {
 }
 
 // ─── Callback after FB.login() completes ──────────────────────
-const fbLoginCallback = async (response) => {
-  if (response.authResponse) {
-    const code = response.authResponse.code
-    const signupData = window._embeddedSignupData || {}
-    const phone_number_id = signupData.phone_number_id
-    const waba_id = signupData.waba_id
+const fbLoginCallback = (response) => {
+  // FB SDK throws errors if you pass an async function directly to FB.login()
+  // So we use a standard sync function here, and run async code inside.
+  (async () => {
+    if (response.authResponse) {
+      const code = response.authResponse.code
+      const signupData = window._embeddedSignupData || {}
+      const phone_number_id = signupData.phone_number_id
+      const waba_id = signupData.waba_id
 
-    if (!phone_number_id || !waba_id) {
+      if (!phone_number_id || !waba_id) {
+        embeddedSignupStatus.value = 'error'
+        embeddedSignupMessage.value = 'Could not capture phone_number_id or waba_id from Meta. Please try again.'
+        return
+      }
+
+      embeddedSignupStatus.value = 'loading'
+      embeddedSignupMessage.value = 'Saving your WhatsApp channel...'
+
+      try {
+        const token = localStorage.getItem('token')
+        const res = await axios.post('/api/v1/meta/embedded-signup/exchange', {
+          code, phone_number_id, waba_id
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+
+        embeddedSignupStatus.value = 'success'
+        embeddedSignupMessage.value = `✅ Connected! Phone: +${res.data.channel.phoneNumber}`
+        fetchMetaChannels()
+        delete window._embeddedSignupData
+      } catch (err) {
+        embeddedSignupStatus.value = 'error'
+        embeddedSignupMessage.value = err.response?.data?.message || 'Failed to save channel. Please try again.'
+      }
+    } else {
       embeddedSignupStatus.value = 'error'
-      embeddedSignupMessage.value = 'Could not capture phone_number_id or waba_id from Meta. Please try again.'
-      return
+      embeddedSignupMessage.value = 'Facebook login cancelled or failed.'
     }
-
-    embeddedSignupStatus.value = 'loading'
-    embeddedSignupMessage.value = 'Saving your WhatsApp channel...'
-
-    try {
-      const token = localStorage.getItem('token')
-      const res = await axios.post('/api/v1/meta/embedded-signup/exchange', {
-        code, phone_number_id, waba_id
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-
-      embeddedSignupStatus.value = 'success'
-      embeddedSignupMessage.value = `✅ Connected! Phone: +${res.data.channel.phoneNumber}`
-      fetchMetaChannels()
-      delete window._embeddedSignupData
-    } catch (err) {
-      embeddedSignupStatus.value = 'error'
-      embeddedSignupMessage.value = err.response?.data?.message || 'Failed to save channel. Please try again.'
-    }
-  } else {
-    embeddedSignupStatus.value = 'error'
-    embeddedSignupMessage.value = 'Facebook login cancelled or failed.'
-  }
+  })();
 }
 
 // ─── Launch the Embedded Signup Popup ─────────────────────────
