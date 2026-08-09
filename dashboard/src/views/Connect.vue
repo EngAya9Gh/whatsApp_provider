@@ -319,6 +319,7 @@ const launchEmbeddedSignup = () => {
     config_id: FB_CONFIG_ID,
     response_type: 'code',
     override_default_response_type: true,
+    display: 'popup',
     extras: { setup: {} }
   })
 }
