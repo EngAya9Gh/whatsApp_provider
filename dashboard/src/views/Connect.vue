@@ -197,7 +197,33 @@ const embeddedSignupMessage = ref('')
 
 // ─── Facebook SDK ─────────────────────────────────────────────
 const loadFbSdk = () => {
-  if (document.getElementById('facebook-jssdk')) return
+  window.fbAsyncInit = function () {
+    if (window.FB) {
+      window.FB.init({
+        appId: FB_APP_ID,
+        autoLogAppEvents: true,
+        xfbml: true,
+        version: 'v21.0'
+      })
+    }
+  }
+
+  if (document.getElementById('facebook-jssdk')) {
+    // Script already injected. If FB object exists but not initialized, 
+    // calling init directly might throw if already init'd, but we can rely on it being loaded.
+    if (window.FB) {
+      try {
+        window.FB.init({
+          appId: FB_APP_ID,
+          autoLogAppEvents: true,
+          xfbml: true,
+          version: 'v21.0'
+        })
+      } catch (e) { /* already initialized */ }
+    }
+    return
+  }
+  
   const script = document.createElement('script')
   script.id = 'facebook-jssdk'
   script.async = true
@@ -205,15 +231,6 @@ const loadFbSdk = () => {
   script.crossOrigin = 'anonymous'
   script.src = 'https://connect.facebook.net/en_US/sdk.js'
   document.head.appendChild(script)
-
-  window.fbAsyncInit = function () {
-    window.FB.init({
-      appId: FB_APP_ID,
-      autoLogAppEvents: true,
-      xfbml: true,
-      version: 'v22.0'
-    })
-  }
 }
 
 // ─── Message event listener (captures IDs from popup) ─────────
