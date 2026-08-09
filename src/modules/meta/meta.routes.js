@@ -156,6 +156,9 @@ router.get('/channel/:channelId/profile', metaProfileController.getProfile.bind(
 router.put('/channel/:channelId/profile', metaProfileController.updateProfile.bind(metaProfileController));
 router.post('/channel/:channelId/profile/photo', uploadPhoto.single('photo'), metaProfileController.uploadPhoto.bind(metaProfileController));
 
+// Sync delivery analytics from Meta API (use after server downtime to recover stats)
+router.post('/channel/:channelId/sync-stats', metaController.syncStats.bind(metaController));
+
 
 // ────────────────────────────────────────────────────────────────────────────
 // WhatsApp Flows — Create, Manage, Publish Interactive Flows
