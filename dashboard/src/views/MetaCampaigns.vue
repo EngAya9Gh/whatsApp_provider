@@ -25,10 +25,16 @@
             <p class="hero-sub">{{ isAr ? 'إرسال رسائل واتساب رسمية عبر Meta Cloud API' : 'Send via official Meta/WhatsApp API with 100% delivery reliability' }}</p>
           </div>
         </div>
-        <button @click="openModal" class="btn-create">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          {{ isAr ? 'حملة جديدة' : 'New Campaign' }}
-        </button>
+        <div style="display: flex; gap: 10px;">
+          <button @click="syncStats" class="btn-create" style="background: linear-gradient(135deg, #10B981, #059669);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.13 15.57a9 9 0 1 0 3.84-10.2L2.5 8"/><path d="M2.5 8V2h6"/></svg>
+            {{ isAr ? 'تحديث الإحصائيات' : 'Sync Stats' }}
+          </button>
+          <button @click="openModal" class="btn-create">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            {{ isAr ? 'حملة جديدة' : 'New Campaign' }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -496,7 +502,46 @@ const launchCampaign = async (campaignId) => {
   } catch (err) {
     const errorMsg = err.response?.data?.error?.message || err.response?.data?.error || (isAr.value ? 'فشل إطلاق الحملة.' : 'Failed to launch campaign.');
     showAlert(errorMsg, 'error')
-  } finally { launchingId.value = null }
+  } finally { launchingId.value = null  }
+}
+
+const syncStats = async () => {
+  const token = localStorage.getItem('token')
+  const tenantStr = localStorage.getItem('tenant')
+  if (!tenantStr) return
+  try {
+    const tenantObj = JSON.parse(tenantStr)
+    const activeChannelId = localStorage.getItem(`active_meta_channel_${tenantObj.id}`)
+    
+    if (!activeChannelId) {
+      alertMsg.value = isAr.value ? 'يرجى تحديد قناة واتساب أولاً.' : 'Please select an active channel first.'
+      alertType.value = 'error'
+      setTimeout(() => alertMsg.value = '', 4000)
+      return
+    }
+
+    loading.value = true
+    alertMsg.value = isAr.value ? 'جاري جلب الإحصائيات من Meta...' : 'Fetching statistics from Meta...'
+    alertType.value = 'success'
+    
+    await axios.post(`/api/v1/meta/channel/${activeChannelId}/sync-stats`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    // Refresh campaigns list to show updated stats
+    await fetchCampaigns()
+    
+    alertMsg.value = isAr.value ? 'تم تحديث جميع الإحصائيات بنجاح ✅' : 'All statistics synced successfully ✅'
+    alertType.value = 'success'
+    setTimeout(() => alertMsg.value = '', 4000)
+  } catch (err) {
+    console.error('Failed to sync stats', err)
+    alertMsg.value = isAr.value ? 'حدث خطأ أثناء تحديث الإحصائيات.' : 'Failed to sync statistics.'
+    alertType.value = 'error'
+    setTimeout(() => alertMsg.value = '', 4000)
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(() => {

@@ -8,6 +8,10 @@
         <p class="dash-subtitle">{{ isAr ? 'نظرة شاملة على حسابك وأداء رسائلك' : 'A complete overview of your account and messaging performance.' }}</p>
       </div>
       <div class="date-filter-group">
+        <button @click="syncStats" class="btn-create" style="background: linear-gradient(135deg, #10B981, #059669);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.13 15.57a9 9 0 1 0 3.84-10.2L2.5 8"/><path d="M2.5 8V2h6"/></svg>
+          {{ isAr ? 'مزامنة مع ميتا' : 'Sync Meta' }}
+        </button>
         <label class="filter-label">{{ isAr ? 'الفترة' : 'Period' }}</label>
         <div class="filter-controls">
           <select v-model="dateFilter" @change="handleDateFilterChange" class="filter-select">
@@ -278,6 +282,36 @@ const getPercent = (type) => {
   const total = totalMessages.value
   if (!total) return 0
   return Math.round(((stats.value?.categories?.[activeProvider.value]?.[type] || 0) / total) * 100)
+}
+
+const syncStats = async () => {
+  const token = localStorage.getItem('token')
+  const tenantStr = localStorage.getItem('tenant')
+  if (!tenantStr) return
+  try {
+    const tenantObj = JSON.parse(tenantStr)
+    const activeChannelId = localStorage.getItem(`active_meta_channel_${tenantObj.id}`)
+    
+    if (!activeChannelId) {
+      alert(isAr.value ? 'يرجى تحديد قناة واتساب أولاً من صفحة الربط.' : 'Please select an active channel first from Connections.')
+      return
+    }
+
+    loading.value = true
+    await axios.post(`/api/v1/meta/channel/${activeChannelId}/sync-stats`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    // Refresh dashboard stats after syncing
+    await fetchDashboardStats()
+    
+    alert(isAr.value ? 'تم جلب الإحصائيات من ميتا بنجاح ✅' : 'Stats synced successfully from Meta ✅')
+  } catch (err) {
+    console.error('Failed to sync stats', err)
+    alert(isAr.value ? 'حدث خطأ أثناء المزامنة مع ميتا.' : 'Failed to sync with Meta.')
+  } finally {
+    loading.value = false
+  }
 }
 
 const fetchDashboardStats = async () => {

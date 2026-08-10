@@ -311,10 +311,9 @@ const launchEmbeddedSignup = () => {
     embeddedSignupMessage.value = 'VITE_FB_APP_ID or VITE_FB_CONFIG_ID is not configured in .env'
     return
   }
-  embeddedSignupStatus.value = ''
-  embeddedSignupMessage.value = ''
-  delete window._embeddedSignupData
 
+  // To prevent Popup Blockers, window.open (inside FB.login) MUST be called synchronously
+  // before any async or Vue reactive DOM updates happen.
   window.FB.login(fbLoginCallback, {
     config_id: FB_CONFIG_ID,
     response_type: 'code',
@@ -322,6 +321,11 @@ const launchEmbeddedSignup = () => {
     display: 'popup',
     extras: { setup: {} }
   })
+
+  // Update UI after calling FB.login
+  embeddedSignupStatus.value = ''
+  embeddedSignupMessage.value = ''
+  delete window._embeddedSignupData
 }
 
 // ─── Standard Meta Channels CRUD ──────────────────────────────
