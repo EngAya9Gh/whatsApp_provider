@@ -159,20 +159,17 @@ class MetaController {
       logger.info(`[MetaSyncStats] Fetching analytics for channel ${channelId} from ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
       const response = await axios.get(
-        `https://graph.facebook.com/${GRAPH_API_VERSION}/${channel.metaWabaId}/analytics`,
+        `https://graph.facebook.com/${GRAPH_API_VERSION}/${channel.metaWabaId}`,
         {
           headers: { Authorization: `Bearer ${channel.metaAccessToken}` },
           params: {
-            start: startTs,
-            end: endTs,
-            granularity: 'DAY',
-            metric_types: JSON.stringify(['SENT', 'DELIVERED', 'READ', 'FAILED_DELIVERY'])
+            fields: `analytics.start(${startTs}).end(${endTs}).granularity(DAY)`
           }
         }
       );
 
-      const analytics = response.data?.data?.granular_breakdowns?.[0]?.data_points
-        || response.data?.data
+      const analytics = response.data?.analytics?.data_points
+        || response.data?.analytics?.data
         || [];
 
       logger.info(`[MetaSyncStats] Received ${analytics.length} data points from Meta`);
