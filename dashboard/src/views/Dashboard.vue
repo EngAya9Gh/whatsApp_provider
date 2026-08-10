@@ -302,10 +302,7 @@ const syncStats = async () => {
     // Refresh dashboard stats after syncing
     await fetchDashboardStats()
     
-    const metaData = res.data?.data || []
-    alert(isAr.value 
-      ? `تم جلب الإحصائيات من ميتا بنجاح ✅\nالرد من ميتا:\n${JSON.stringify(metaData, null, 2)}` 
-      : `Stats synced successfully from Meta ✅\nMeta Response:\n${JSON.stringify(metaData, null, 2)}`)
+    alert(isAr.value ? 'تم جلب الإحصائيات من ميتا بنجاح ✅' : 'Stats synced successfully from Meta ✅')
   } catch (err) {
     console.error('Failed to sync stats', err)
     alert(isAr.value ? 'حدث خطأ أثناء المزامنة مع ميتا.' : 'Failed to sync with Meta.')
