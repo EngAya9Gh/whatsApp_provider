@@ -173,6 +173,7 @@ class MetaController {
         || [];
 
       logger.info(`[MetaSyncStats] Received ${analytics.length} data points from Meta`);
+      logger.info(`[MetaSyncStats] Raw Meta Data: ${JSON.stringify(analytics)}`);
 
       res.json({
         success: true,
