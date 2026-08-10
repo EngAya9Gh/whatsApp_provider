@@ -86,6 +86,35 @@ class DashboardController {
         }
       }
 
+      // Merge CampaignTargets
+      const campaignTargets = await prisma.campaignTarget.findMany({
+        where: {
+          campaign: { tenantId, createdAt: { gte: queryStart, lte: queryEnd } }
+        },
+        select: {
+          status: true,
+          campaign: { select: { campaignType: true, metaCategory: true } }
+        }
+      });
+
+      totalSent += campaignTargets.length;
+      for (const target of campaignTargets) {
+        if (['DELIVERED', 'READ', 'SENT'].includes(target.status)) {
+          totalDeliveredOrRead++;
+        }
+        
+        const isMeta = target.campaign?.campaignType === 'META' || target.campaign?.campaignType === 'META_CLOUD';
+        const providerObj = isMeta ? categories.META : categories.QR;
+        
+        if (target.campaign?.metaCategory) {
+          const cat = target.campaign.metaCategory.toUpperCase();
+          if (providerObj[cat] !== undefined) providerObj[cat]++;
+          else providerObj.UNCATEGORIZED++;
+        } else {
+          providerObj.MARKETING++; // Default for campaigns is usually Marketing
+        }
+      }
+
       const deliveryRate = totalSent > 0 ? ((totalDeliveredOrRead / totalSent) * 100).toFixed(1) : 100;
 
       res.status(200).json({
