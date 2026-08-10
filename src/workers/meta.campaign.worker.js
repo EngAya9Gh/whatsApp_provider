@@ -96,21 +96,6 @@ const worker = new Worker('meta-campaign-queue', async (job) => {
       data: { status: 'SENT' }
     });
 
-    // 6. Log Message
-    await prisma.messageLog.create({
-      data: {
-        tenantId,
-        channelId,
-        campaignId,
-        phone,
-        messageType: 'TEMPLATE',
-        content: `[Template: ${templateName}] Variables: ${JSON.stringify(variables)}`,
-        status: 'SENT',
-        direction: 'OUTBOUND',
-        metaMessageId: wamid
-      }
-    });
-
     logger.info(`[MetaCampaign] Message sent to ${phone} for campaign ${campaignId}. WAMID: ${wamid}`);
     return { success: true, wamid };
 
