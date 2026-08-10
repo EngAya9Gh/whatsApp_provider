@@ -97,7 +97,7 @@ class AdminController {
   async testMetaConnection(req, res, next) {
     try {
       const result = await adminService.testMetaConnection(req.params.id, req.params.channelId);
-      res.json({ success: true, data: result });
+      res.json(result);
     } catch (error) {
       next(error);
     }

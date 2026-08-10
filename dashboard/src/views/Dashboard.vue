@@ -8,9 +8,9 @@
         <p class="dash-subtitle">{{ isAr ? 'نظرة شاملة على حسابك وأداء رسائلك' : 'A complete overview of your account and messaging performance.' }}</p>
       </div>
       <div class="date-filter-group">
-        <button @click="syncStats" class="btn-create" style="background: linear-gradient(135deg, #10B981, #059669);">
+        <button @click="syncStats" class="btn-sync">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.13 15.57a9 9 0 1 0 3.84-10.2L2.5 8"/><path d="M2.5 8V2h6"/></svg>
-          {{ isAr ? 'مزامنة مع ميتا' : 'Sync Meta' }}
+          {{ isAr ? 'مزامنة الإحصائيات' : 'Sync Meta' }}
         </button>
         <label class="filter-label">{{ isAr ? 'الفترة' : 'Period' }}</label>
         <div class="filter-controls">
@@ -286,17 +286,14 @@ const getPercent = (type) => {
 
 const syncStats = async () => {
   const token = localStorage.getItem('token')
-  const tenantStr = localStorage.getItem('tenant')
-  if (!tenantStr) return
-  try {
-    const tenantObj = JSON.parse(tenantStr)
-    const activeChannelId = localStorage.getItem(`active_meta_channel_${tenantObj.id}`)
-    
-    if (!activeChannelId) {
-      alert(isAr.value ? 'يرجى تحديد قناة واتساب أولاً من صفحة الربط.' : 'Please select an active channel first from Connections.')
-      return
-    }
+  const activeChannelId = localStorage.getItem('activeMetaChannelId')
+  
+  if (!activeChannelId) {
+    alert(isAr.value ? 'يرجى تحديد قناة واتساب أولاً من صفحة الربط.' : 'Please select an active channel first from Connections.')
+    return
+  }
 
+  try {
     loading.value = true
     await axios.post(`/api/v1/meta/channel/${activeChannelId}/sync-stats`, {}, {
       headers: { Authorization: `Bearer ${token}` }
@@ -535,6 +532,8 @@ watch(activeProvider, async () => {
 .dash-subtitle { font-size:.9rem; color:#64748B; margin:0; font-weight:500; }
 .date-filter-group { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
 .filter-label { font-size:.8rem; font-weight:700; color:#64748B; }
+.btn-sync { display:flex; align-items:center; gap:6px; background:linear-gradient(135deg, #10B981, #059669); color:white; font-size:.85rem; font-weight:700; padding:.5rem 1rem; border-radius:10px; border:none; cursor:pointer; transition:transform .15s, box-shadow .15s; box-shadow:0 2px 6px rgba(16,185,129,0.3); }
+.btn-sync:hover { transform:translateY(-1px); box-shadow:0 4px 10px rgba(16,185,129,0.4); }
 .filter-controls { display:flex; align-items:center; gap:.5rem; }
 .filter-select { background:white; border:1.5px solid #E2E8F0; color:#1E293B; font-size:.85rem; font-weight:600; padding:.5rem .875rem; border-radius:10px; outline:none; cursor:pointer; }
 .filter-select:focus { border-color:#FF6600; }

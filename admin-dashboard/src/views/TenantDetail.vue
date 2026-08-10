@@ -183,11 +183,11 @@
             </div>
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">Permanent Access Token</label>
-              <input type="password" v-model="metaForm.metaAccessToken" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
+              <input type="text" v-model="metaForm.metaAccessToken" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
             </div>
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1">App Secret</label>
-              <input type="password" v-model="metaForm.metaAppSecret" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
+              <input type="text" v-model="metaForm.metaAppSecret" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
             </div>
             
             <div class="flex gap-3 mt-2">

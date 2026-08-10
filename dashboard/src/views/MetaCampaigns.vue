@@ -507,19 +507,16 @@ const launchCampaign = async (campaignId) => {
 
 const syncStats = async () => {
   const token = localStorage.getItem('token')
-  const tenantStr = localStorage.getItem('tenant')
-  if (!tenantStr) return
-  try {
-    const tenantObj = JSON.parse(tenantStr)
-    const activeChannelId = localStorage.getItem(`active_meta_channel_${tenantObj.id}`)
-    
-    if (!activeChannelId) {
-      alertMsg.value = isAr.value ? 'يرجى تحديد قناة واتساب أولاً.' : 'Please select an active channel first.'
-      alertType.value = 'error'
-      setTimeout(() => alertMsg.value = '', 4000)
-      return
-    }
+  const activeChannelId = localStorage.getItem('activeMetaChannelId')
+  
+  if (!activeChannelId) {
+    alertMsg.value = isAr.value ? 'يرجى تحديد قناة واتساب أولاً.' : 'Please select an active channel first.'
+    alertType.value = 'error'
+    setTimeout(() => alertMsg.value = '', 4000)
+    return
+  }
 
+  try {
     loading.value = true
     alertMsg.value = isAr.value ? 'جاري جلب الإحصائيات من Meta...' : 'Fetching statistics from Meta...'
     alertType.value = 'success'
