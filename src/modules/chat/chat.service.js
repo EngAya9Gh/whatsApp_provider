@@ -4,6 +4,8 @@ const metaService = require('../meta/meta.service');
 const socketService = require('../../services/socket.service');
 const billingService = require('../billing/billing.service');
 const logger = require('../../utils/logger');
+const ChatThread = require('../../models/mongo/ChatThread');
+const ChatMessage = require('../../models/mongo/ChatMessage');
 
 class ChatService {
   async getThreads(tenantId, page = 1, limit = 50, search = '', channelId = null) {
@@ -14,26 +16,40 @@ class ChatService {
       where.channelId = channelId;
     }
     if (search) {
-      where.OR = [
-        { contactPhone: { contains: search } },
-        { contactName: { contains: search } }
+      where.$or = [
+        { contactPhone: { $regex: search, $options: 'i' } },
+        { contactName: { $regex: search, $options: 'i' } }
       ];
     }
 
-    const threads = await prisma.chatThread.findMany({
-      where,
-      orderBy: { lastMessageAt: 'desc' },
-      skip,
-      take: limit,
-      include: {
-        channel: { select: { id: true, phoneNumber: true, name: true, displayPhoneNumber: true } }
-      }
+    // Fetch from MongoDB
+    const threads = await ChatThread.find(where)
+      .sort({ lastMessageAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const total = await ChatThread.countDocuments(where);
+
+    // Fetch channels from MySQL to attach to threads (since Mongo only has channelId)
+    const channelIds = [...new Set(threads.map(t => t.channelId))];
+    const channels = await prisma.whatsAppChannel.findMany({
+      where: { id: { in: channelIds } },
+      select: { id: true, phoneNumber: true, name: true, displayPhoneNumber: true }
+    });
+    
+    const channelMap = {};
+    channels.forEach(ch => { channelMap[ch.id] = ch; });
+
+    const enrichedThreads = threads.map(t => {
+      // Map _id to id for frontend compatibility
+      t.id = t._id.toString();
+      t.channel = channelMap[t.channelId] || null;
+      return t;
     });
 
-    const total = await prisma.chatThread.count({ where });
-
     return {
-      threads,
+      threads: enrichedThreads,
       pagination: {
         total,
         page,
@@ -45,31 +61,30 @@ class ChatService {
   async getMessages(tenantId, threadId, page = 1, limit = 50) {
     const skip = (page - 1) * limit;
 
-    const thread = await prisma.chatThread.findFirst({
-      where: { id: threadId, tenantId }
-    });
+    const thread = await ChatThread.findOne({ _id: threadId, tenantId });
     if (!thread) throw new Error('Thread not found');
 
-    const messages = await prisma.chatMessage.findMany({
-      where: { threadId },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit
-    });
+    const messages = await ChatMessage.find({ threadId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
-    const total = await prisma.chatMessage.count({ where: { threadId } });
+    const total = await ChatMessage.countDocuments({ threadId });
 
     // Mark as read when fetching messages
     if (thread.unreadCount > 0) {
-      await prisma.chatThread.update({
-        where: { id: threadId },
-        data: { unreadCount: 0 }
-      });
-      socketService.emitToTenant(tenantId, 'thread_updated', { threadId, unreadCount: 0 });
+      await ChatThread.updateOne({ _id: threadId }, { $set: { unreadCount: 0 } });
+      socketService.emitToTenant(tenantId, 'thread_updated', { id: threadId, unreadCount: 0 });
     }
 
+    const formattedMessages = messages.map(m => {
+      m.id = m._id.toString();
+      return m;
+    });
+
     return {
-      messages: messages.reverse(), // Return chronological order for UI
+      messages: formattedMessages.reverse(), // Return chronological order for UI
       pagination: {
         total,
         page,
@@ -80,12 +95,14 @@ class ChatService {
 
   async sendMessage(tenantId, threadId, payload) {
     // payload: { content, type, hasMedia, mediaUrl, mediaMime }
-    const thread = await prisma.chatThread.findFirst({
-      where: { id: threadId, tenantId },
-      include: { channel: true }
-    });
-
+    const thread = await ChatThread.findOne({ _id: threadId, tenantId });
     if (!thread) throw new Error('Thread not found');
+
+    // Fetch channel from MySQL
+    const channel = await prisma.whatsAppChannel.findUnique({
+      where: { id: thread.channelId }
+    });
+    if (!channel) throw new Error('Channel not found');
     
     // Check billing
     const canSend = await billingService.checkLimit(tenantId);
@@ -100,7 +117,7 @@ class ChatService {
     try {
       if (payload.hasMedia && payload.mediaUrl) {
         metaResponse = await metaService.sendMedia(
-          thread.channel,
+          channel,
           thread.contactPhone,
           msgType,
           payload.mediaUrl,
@@ -108,7 +125,7 @@ class ChatService {
         );
       } else {
         metaResponse = await metaService.sendText(
-          thread.channel,
+          channel,
           thread.contactPhone,
           payload.content
         );
@@ -116,49 +133,50 @@ class ChatService {
 
       await billingService.incrementUsage(tenantId, 'sent');
       
-      const message = await prisma.chatMessage.create({
-        data: {
-          threadId: thread.id,
-          direction: 'OUTBOUND',
-          type: msgType.toUpperCase(),
-          content: payload.content || '',
-          hasMedia: payload.hasMedia || false,
-          mediaUrl: payload.mediaUrl || null,
-          mediaMime: payload.mediaMime || null,
-          status: 'SENT',
-          metaMessageId: metaResponse?.messages?.[0]?.id || null
-        }
+      const message = await ChatMessage.create({
+        threadId: thread._id,
+        direction: 'OUTBOUND',
+        type: msgType.toUpperCase(),
+        content: payload.content || '',
+        hasMedia: payload.hasMedia || false,
+        mediaUrl: payload.mediaUrl || null,
+        mediaMime: payload.mediaMime || null,
+        status: 'SENT',
+        metaMessageId: metaResponse?.messages?.[0]?.id || null
       });
 
-      await prisma.chatThread.update({
-        where: { id: thread.id },
-        data: { lastMessageAt: new Date() }
-      });
+      await ChatThread.updateOne(
+        { _id: thread._id },
+        { $set: { lastMessageAt: new Date() } }
+      );
 
-      socketService.emitToTenant(tenantId, 'new_chat_message', message);
+      const msgData = message.toObject();
+      msgData.id = msgData._id.toString();
       
-      return message;
+      socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
+      
+      return msgData;
     } catch (error) {
       logger.error('Error sending chat message:', error);
       
-      const failedMessage = await prisma.chatMessage.create({
-        data: {
-          threadId: thread.id,
-          direction: 'OUTBOUND',
-          type: msgType.toUpperCase(),
-          content: payload.content || '',
-          hasMedia: payload.hasMedia || false,
-          mediaUrl: payload.mediaUrl || null,
-          status: 'FAILED'
-        }
+      const failedMessage = await ChatMessage.create({
+        threadId: thread._id,
+        direction: 'OUTBOUND',
+        type: msgType.toUpperCase(),
+        content: payload.content || '',
+        hasMedia: payload.hasMedia || false,
+        mediaUrl: payload.mediaUrl || null,
+        status: 'FAILED'
       });
-      socketService.emitToTenant(tenantId, 'new_chat_message', failedMessage);
+      
+      const failedMsgData = failedMessage.toObject();
+      failedMsgData.id = failedMsgData._id.toString();
+      socketService.emitToTenant(tenantId, 'new_chat_message', failedMsgData);
       throw error;
     }
   }
 
   async handleIncomingMessage(tenantId, channelId, contactPhone, contactName, msg) {
-    // Determine message type and content
     let type = 'TEXT';
     let content = '';
     let hasMedia = false;
@@ -172,8 +190,6 @@ class ChatService {
       type = msg.type.toUpperCase();
       hasMedia = true;
       content = msg[msg.type]?.caption || '';
-      // We don't have the media URL directly, Meta gives media ID. 
-      // We'd need to fetch it via API, but for now we store the ID.
       mediaUrl = msg[msg.type]?.id;
       mediaMime = msg[msg.type]?.mime_type;
     } else if (msg.type === 'interactive') {
@@ -187,67 +203,56 @@ class ChatService {
       content = `[Unsupported message type: ${msg.type}]`;
     }
 
-    // Upsert Thread
-    let thread = await prisma.chatThread.findUnique({
-      where: {
-        tenantId_channelId_contactPhone: {
-          tenantId,
-          channelId,
-          contactPhone
-        }
-      }
-    });
+    // Upsert Thread in MongoDB
+    let thread = await ChatThread.findOne({ tenantId, channelId, contactPhone });
 
     if (thread) {
-      thread = await prisma.chatThread.update({
-        where: { id: thread.id },
-        data: {
-          lastMessageAt: new Date(),
-          unreadCount: { increment: 1 },
-          contactName: contactName || thread.contactName
-        }
-      });
+      thread = await ChatThread.findOneAndUpdate(
+        { _id: thread._id },
+        { 
+          $set: { lastMessageAt: new Date(), contactName: contactName || thread.contactName },
+          $inc: { unreadCount: 1 }
+        },
+        { new: true }
+      );
     } else {
-      thread = await prisma.chatThread.create({
-        data: {
-          tenantId,
-          channelId,
-          contactPhone,
-          contactName: contactName || contactPhone,
-          lastMessageAt: new Date(),
-          unreadCount: 1
-        }
+      thread = await ChatThread.create({
+        tenantId,
+        channelId,
+        contactPhone,
+        contactName: contactName || contactPhone,
+        lastMessageAt: new Date(),
+        unreadCount: 1
       });
     }
 
     // Save Message
-    // Check if it already exists to prevent duplicate webhooks
-    const existingMsg = await prisma.chatMessage.findFirst({
-      where: { metaMessageId }
-    });
+    const existingMsg = await ChatMessage.findOne({ metaMessageId });
 
     if (!existingMsg) {
-      const chatMessage = await prisma.chatMessage.create({
-        data: {
-          threadId: thread.id,
-          direction: 'INBOUND',
-          type,
-          content,
-          hasMedia,
-          mediaUrl,
-          mediaMime,
-          metaMessageId,
-          status: 'DELIVERED'
-        }
+      const chatMessage = await ChatMessage.create({
+        threadId: thread._id,
+        direction: 'INBOUND',
+        type,
+        content,
+        hasMedia,
+        mediaUrl,
+        mediaMime,
+        metaMessageId,
+        status: 'DELIVERED'
       });
 
+      const threadData = thread.toObject();
+      threadData.id = threadData._id.toString();
+
+      const msgData = chatMessage.toObject();
+      msgData.id = msgData._id.toString();
+
       // Broadcast to frontend
-      socketService.emitToTenant(tenantId, 'new_chat_message', chatMessage);
-      socketService.emitToTenant(tenantId, 'thread_updated', thread);
+      socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
+      socketService.emitToTenant(tenantId, 'thread_updated', threadData);
     }
   }
 }
 
 module.exports = new ChatService();
-
-

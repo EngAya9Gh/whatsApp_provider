@@ -6,6 +6,7 @@ const { redisClient } = require('./config/redis');
 const { Server } = require('socket.io');
 const sessionManager = require('./modules/whatsapp/session.manager');
 const socketService = require('./services/socket.service');
+const connectMongo = require('./config/mongo');
 
 const server = http.createServer(app);
 
@@ -43,6 +44,9 @@ const startServer = async () => {
     const planService = require('./modules/plan/plan.service');
     await planService.initPlans();
     logger.info('Initialized Subscription Plans');
+
+    // Initialize MongoDB
+    await connectMongo();
 
     server.listen(config.port, () => {
       logger.info(`Server is running on port ${config.port} in ${config.env} mode`);

@@ -116,6 +116,17 @@ async function processStatusUpdate(channelId, tenantId, payload) {
   const msgLog = await prisma.messageLog.findFirst({ where: { metaMessageId: wamid }, select: { campaignId: true, phone: true } });
   await prisma.messageLog.updateMany({ where: { metaMessageId: wamid }, data: updateData });
 
+  // Update Mongoose ChatMessage
+  const ChatMessage = require('../../models/mongo/ChatMessage');
+  try {
+    await ChatMessage.updateMany(
+      { metaMessageId: wamid },
+      { $set: { status: updateData.status || status.toUpperCase() } }
+    );
+  } catch (e) {
+    logger.error(`[MetaWebhookWorker] Failed to update Mongoose ChatMessage status:`, e.message);
+  }
+
   if (msgLog?.campaignId && status === 'failed') {
     await prisma.campaignTarget.updateMany({ where: { campaignId: msgLog.campaignId, phone: msgLog.phone }, data: { status: 'FAILED', error: updateData.errorMessage } });
   }
