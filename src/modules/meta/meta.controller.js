@@ -59,7 +59,10 @@ class MetaController {
 
         logger.info(`[MetaWebhook] 🔍 Looking for channel with phone_number_id: "${metaPhoneNumberId}"`);
         const channel = await prisma.whatsAppChannel.findFirst({
-          where: { metaPhoneNumberId, status: 'CONNECTED' }
+          where: { 
+            metaPhoneNumberId, 
+            status: { in: ['CONNECTED', 'ACTIVE'] } 
+          }
         }).catch(() => null);
 
         if (!channel) {
