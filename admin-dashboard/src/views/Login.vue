@@ -2,7 +2,9 @@
   <div class="auth-page">
     <div class="brand-panel">
       <div class="brand-content">
-        <img src="/logo.svg" alt="wakeel.." class="brand-logo" />
+        <a href="/">
+          <img src="/logo.svg" alt="wakeel.." class="brand-logo" />
+        </a>
         <div class="brand-tagline">{{ $t('brand.tagline') }}</div>
         <h2>{{ $t('brand.title') }}</h2>
         <p>{{ $t('brand.desc') }}</p>

@@ -2,7 +2,9 @@
   <div class="auth-page">
     <div class="brand-panel">
       <div class="brand-content">
-        <img src="/logo.svg" alt="wakeel.." class="brand-logo" />
+        <router-link to="/">
+          <img src="/logo.svg" alt="wakeel.." class="brand-logo" />
+        </router-link>
         <h2>Join wakeel..</h2>
         <p>Create your account and start sending OTP messages to your users in minutes.</p>
         <div class="brand-features">

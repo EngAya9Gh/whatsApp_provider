@@ -2,7 +2,9 @@
   <div class="auth-page">
     <div class="brand-panel">
       <div class="brand-content">
-        <img src="/logo.svg" alt="wakeel.." class="brand-logo" />
+        <router-link to="/">
+          <img src="/logo.svg" alt="wakeel.." class="brand-logo" />
+        </router-link>
         <h2>{{ $t('login.features.title') }}</h2>
         <p>{{ $t('login.features.desc') }}</p>
         <div class="brand-features">

@@ -13,7 +13,7 @@ const connectMongo = async () => {
     
     logger.info('[MongoDB] Connected successfully');
   } catch (error) {
-    logger.error('[MongoDB] Connection failed:', error.message);
+    logger.error('[MongoDB] Connection failed:', error);
   }
 };
 
