@@ -105,6 +105,23 @@ exports.exchangeCode = async (req, res, next) => {
 
     logger.info(`[EmbeddedSignup] ✅ Channel created: ${channel.id} for tenant ${tenantId}`);
 
+    // Step 5: Automatically Subscribe the WABA to our App's Webhooks
+    try {
+      logger.info(`[EmbeddedSignup] 🔗 Subscribing WABA ${waba_id} to our App's Webhooks...`);
+      await axios.post(
+        `https://graph.facebook.com/v21.0/${waba_id}/subscribed_apps`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${userAccessToken}`
+          }
+        }
+      );
+      logger.info(`[EmbeddedSignup] 🔗 Successfully subscribed WABA ${waba_id} to App Webhooks!`);
+    } catch (subErr) {
+      logger.error(`[EmbeddedSignup] ⚠️ Failed to subscribe WABA ${waba_id} to Webhooks automatically. User may need to do it manually. Error: ${subErr.response?.data?.error?.message || subErr.message}`);
+    }
+
     return res.status(201).json({
       success: true,
       message: 'WhatsApp channel connected successfully via Embedded Signup!',
