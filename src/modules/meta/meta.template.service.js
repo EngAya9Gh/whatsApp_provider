@@ -250,10 +250,12 @@ class MetaTemplateService {
           header.example = { header_text: [opts.headerExample || 'Sample'] };
         }
       } else {
-        // IMAGE / VIDEO / DOCUMENT — provide a link example
-        header.example = {
-          header_handle: [opts.headerExample || 'https://example.com/sample.jpg']
-        };
+        // IMAGE / VIDEO / DOCUMENT — provide the upload handle
+        if (opts.headerExample) {
+          header.example = {
+            header_handle: [opts.headerExample]
+          };
+        }
       }
       components.push(header);
     }

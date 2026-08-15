@@ -130,23 +130,5 @@ export const metaTemplateLibrary = [
       ]
     }
   },
-  {
-    id: 'auth_otp_ar',
-    title: 'رمز التحقق (OTP)',
-    description: 'Authentication • OTP',
-    category: 'AUTHENTICATION',
-    formState: {
-      name: 'auth_otp_ar',
-      language: 'ar',
-      category: 'AUTHENTICATION',
-      headerType: '',
-      headerText: '',
-      bodyText: 'رمز التحقق الخاص بك هو: {{1}}.\n\nصالح لمدة {{2}} دقائق. لا تشارك هذا الرمز مع أحد.',
-      bodyExamples: ['123456', '5'],
-      footerText: 'نظام الحماية',
-      buttons: [
-        { type: 'URL', text: 'نسخ الرمز', url: 'https://example.com/otp/{{1}}' }
-      ]
-    }
-  }
+
 ];

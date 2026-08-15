@@ -491,6 +491,10 @@ const submitTemplate = async () => {
   if (!activeMetaChannelId.value) return;
   if (!form.value.name || !form.value.body) return alert('Name and body are required')
   
+  if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(form.value.headerType) && !form.value.headerMediaId) {
+    return alert(`You must upload a valid ${form.value.headerType} file for the header before submitting.`);
+  }
+  
   creating.value = true
   const token = localStorage.getItem('token')
   try {
