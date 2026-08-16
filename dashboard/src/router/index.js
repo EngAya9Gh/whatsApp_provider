@@ -75,14 +75,57 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
+  let tenant = null
+  try {
+    tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
+  } catch (e) {}
   
   if (to.meta.requiresAuth && !token) {
-    next('/login')
-  } else if (to.meta.guest && token) {
-    next('/dashboard')
-  } else {
-    next()
+    return next('/login')
+  } 
+  
+  if (to.meta.guest && token) {
+    return next('/dashboard')
+  } 
+
+  // --- Sub-User Permissions Guard ---
+  if (to.meta.requiresAuth && tenant && tenant.isSubUser) {
+    const perms = tenant.subUser?.permissions || {}
+    
+    // Map paths to their required permissions
+    const routePermMap = {
+      '/sub-users': perms.can_manage_sub_users,
+      '/keys': perms.can_view_api_keys,
+      '/developer': perms.can_view_api_keys,
+      '/logs': perms.can_view_logs,
+      '/billing': perms.can_view_billing,
+      '/settings': perms.can_manage_settings,
+      '/connect': perms.can_manage_settings,
+      '/live-chat': perms.can_view_live_chat,
+      
+      '/send-message': perms.can_send_message,
+      '/campaigns': perms.can_view_campaigns,
+      '/templates': perms.can_view_templates,
+      '/chatbot': perms.can_view_chatbot,
+      
+      '/meta-send-message': perms.can_send_message,
+      '/meta-templates': perms.can_view_templates,
+      '/meta-campaigns': perms.can_view_campaigns,
+      '/meta-chatbot': perms.can_view_chatbot,
+      '/meta-autoreply': perms.can_view_chatbot,
+      '/meta-flows': perms.can_view_chatbot,
+      '/meta-business-profile': perms.can_manage_settings,
+    }
+
+    const basePath = '/' + to.path.split('/')[1]
+    
+    // If the permission evaluates strictly to false, block access
+    if (routePermMap[to.path] === false || routePermMap[basePath] === false) {
+      return next('/dashboard') // Redirect to dashboard if not allowed
+    }
   }
+
+  next()
 })
 
 export default router
