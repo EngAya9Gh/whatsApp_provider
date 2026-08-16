@@ -45,6 +45,7 @@ model Tenant {
   usageRecords     UsageRecord[]
   channels         WhatsAppChannel[]
   chatThreads      ChatThread[]
+  subUsers         SubUser[]
 
   @@map("tenants")
 }
@@ -73,6 +74,7 @@ model WhatsAppChannel {
   messageLogs       MessageLog[]
   chatThreads       ChatThread[]
   autoResponders    AutoResponder[]
+  subUsers          SubUser[]
 
   @@index([tenantId], map: "whatsapp_channels_tenant_id_fkey")
   @@map("whatsapp_channels")
@@ -357,4 +359,38 @@ model SystemSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")
+}
+
+// ══════════════════════════════════════════
+// Sub-User Management (Users under a Tenant)
+// ══════════════════════════════════════════
+
+model SubUser {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  channelId    String?   @map("channel_id")    // رقم الواتساب المخصص لهذا المستخدم
+  name         String
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  // الدور: OWNER (محجوز للمالك) | ADMIN | MANAGER | AGENT
+  role         SubUserRole @default(AGENT)
+  // صلاحيات مخصصة تُعيد تعريف الدور الافتراضي
+  permissions  Json?     // { "can_send_message": true, "can_view_campaigns": false, ... }
+  isActive     Boolean   @default(true)         @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now())        @map("created_at")
+  updatedAt    DateTime  @updatedAt             @map("updated_at")
+
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel      WhatsAppChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId], map: "sub_users_tenant_id_fkey")
+  @@index([channelId], map: "sub_users_channel_id_fkey")
+  @@map("sub_users")
+}
+
+enum SubUserRole {
+  ADMIN
+  MANAGER
+  AGENT
 }

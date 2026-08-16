@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const config = require('../../config/env');
 const entitlementService = require('../../services/entitlement.service');
+const subUserService = require('../subuser/subuser.service');
 
 const prisma = new PrismaClient();
 
@@ -119,6 +120,33 @@ class AuthService {
     });
 
     return updatedTenant;
+  }
+
+  /**
+   * تسجيل دخول مستخدم فرعي (Sub-User)
+   * يُنشئ JWT يحمل isSubUser: true + subUserId + tenantId + channelId
+   */
+  async subLogin(email, password) {
+    const result = await subUserService.login(email, password);
+
+    const payload = {
+      tenantId:  result.tenant.id,
+      subUserId: result.subUser.id,
+      email:     result.subUser.email,
+      role:      result.subUser.role,
+      channelId: result.subUser.channelId,
+      isSubUser: true,
+    };
+
+    const token = jwt.sign(payload, config.jwt.secret, {
+      expiresIn: config.jwt.expiresIn
+    });
+
+    return {
+      token,
+      subUser:  result.subUser,
+      tenant:   result.tenant,
+    };
   }
 }
 

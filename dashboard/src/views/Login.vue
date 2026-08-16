@@ -18,13 +18,30 @@
 
     <div class="form-panel">
       <div class="form-box">
+        <!-- Login Type Tabs -->
+        <div class="login-tabs">
+          <button class="login-tab" :class="{ active: loginMode === 'owner' }" @click="loginMode = 'owner'; error = ''">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M3 21v-2a7 7 0 0 1 14 0v2"/></svg>
+            {{ locale === 'ar' ? 'حساب الشركة' : 'Company Account' }}
+          </button>
+          <button class="login-tab" :class="{ active: loginMode === 'sub' }" @click="loginMode = 'sub'; error = ''">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            {{ locale === 'ar' ? 'دخول موظف' : 'Employee Login' }}
+          </button>
+        </div>
+
         <h1>{{ $t('login.welcome_back') }}</h1>
-        <p class="form-subtitle">{{ $t('login.sign_in_desc') }}</p>
+        <p class="form-subtitle">
+          <template v-if="loginMode === 'sub'">
+            {{ locale === 'ar' ? 'سجّل دخولك كموظف في الشركة' : 'Sign in as a company team member' }}
+          </template>
+          <template v-else>{{ $t('login.sign_in_desc') }}</template>
+        </p>
 
         <form @submit.prevent="handleLogin">
           <div class="form-group">
             <label>{{ $t('login.email') }}</label>
-            <input type="email" v-model="email" placeholder="admin@example.com" required />
+            <input type="email" v-model="email" placeholder="user@company.com" required />
           </div>
           <div class="form-group">
             <label>{{ $t('login.password') }}</label>
@@ -43,9 +60,13 @@
           </button>
         </form>
 
-        <div class="form-footer">
+        <div v-if="loginMode !== 'sub'" class="form-footer">
           {{ $t('login.no_account') }}
           <router-link to="/register">{{ $t('login.create_one') }} →</router-link>
+        </div>
+        <div v-else class="sub-login-hint">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          {{ locale === 'ar' ? 'حسابك تم إنشاؤه من قِبَل مدير الشركة' : 'Your account was created by your company admin' }}
         </div>
       </div>
     </div>
@@ -55,28 +76,48 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
+const { locale } = useI18n()
 const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
 const showPassword = ref(false)
+const loginMode = ref('owner')  // 'owner' | 'sub'
 const router = useRouter()
 
 const handleLogin = async () => {
   loading.value = true
   error.value = ''
   try {
-    const res = await axios.post('/api/auth/login', {
-      email: email.value,
-      password: password.value
-    })
-    localStorage.setItem('token', res.data.data.token)
-    localStorage.setItem('tenant', JSON.stringify(res.data.data.tenant))
+    if (loginMode.value === 'sub') {
+      // تسجيل دخول المستخدم الفرعي
+      const res = await axios.post('/api/auth/sub-login', {
+        email: email.value,
+        password: password.value
+      })
+      const data = res.data.data
+      localStorage.setItem('token', data.token)
+      // نخزن بيانات الـ tenant مع معلومات الـ sub-user
+      localStorage.setItem('tenant', JSON.stringify({
+        ...data.tenant,
+        isSubUser: true,
+        subUser: data.subUser,
+      }))
+    } else {
+      // تسجيل دخول الأوونر
+      const res = await axios.post('/api/auth/login', {
+        email: email.value,
+        password: password.value
+      })
+      localStorage.setItem('token', res.data.data.token)
+      localStorage.setItem('tenant', JSON.stringify(res.data.data.tenant))
+    }
     router.push('/dashboard')
   } catch (err) {
-    error.value = err.response?.data?.error || 'Invalid credentials'
+    error.value = err.response?.data?.error || err.response?.data?.message || 'Invalid credentials'
   } finally {
     loading.value = false
   }
@@ -204,6 +245,25 @@ input:focus { outline: none; border-color: #FF6600; box-shadow: 0 0 0 3px rgba(2
 .form-footer { text-align: center; margin-top: 1.5rem; color: #64748B; font-size: 0.9rem; }
 .form-footer a { color: #FF6600; font-weight: 600; margin-left: 0.25rem; }
 .form-footer a:hover { text-decoration: underline; }
+
+/* Login Tabs */
+.login-tabs {
+  display: flex; gap: 0.5rem; margin-bottom: 1.5rem;
+  background: #F1F5F9; border-radius: 12px; padding: 4px;
+}
+.login-tab {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  padding: 0.6rem; border: none; border-radius: 9px; cursor: pointer;
+  font-size: 0.82rem; font-weight: 700; color: #64748B; background: transparent;
+  transition: all 0.2s; font-family: inherit;
+}
+.login-tab.active { background: white; color: #0F172A; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+.login-tab:hover:not(.active) { color: #0F172A; }
+
+.sub-login-hint {
+  display: flex; align-items: center; gap: 0.5rem; justify-content: center;
+  margin-top: 1.5rem; color: #94A3B8; font-size: 0.82rem;
+}
 
 @media (max-width: 768px) {
   .brand-panel { display: none; }

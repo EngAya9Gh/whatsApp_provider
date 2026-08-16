@@ -76,35 +76,43 @@
 
         <!-- SYSTEM -->
         <div class="nav-section-title mt-4">{{ $t('sidebar.system') }}</div>
-        <router-link to="/keys" class="nav-item" active-class="active">
+        <router-link v-if="!isSubUser || subUserPerms?.can_view_api_keys" to="/keys" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
           <span class="nav-label">{{ $t('sidebar.api_keys') }}</span>
         </router-link>
-        <router-link to="/logs" class="nav-item" active-class="active">
+        <router-link v-if="!isSubUser || subUserPerms?.can_view_logs" to="/logs" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           <span class="nav-label">{{ $t('sidebar.message_logs') }}</span>
         </router-link>
-        <router-link to="/billing" class="nav-item" active-class="active">
+        <router-link v-if="!isSubUser || subUserPerms?.can_view_billing" to="/billing" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
           <span class="nav-label">{{ $t('sidebar.billing') }}</span>
         </router-link>
-        <router-link to="/settings" class="nav-item" active-class="active">
+        <router-link v-if="!isSubUser || subUserPerms?.can_manage_settings" to="/settings" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span class="nav-label">{{ $t('sidebar.settings') }}</span>
         </router-link>
-        <router-link to="/developer" class="nav-item" active-class="active">
+        <router-link v-if="!isSubUser" to="/developer" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
           <span class="nav-label">{{ $t('sidebar.developer_tools') }}</span>
+        </router-link>
+        <!-- إدارة المستخدمين: للأوونر فقط -->
+        <router-link v-if="!isSubUser" to="/sub-users" class="nav-item" active-class="active">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span class="nav-label">{{ locale === 'ar' ? 'إدارة المستخدمين' : 'Team Members' }}</span>
         </router-link>
       </nav>
 
       <!-- Footer -->
       <div class="sidebar-footer">
         <div class="user-info">
-          <div class="user-avatar">{{ userInitial }}</div>
+          <div class="user-avatar" :class="isSubUser ? 'avatar-sub' : ''">
+            {{ userInitial }}
+          </div>
           <div class="user-details">
-            <div class="user-name">{{ tenant?.name || 'Account' }}</div>
-            <div class="user-plan-badge" :class="planClass">{{ tenant?.plan || 'FREE' }}</div>
+            <div class="user-name">{{ displayName }}</div>
+            <div v-if="isSubUser" class="user-plan-badge badge-sub">{{ subUserRole }}</div>
+            <div v-else class="user-plan-badge" :class="planClass">{{ tenant?.plan || 'FREE' }}</div>
           </div>
         </div>
         <button @click="toggleLang" class="lang-btn" title="Change Language">{{ currentLang === 'en' ? 'ع' : 'EN' }}</button>
@@ -141,7 +149,21 @@ const loadTenant = () => {
 loadTenant()
 
 const showSidebar = computed(() => !route.meta.guest && !route.meta.hideSidebar && route.path !== '/' && !!localStorage.getItem('token'))
-const userInitial = computed(() => (tenant.value?.name || 'U')[0].toUpperCase())
+
+// ── Sub-user awareness ────────────────────────────────────
+const isSubUser   = computed(() => !!tenant.value?.isSubUser)
+const subUserPerms = computed(() => tenant.value?.subUser?.permissions || null)
+const subUserRole  = computed(() => {
+  const r = tenant.value?.subUser?.role
+  return r === 'ADMIN' ? 'Admin' : r === 'MANAGER' ? 'Manager' : r === 'AGENT' ? 'Agent' : r || ''
+})
+const displayName = computed(() => {
+  if (isSubUser.value) return tenant.value?.subUser?.name || tenant.value?.name || 'User'
+  return tenant.value?.name || 'Account'
+})
+// ─────────────────────────────────────────────────────────
+
+const userInitial = computed(() => (displayName.value || 'U')[0].toUpperCase())
 
 const planClass = computed(() => {
   const plan = tenant.value?.plan || 'FREE'
@@ -173,7 +195,7 @@ onMounted(async () => {
       })
       if (res.data && res.data.data) {
         localStorage.setItem('tenant', JSON.stringify(res.data.data))
-        loadTenant() // Update reactive state
+        loadTenant()
       }
     } catch (e) {
       if (e.response && e.response.status === 401) {
@@ -369,6 +391,8 @@ body {
 .badge-advanced{ background: rgba(168,85,247,0.2); color: #C084FC; }
 .badge-pro     { background: rgba(251,191,36,0.2); color: #FCD34D; }
 .badge-enterprise { background: rgba(255,102,0,0.2); color: #FF6600; }
+.badge-sub     { background: rgba(16,185,129,0.2); color: #34D399; }
+.avatar-sub    { background: linear-gradient(135deg, #10B981, #059669) !important; }
 
 .lang-btn {
   background: rgba(255,255,255,0.07);

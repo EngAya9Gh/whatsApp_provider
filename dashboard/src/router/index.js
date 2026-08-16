@@ -8,6 +8,7 @@ import Logs from '../views/Logs.vue'
 import Billing from '../views/Billing.vue'
 import Settings from '../views/Settings.vue'
 import Chatbot from '../views/Chatbot.vue'
+import SubUsers from '../views/SubUsers.vue'
 
 import Landing from '../views/Landing.vue'
 import InvoiceView from '../views/InvoiceView.vue'
@@ -48,6 +49,7 @@ const routes = [
   { path: '/billing', component: Billing, meta: { requiresAuth: true } },
   { path: '/settings', component: Settings, meta: { requiresAuth: true } },
   { path: '/developer', component: () => import('../views/DeveloperTools.vue'), meta: { requiresAuth: true } },
+  { path: '/sub-users', component: SubUsers, meta: { requiresAuth: true } },
 
   // Meta Cloud Routes
   { path: '/meta-send-message', component: MetaSendMessage, meta: { requiresAuth: true } },

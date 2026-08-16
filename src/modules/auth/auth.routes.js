@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.post('/register', validate(registerSchema), authController.register);
 router.post('/login', validate(loginSchema), authController.login);
+router.post('/sub-login', authController.subLogin);      // تسجيل دخول المستخدمين الفرعيين
 router.get('/me', authMiddleware, authController.getMe);
 router.put('/profile', authMiddleware, authController.updateProfile);
 
