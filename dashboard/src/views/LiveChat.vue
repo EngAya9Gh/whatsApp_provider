@@ -123,6 +123,15 @@
           </div>
           
           <form @submit.prevent="sendMessage" class="chat-form">
+            <div class="emoji-wrapper">
+              <button type="button" class="btn-attach" @click="showEmojiPicker = !showEmojiPicker" title="إدراج رمز تعبيري">
+                <i class="far fa-smile"></i>
+              </button>
+              <div class="emoji-picker-container" v-if="showEmojiPicker">
+                <EmojiPicker :native="true" @select="onSelectEmoji" :disable-skin-tones="true" />
+              </div>
+            </div>
+            
             <button type="button" class="btn-attach" @click="$refs.fileInput.click()" title="إرفاق ملف">
               <i class="fas fa-paperclip"></i>
             </button>
@@ -168,6 +177,8 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import axios from 'axios'
 import { io } from 'socket.io-client'
 import FeatureLock from '../components/FeatureLock.vue'
+import EmojiPicker from 'vue3-emoji-picker'
+import 'vue3-emoji-picker/css'
 
 const socket = ref(null)
 const threads = ref([])
@@ -179,6 +190,7 @@ const selectedChannel = ref('')
 const newMessage = ref('')
 const attachment = ref(null)
 const fileInput = ref(null)
+const showEmojiPicker = ref(false)
 
 const loadingThreads = ref(false)
 const loadingMessages = ref(false)
@@ -253,6 +265,12 @@ const scrollToBottom = () => {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
     }
   })
+}
+
+const onSelectEmoji = (emoji) => {
+  newMessage.value += emoji.i
+  // Optional: Keep the picker open or close it
+  // showEmojiPicker.value = false
 }
 
 const handleFileUpload = (event) => {
@@ -366,6 +384,7 @@ const sendMessage = async () => {
 
     newMessage.value = ''
     attachment.value = null
+    showEmojiPicker.value = false
     if (fileInput.value) fileInput.value.value = ''
     scrollToBottom()
   } catch (error) {
@@ -871,5 +890,18 @@ onUnmounted(() => {
   0% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.2); opacity: 0.7; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+.emoji-wrapper {
+  position: relative;
+}
+
+.emoji-picker-container {
+  position: absolute;
+  bottom: 60px;
+  left: 0;
+  z-index: 1000;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+  border-radius: 12px;
 }
 </style>
