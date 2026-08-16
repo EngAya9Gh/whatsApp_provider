@@ -119,11 +119,40 @@ router.post('/channel/:channelId/upload-media', uploadTmp.single('file'), async 
     if (!channel) return res.status(404).json({ success: false, message: 'Meta channel not found' });
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
 
-    const mediaId = await metaService.uploadMedia(channel, req.file.path, req.file.mimetype);
-    // Build a public URL handle — Meta returns a media_id, not a URL.
-    // We store the media_id and tell the template to use it.
-    res.json({ success: true, mediaId, mimetype: req.file.mimetype, originalName: req.file.originalname });
-  } catch (err) { next(err); }
+    const size = req.file.size;
+    const mimetype = req.file.mimetype;
+    
+    // Step 1: Create upload session
+    const appId = process.env.META_FB_APP_ID || process.env.META_APP_ID || '1567752178149611';
+    const axios = require('axios');
+    const fs = require('fs');
+    
+    const sessionRes = await axios.post(`https://graph.facebook.com/v21.0/${appId}/uploads`, null, {
+      params: {
+        file_length: size,
+        file_type: mimetype,
+        access_token: channel.metaAccessToken
+      }
+    });
+    
+    const sessionId = sessionRes.data.id;
+    
+    // Step 2: Upload binary data
+    const uploadRes = await axios.post(`https://graph.facebook.com/v21.0/${sessionId}`, fs.readFileSync(req.file.path), {
+      headers: {
+        'Authorization': `OAuth ${channel.metaAccessToken}`,
+        'file_offset': '0',
+        'Content-Type': 'application/octet-stream'
+      }
+    });
+
+    const mediaId = uploadRes.data.h; // The handle!
+    
+    res.json({ success: true, mediaId, mimetype, originalName: req.file.originalname });
+  } catch (err) { 
+    console.error('[Upload-Media] Resumable Upload Error:', err.response?.data || err.message);
+    next(err); 
+  }
 });
 
 // Meta Auto Responder — Channel-specific auto reply rules
