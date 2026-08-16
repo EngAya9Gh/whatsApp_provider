@@ -190,8 +190,12 @@ class ChatService {
       type = msg.type.toUpperCase();
       hasMedia = true;
       content = msg[msg.type]?.caption || '';
-      mediaUrl = msg[msg.type]?.id;
+      const rawMediaId = msg[msg.type]?.id;
       mediaMime = msg[msg.type]?.mime_type;
+      
+      if (rawMediaId) {
+        mediaUrl = `/api/v1/chat/media/${rawMediaId}?channelId=${channelId}`;
+      }
     } else if (msg.type === 'interactive') {
       type = 'INTERACTIVE';
       if (msg.interactive.type === 'button_reply') {

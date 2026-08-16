@@ -84,10 +84,10 @@
             <div class="message-content">
               <!-- Media Content -->
               <div v-if="msg.hasMedia && msg.mediaUrl" class="message-media">
-                <img v-if="msg.type === 'IMAGE'" :src="msg.mediaUrl" alt="Media" @error="handleMediaError" />
-                <video v-else-if="msg.type === 'VIDEO'" :src="msg.mediaUrl" controls></video>
-                <audio v-else-if="msg.type === 'AUDIO'" :src="msg.mediaUrl" controls></audio>
-                <a v-else-if="msg.type === 'DOCUMENT'" :href="msg.mediaUrl" target="_blank" class="document-link">
+                <img v-if="msg.type === 'IMAGE'" :src="getMediaUrl(msg.mediaUrl)" alt="Media" @error="handleMediaError" />
+                <video v-else-if="msg.type === 'VIDEO'" :src="getMediaUrl(msg.mediaUrl)" controls></video>
+                <audio v-else-if="msg.type === 'AUDIO'" :src="getMediaUrl(msg.mediaUrl)" controls></audio>
+                <a v-else-if="msg.type === 'DOCUMENT'" :href="getMediaUrl(msg.mediaUrl)" target="_blank" class="document-link">
                   <i class="fas fa-file-alt"></i> View Document
                 </a>
                 <span v-else class="media-placeholder">[Media: {{ msg.type }}]</span>
@@ -259,12 +259,13 @@ const uploadFile = async () => {
   formData.append('file', attachment.value)
   
   try {
-    // We can use the existing /api/uploads endpoint if it accepts general files
-    // Assuming /api/v1/templates/upload handles images, but let's assume we have a generic upload
-    const res = await axios.post('/api/v1/templates/upload', formData, {
+    const baseURL = axios.defaults.baseURL || window.location.origin
+    const res = await axios.post('/api/v1/chat/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
-    return res.data.url
+    // We want the relative URL or absolute URL depending on how the backend returns it.
+    // The backend returns mediaUrl as a full URL. We'll pass it directly to sendMessage payload.
+    return res.data.mediaUrl
   } catch (err) {
     console.error('Upload error', err)
     throw new Error('Failed to upload file.')
@@ -297,9 +298,14 @@ const sendMessage = async () => {
     }
 
     const res = await axios.post(`/api/v1/chat/threads/${selectedThread.value.id}/messages`, payload)
-    
-    messages.value.push(res.data.data)
-    
+    const sentMsg = res.data.data
+    const exists = messages.value.find(m => m.id === sentMsg.id)
+    if (!exists) {
+      messages.value.push(sentMsg)
+    } else {
+      const idx = messages.value.findIndex(m => m.id === sentMsg.id)
+      messages.value.splice(idx, 1, sentMsg)
+    }
     // Update thread summary
     const thread = threads.value.find(t => t.id === selectedThread.value.id)
     if (thread) {
@@ -334,6 +340,17 @@ const getStatusIcon = (status) => {
     case 'FAILED': return 'fas fa-exclamation-circle text-danger'
     default: return 'far fa-clock text-muted'
   }
+}
+
+const getMediaUrl = (url) => {
+  if (!url) return ''
+  if (url.startsWith('/api/v1/chat/media/')) {
+    const token = localStorage.getItem('token')
+    const separator = url.includes('?') ? '&' : '?'
+    const base = axios.defaults.baseURL || window.location.origin
+    return `${base}${url}${separator}token=${token}`
+  }
+  return url
 }
 
 const handleMediaError = (e) => {
