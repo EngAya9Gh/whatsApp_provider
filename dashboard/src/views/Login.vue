@@ -106,16 +106,21 @@ const handleLogin = async () => {
         isSubUser: true,
         subUser: data.subUser,
       }))
+      window.location.href = '/dashboard'
     } else {
-      // تسجيل دخول الأوونر
+      // تسجيل دخول صاحب الحساب (Owner)
       const res = await axios.post('/api/auth/login', {
         email: email.value,
         password: password.value
       })
-      localStorage.setItem('token', res.data.data.token)
-      localStorage.setItem('tenant', JSON.stringify(res.data.data.tenant))
+      const data = res.data.data
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('tenant', JSON.stringify({
+        ...data.tenant,
+        isSubUser: false,
+      }))
+      window.location.href = '/dashboard'
     }
-    router.push('/dashboard')
   } catch (err) {
     error.value = err.response?.data?.error || err.response?.data?.message || 'Invalid credentials'
   } finally {
