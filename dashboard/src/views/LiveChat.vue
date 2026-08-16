@@ -123,7 +123,7 @@
           </div>
           
           <form @submit.prevent="sendMessage" class="chat-form">
-            <div class="emoji-wrapper">
+            <div class="emoji-wrapper" ref="emojiWrapper">
               <button type="button" class="btn-attach" @click="showEmojiPicker = !showEmojiPicker" title="إدراج رمز تعبيري">
                 <i class="far fa-smile"></i>
               </button>
@@ -191,6 +191,7 @@ const newMessage = ref('')
 const attachment = ref(null)
 const fileInput = ref(null)
 const showEmojiPicker = ref(false)
+const emojiWrapper = ref(null)
 
 const loadingThreads = ref(false)
 const loadingMessages = ref(false)
@@ -426,7 +427,14 @@ const handleMediaError = (e) => {
   e.target.style.display = 'none'
 }
 
+const closeEmojiPicker = (e) => {
+  if (showEmojiPicker.value && emojiWrapper.value && !emojiWrapper.value.contains(e.target)) {
+    showEmojiPicker.value = false
+  }
+}
+
 onMounted(() => {
+  document.addEventListener('click', closeEmojiPicker)
   fetchChannels()
   fetchThreads()
 
@@ -486,6 +494,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('click', closeEmojiPicker)
   if (socket.value) {
     socket.value.disconnect()
   }
@@ -903,5 +912,15 @@ onUnmounted(() => {
   z-index: 1000;
   box-shadow: 0 5px 20px rgba(0,0,0,0.15);
   border-radius: 12px;
+}
+
+.message-media audio {
+  max-width: 250px;
+  height: 40px;
+}
+
+.message-media video, .message-media img {
+  max-width: 100%;
+  border-radius: 8px;
 }
 </style>

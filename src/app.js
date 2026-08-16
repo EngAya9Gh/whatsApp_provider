@@ -39,6 +39,7 @@ const metaRoutes = require('./modules/meta/meta.routes');
 const chatRoutes = require('./modules/chat/chat.routes');
 const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
 const subUserRoutes = require('./modules/subuser/subuser.routes');
+const contactRoutes = require('./modules/contacts/contact.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/keys', apiKeyRoutes);
@@ -57,6 +58,7 @@ app.use('/api/v1/meta', metaRoutes);
 app.use('/api/v1/chat', chatRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/sub-users', subUserRoutes);
+app.use('/api/contacts', contactRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

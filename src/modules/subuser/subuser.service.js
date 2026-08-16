@@ -20,6 +20,7 @@ const DEFAULT_PERMISSIONS = {
     can_view_api_keys:       false,
     can_view_billing:        false,
     can_manage_sub_users:    false,
+    can_manage_contacts:     true,
   },
   MANAGER: {
     can_send_message:        true,
@@ -36,6 +37,7 @@ const DEFAULT_PERMISSIONS = {
     can_view_api_keys:       false,
     can_view_billing:        false,
     can_manage_sub_users:    false,
+    can_manage_contacts:     true,
   },
   AGENT: {
     can_send_message:        true,
@@ -52,6 +54,7 @@ const DEFAULT_PERMISSIONS = {
     can_view_api_keys:       false,
     can_view_billing:        false,
     can_manage_sub_users:    false,
+    can_manage_contacts:     false,
   },
 };
 

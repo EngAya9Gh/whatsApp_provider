@@ -17,7 +17,7 @@ model Admin {
 }
 
 model Tenant {
-  customFeatures Json? @map("custom_features")
+  customFeatures   Json?             @map("custom_features")
   id               String            @id @default(uuid())
   name             String
   email            String            @unique
@@ -46,40 +46,41 @@ model Tenant {
   channels         WhatsAppChannel[]
   chatThreads      ChatThread[]
   subUsers         SubUser[]
+  contactGroups    ContactGroup[]
+  contacts         Contact[]
 
   @@map("tenants")
 }
 
 model WhatsAppChannel {
-  id                String   @id @default(uuid())
-  tenantId          String   @map("tenant_id")
-  providerType      String   @default("BAILEYS") @map("provider_type") // BAILEYS or META_CLOUD
-  phoneNumber       String?  @map("phone_number")
-  status            String   @default("DISCONNECTED")
+  id           String  @id @default(uuid())
+  tenantId     String  @map("tenant_id")
+  providerType String  @default("BAILEYS") @map("provider_type") // BAILEYS or META_CLOUD
+  phoneNumber  String? @map("phone_number")
+  status       String  @default("DISCONNECTED")
 
   // Meta Specific fields
-  metaPhoneNumberId String?  @map("meta_phone_number_id")
-  metaWabaId        String?  @map("meta_waba_id")
-  metaAccessToken   String?  @map("meta_access_token") @db.Text
-  metaAppSecret     String?  @map("meta_app_secret") @db.Text // Required for HMAC validation
+  metaPhoneNumberId  String? @map("meta_phone_number_id")
+  metaWabaId         String? @map("meta_waba_id")
+  metaAccessToken    String? @map("meta_access_token") @db.Text
+  metaAppSecret      String? @map("meta_app_secret") @db.Text // Required for HMAC validation
   // Human-readable label for this channel (e.g. "Support Line", "+966500000000")
-  name              String?  @default("") @map("name")
+  name               String? @default("") @map("name")
   displayPhoneNumber String? @map("display_phone_number") // from Meta Business Manager
 
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  campaigns         Campaign[]
-  messageLogs       MessageLog[]
-  chatThreads       ChatThread[]
-  autoResponders    AutoResponder[]
-  subUsers          SubUser[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaigns      Campaign[]
+  messageLogs    MessageLog[]
+  chatThreads    ChatThread[]
+  autoResponders AutoResponder[]
+  subUsers       SubUser[]
 
   @@index([tenantId], map: "whatsapp_channels_tenant_id_fkey")
   @@map("whatsapp_channels")
 }
-
 
 model ApiKey {
   id         String    @id @default(uuid())
@@ -97,20 +98,20 @@ model ApiKey {
 }
 
 model MessageLog {
-  id              String        @id @default(uuid())
-  tenantId        String        @map("tenant_id")
-  channelId       String?       @map("channel_id")
-  phone           String
-  messageType     MessageType   @default(OTP) @map("message_type")
-  status          MessageStatus @default(QUEUED)
-  errorMessage    String?       @map("error_message") @db.Text
+  id             String           @id @default(uuid())
+  tenantId       String           @map("tenant_id")
+  channelId      String?          @map("channel_id")
+  phone          String
+  messageType    MessageType      @default(OTP) @map("message_type")
+  status         MessageStatus    @default(QUEUED)
+  errorMessage   String?          @map("error_message") @db.Text
   // Meta Cloud API specific: wamid returned from Meta API on send
-  metaMessageId   String?       @map("meta_message_id") @db.VarChar(200)
+  metaMessageId  String?          @map("meta_message_id") @db.VarChar(200)
   // Tracks Meta delivery lifecycle: sent → delivered → read → failed
-  deliveryStatus  String?       @map("delivery_status") @default("pending")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  channel         WhatsAppChannel? @relation(fields: [channelId], references: [id])
+  deliveryStatus String?          @default("pending") @map("delivery_status")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel        WhatsAppChannel? @relation(fields: [channelId], references: [id])
 
   @@index([tenantId], map: "message_logs_tenant_id_fkey")
   @@index([channelId], map: "message_logs_channel_id_fkey")
@@ -228,34 +229,34 @@ model Invoice {
 }
 
 model AutoResponder {
-  id                String    @id @default(uuid())
-  tenantId          String    @map("tenant_id")
-  keyword           String    @db.Text
-  matchType         String    @default("EXACT") @map("match_type")
+  id               String           @id @default(uuid())
+  tenantId         String           @map("tenant_id")
+  keyword          String           @db.Text
+  matchType        String           @default("EXACT") @map("match_type")
   // responseType: TEXT | IMAGE | VIDEO | DOCUMENT | QR_CODE | META_TEMPLATE
-  responseType      String    @default("TEXT") @map("response_type")
-  message           String?   @db.Text
-  mediaPath         String?   @map("media_path") @db.Text
-  mediaUrl          String?   @map("media_url") @db.Text   // public URL for Meta media
-  mediaMime         String?   @map("media_mime")
-  isActive          Boolean   @default(true) @map("is_active")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  lat               Float?
-  lng               Float?
-  locationAddress   String?   @map("location_address")
-  locationName      String?   @map("location_name")
-  endDate           DateTime? @map("end_date")
-  startDate         DateTime? @map("start_date")
-  campaignId        String?   @map("campaign_id")
+  responseType     String           @default("TEXT") @map("response_type")
+  message          String?          @db.Text
+  mediaPath        String?          @map("media_path") @db.Text
+  mediaUrl         String?          @map("media_url") @db.Text // public URL for Meta media
+  mediaMime        String?          @map("media_mime")
+  isActive         Boolean          @default(true) @map("is_active")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  lat              Float?
+  lng              Float?
+  locationAddress  String?          @map("location_address")
+  locationName     String?          @map("location_name")
+  endDate          DateTime?        @map("end_date")
+  startDate        DateTime?        @map("start_date")
+  campaignId       String?          @map("campaign_id")
   // Meta-specific: link rule to a specific Meta channel
-  channelId         String?   @map("channel_id")
+  channelId        String?          @map("channel_id")
   // For META_TEMPLATE response type
-  metaTemplateName  String?   @map("meta_template_name")
-  metaTemplateLang  String?   @map("meta_template_lang") @default("ar")
-  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  campaign          Campaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  channel           WhatsAppChannel?    @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  metaTemplateName String?          @map("meta_template_name")
+  metaTemplateLang String?          @default("ar") @map("meta_template_lang")
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaign         Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  channel          WhatsAppChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
 
   @@index([tenantId], map: "auto_responders_tenant_id_fkey")
   @@index([campaignId], map: "auto_responders_campaign_id_fkey")
@@ -264,8 +265,8 @@ model AutoResponder {
 }
 
 model PlanSetting {
-  featureFlags Json? @map("feature_flags")
-  id        String   @id @default(uuid())
+  featureFlags Json?    @map("feature_flags")
+  id           String   @id @default(uuid())
   planCode     Plan     @unique @map("plan_code")
   name         String
   nameAr       String?  @map("name_ar")
@@ -281,7 +282,7 @@ model PlanSetting {
   buttonTextAr String?  @map("button_text_ar")
   buttonTextEn String?  @map("button_text_en")
   createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("plan_settings")
 }
@@ -315,19 +316,19 @@ enum MessageStatus {
 }
 
 model ChatThread {
-  id            String       @id @default(uuid())
-  tenantId      String       @map("tenant_id")
-  channelId     String       @map("channel_id")
-  contactPhone  String       @map("contact_phone")
-  contactName   String?      @map("contact_name")
-  lastMessageAt DateTime     @default(now()) @map("last_message_at")
-  unreadCount   Int          @default(0) @map("unread_count")
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
-  
-  messages      ChatMessage[]
-  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  channel       WhatsAppChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  channelId     String   @map("channel_id")
+  contactPhone  String   @map("contact_phone")
+  contactName   String?  @map("contact_name")
+  lastMessageAt DateTime @default(now()) @map("last_message_at")
+  unreadCount   Int      @default(0) @map("unread_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  messages ChatMessage[]
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel  WhatsAppChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, channelId, contactPhone])
   @@index([tenantId], map: "chat_threads_tenant_id_fkey")
@@ -335,19 +336,19 @@ model ChatThread {
 }
 
 model ChatMessage {
-  id            String     @id @default(uuid())
-  threadId      String     @map("thread_id")
-  direction     String     // "INBOUND" or "OUTBOUND"
-  type          String     @default("TEXT") // "TEXT", "IMAGE", "VIDEO", "DOCUMENT", "AUDIO"
-  content       String?    @db.Text
-  hasMedia      Boolean    @default(false) @map("has_media")
-  mediaUrl      String?    @map("media_url") @db.Text
-  mediaMime     String?    @map("media_mime")
-  status        String?    // "SENT", "DELIVERED", "READ", "FAILED" for outbound
-  metaMessageId String?    @map("meta_message_id")
-  createdAt     DateTime   @default(now()) @map("created_at")
-  
-  thread        ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  id            String   @id @default(uuid())
+  threadId      String   @map("thread_id")
+  direction     String // "INBOUND" or "OUTBOUND"
+  type          String   @default("TEXT") // "TEXT", "IMAGE", "VIDEO", "DOCUMENT", "AUDIO"
+  content       String?  @db.Text
+  hasMedia      Boolean  @default(false) @map("has_media")
+  mediaUrl      String?  @map("media_url") @db.Text
+  mediaMime     String?  @map("media_mime")
+  status        String? // "SENT", "DELIVERED", "READ", "FAILED" for outbound
+  metaMessageId String?  @map("meta_message_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
   @@index([threadId], map: "chat_messages_thread_id_fkey")
   @@map("chat_messages")
@@ -366,23 +367,23 @@ model SystemSetting {
 // ══════════════════════════════════════════
 
 model SubUser {
-  id           String    @id @default(uuid())
-  tenantId     String    @map("tenant_id")
-  channelId    String?   @map("channel_id")    // رقم الواتساب المخصص لهذا المستخدم
+  id           String      @id @default(uuid())
+  tenantId     String      @map("tenant_id")
+  channelId    String?     @map("channel_id") // رقم الواتساب المخصص لهذا المستخدم
   name         String
-  email        String    @unique
-  passwordHash String    @map("password_hash")
+  email        String      @unique
+  passwordHash String      @map("password_hash")
   // الدور: OWNER (محجوز للمالك) | ADMIN | MANAGER | AGENT
   role         SubUserRole @default(AGENT)
   // صلاحيات مخصصة تُعيد تعريف الدور الافتراضي
-  permissions  Json?     // { "can_send_message": true, "can_view_campaigns": false, ... }
-  isActive     Boolean   @default(true)         @map("is_active")
-  lastLoginAt  DateTime? @map("last_login_at")
-  createdAt    DateTime  @default(now())        @map("created_at")
-  updatedAt    DateTime  @updatedAt             @map("updated_at")
+  permissions  Json? // { "can_send_message": true, "can_view_campaigns": false, ... }
+  isActive     Boolean     @default(true) @map("is_active")
+  lastLoginAt  DateTime?   @map("last_login_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
 
-  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  channel      WhatsAppChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel WhatsAppChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
 
   @@index([tenantId], map: "sub_users_tenant_id_fkey")
   @@index([channelId], map: "sub_users_channel_id_fkey")
@@ -393,4 +394,42 @@ enum SubUserRole {
   ADMIN
   MANAGER
   AGENT
+}
+
+// ══════════════════════════════════════════
+// Contacts Management
+// ══════════════════════════════════════════
+
+model ContactGroup {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  contacts Contact[]
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "contact_groups_tenant_id_fkey")
+  @@map("contact_groups")
+}
+
+model Contact {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  groupId   String?  @map("group_id")
+  name      String
+  phone     String
+  email     String?
+  metadata  Json? // For extra fields (variables like var1, var2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group  ContactGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId], map: "contacts_tenant_id_fkey")
+  @@index([groupId], map: "contacts_group_id_fkey")
+  @@map("contacts")
 }

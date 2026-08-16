@@ -4,6 +4,7 @@ import App from './App.vue'
 import router from './router'
 import i18n from './i18n'
 import axios from 'axios'
+import '@fortawesome/fontawesome-free/css/all.css'
 
 // Global error tracking for debugging (removed localhost logger)
 window.onerror = function (msg, url, lineNo, columnNo, error) {

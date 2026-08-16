@@ -9,6 +9,7 @@ import Billing from '../views/Billing.vue'
 import Settings from '../views/Settings.vue'
 import Chatbot from '../views/Chatbot.vue'
 import SubUsers from '../views/SubUsers.vue'
+import Contacts from '../views/Contacts.vue'
 
 import Landing from '../views/Landing.vue'
 import InvoiceView from '../views/InvoiceView.vue'
@@ -50,6 +51,7 @@ const routes = [
   { path: '/settings', component: Settings, meta: { requiresAuth: true } },
   { path: '/developer', component: () => import('../views/DeveloperTools.vue'), meta: { requiresAuth: true } },
   { path: '/sub-users', component: SubUsers, meta: { requiresAuth: true } },
+  { path: '/contacts', component: Contacts, meta: { requiresAuth: true } },
 
   // Meta Cloud Routes
   { path: '/meta-send-message', component: MetaSendMessage, meta: { requiresAuth: true } },
@@ -102,6 +104,7 @@ router.beforeEach((to, from, next) => {
       '/settings': perms.can_manage_settings,
       '/connect': perms.can_manage_settings,
       '/live-chat': perms.can_view_live_chat,
+      '/contacts': perms.can_manage_contacts,
       
       '/send-message': perms.can_send_message,
       '/campaigns': perms.can_view_campaigns,
