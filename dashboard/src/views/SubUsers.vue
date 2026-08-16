@@ -105,9 +105,6 @@
                   <button @click="openEdit(user)" class="btn-icon" :title="isAr ? 'تعديل' : 'Edit'">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   </button>
-                  <button @click="openResetPwd(user)" class="btn-icon orange" :title="isAr ? 'كلمة المرور' : 'Reset Password'">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                  </button>
                   <button @click="confirmDelete(user)" class="btn-icon red" :title="isAr ? 'حذف' : 'Delete'">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                   </button>
@@ -141,10 +138,16 @@
                 <input v-model="form.email" type="email" class="input-std" :placeholder="isAr ? 'user@company.com' : 'user@company.com'" :disabled="!!editingUser" />
               </div>
             </div>
-            <div class="form-row" v-if="!editingUser">
+            <div class="form-row">
               <div class="form-group">
-                <label>{{ isAr ? 'كلمة المرور' : 'Password' }} *</label>
-                <input v-model="form.password" type="password" class="input-std" :placeholder="isAr ? 'على الأقل 6 أحرف' : 'At least 6 characters'" />
+                <label>{{ isAr ? 'كلمة المرور' : 'Password' }} <span v-if="editingUser" class="hint-text">({{ isAr ? 'اتركه فارغاً لعدم التغيير' : 'leave empty to keep unchanged' }})</span><span v-else>*</span></label>
+                <div class="input-wrapper">
+                  <input v-model="form.password" :type="showPassword ? 'text' : 'password'" class="input-std" :placeholder="isAr ? 'على الأقل 6 أحرف' : 'At least 6 characters'" />
+                  <button type="button" class="eye-btn" @click="showPassword = !showPassword" tabindex="-1">
+                    <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -201,30 +204,6 @@
         </div>
       </div>
 
-      <!-- Modal: Reset Password -->
-      <div v-if="showPwdModal" class="modal-overlay" @click.self="showPwdModal = false">
-        <div class="modal-box small">
-          <div class="modal-header">
-            <h2>{{ isAr ? 'إعادة تعيين كلمة المرور' : 'Reset Password' }}</h2>
-            <button @click="showPwdModal = false" class="modal-close">✕</button>
-          </div>
-          <div class="modal-body">
-            <p class="muted mb">{{ isAr ? `تعيين كلمة مرور جديدة لـ ${pwdUser?.name}` : `Set a new password for ${pwdUser?.name}` }}</p>
-            <div class="form-group">
-              <label>{{ isAr ? 'كلمة المرور الجديدة' : 'New Password' }}</label>
-              <input v-model="newPassword" type="password" class="input-std" :placeholder="isAr ? 'على الأقل 6 أحرف' : 'At least 6 characters'" />
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button @click="showPwdModal = false" class="btn-ghost">{{ isAr ? 'إلغاء' : 'Cancel' }}</button>
-            <button @click="doResetPwd" class="btn-primary" :disabled="savingPwd">
-              <span v-if="savingPwd" class="spinner-sm"></span>
-              {{ isAr ? 'تحديث كلمة المرور' : 'Update Password' }}
-            </button>
-          </div>
-        </div>
-      </div>
-
       <!-- Delete Confirmation -->
       <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
         <div class="modal-box small">
@@ -268,15 +247,12 @@ const users = ref([])
 const channels = ref([])
 const loading = ref(true)
 const saving = ref(false)
-const savingPwd = ref(false)
 const deleting = ref(false)
+const showPassword = ref(false)
 
 const showModal = ref(false)
-const showPwdModal = ref(false)
 const editingUser = ref(null)
 const deleteTarget = ref(null)
-const pwdUser = ref(null)
-const newPassword = ref('')
 
 const toast = reactive({ show: false, message: '', type: 'success' })
 
@@ -344,7 +320,7 @@ async function fetchUsers() {
 
 async function fetchChannels() {
   try {
-    const res = await axios.get('/api/whatsapp/channels', { headers: authHeader() })
+    const res = await axios.get('/api/v1/meta/channels', { headers: authHeader() })
     channels.value = res.data.channels || res.data.data || res.data || []
   } catch { channels.value = [] }
 }
@@ -389,7 +365,7 @@ async function saveUser() {
       channelId: form.channelId || null,
       permissions: form.permissions
     }
-    if (!editingUser.value) payload.password = form.password
+    if (form.password) payload.password = form.password // works for both create and update
 
     if (editingUser.value) {
       await axios.put(`/api/sub-users/${editingUser.value.id}`, payload, { headers: authHeader() })
@@ -405,26 +381,6 @@ async function saveUser() {
     showToast(msg, 'error')
   } finally {
     saving.value = false
-  }
-}
-
-function openResetPwd(user) {
-  pwdUser.value = user
-  newPassword.value = ''
-  showPwdModal.value = true
-}
-
-async function doResetPwd() {
-  if (!newPassword.value || newPassword.value.length < 6) return showToast(isAr.value ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : 'Password must be at least 6 characters', 'error')
-  savingPwd.value = true
-  try {
-    await axios.post(`/api/sub-users/${pwdUser.value.id}/reset-password`, { newPassword: newPassword.value }, { headers: authHeader() })
-    showToast(isAr.value ? 'تم تحديث كلمة المرور' : 'Password updated successfully')
-    showPwdModal.value = false
-  } catch (e) {
-    showToast(e.response?.data?.error || (isAr.value ? 'حدث خطأ' : 'Error'), 'error')
-  } finally {
-    savingPwd.value = false
   }
 }
 
@@ -629,6 +585,20 @@ onMounted(async () => {
 .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
 .form-group label { font-size: 0.83rem; font-weight: 700; color: #334155; }
 .field-hint { font-size: 0.75rem; color: #94A3B8; margin-top: 0.3rem; }
+.hint-text { font-size: 0.75rem; color: #94A3B8; font-weight: 500; }
+
+/* Password input wrapper */
+.input-wrapper { position: relative; }
+.input-wrapper input { padding-right: 2.75rem; }
+.eye-btn {
+  position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: #94A3B8;
+  display: flex; align-items: center; padding: 0; transition: color 0.2s;
+}
+.eye-btn:hover { color: #FF6600; }
+.eye-btn svg { width: 18px; height: 18px; }
+.rtl .input-wrapper input { padding-right: 1rem; padding-left: 2.75rem; }
+.rtl .eye-btn { right: auto; left: 0.75rem; }
 
 .input-std {
   width: 100%; padding: 0.8rem 1rem; border: 1.5px solid #CBD5E1;

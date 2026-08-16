@@ -161,6 +161,11 @@ class SubUserService {
     if (data.channelId !== undefined)   updateData.channelId = data.channelId || null;
     if (data.permissions !== undefined) updateData.permissions = data.permissions;
     if (data.isActive !== undefined)    updateData.isActive = data.isActive;
+    
+    if (data.password) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.passwordHash = await bcrypt.hash(data.password, salt);
+    }
 
     const updated = await prisma.subUser.update({
       where: { id: subUserId },
