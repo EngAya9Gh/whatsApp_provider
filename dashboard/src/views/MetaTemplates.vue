@@ -343,10 +343,10 @@
           
           <!-- Modal Footer -->
           <div class="modal-footer">
-            <button @click="showCreateModal = false" class="btn-ghost">إلغاء</button>
-            <button @click="submitTemplate" :disabled="creating" class="btn-create">
-              <span v-if="creating" class="spinner-sm"></span>
-              إرسال إلى Meta للمراجعة
+            <button @click="showCreateModal = false" class="btn-ghost">{{ isAr ? 'إلغاء' : 'Cancel' }}</button>
+            <button @click="submitTemplate" :disabled="creating || uploadingHeader" class="btn-create">
+              <span v-if="creating || uploadingHeader" class="spinner-sm"></span>
+              {{ uploadingHeader ? (isAr ? 'جاري الرفع لـ Meta...' : 'Uploading media...') : (isAr ? 'إرسال إلى Meta للمراجعة' : 'Submit to Meta for Review') }}
             </button>
           </div>
         </div>
