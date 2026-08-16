@@ -84,7 +84,12 @@
             <div class="message-content">
               <!-- Media Content -->
               <div v-if="msg.hasMedia && msg.mediaUrl" class="message-media">
-                <img v-if="msg.type === 'IMAGE'" :src="getMediaUrl(msg.mediaUrl)" alt="Media" @error="handleMediaError" />
+                <div v-if="msg.type === 'IMAGE'" class="image-container">
+                  <img :src="getMediaUrl(msg.mediaUrl)" alt="Media" @error="handleMediaError" />
+                  <a :href="getMediaUrl(msg.mediaUrl)" target="_blank" download class="btn-download-img">
+                    <i class="fas fa-download"></i>
+                  </a>
+                </div>
                 <video v-else-if="msg.type === 'VIDEO'" :src="getMediaUrl(msg.mediaUrl)" controls></video>
                 <audio v-else-if="msg.type === 'AUDIO'" :src="getMediaUrl(msg.mediaUrl)" controls></audio>
                 <a v-else-if="msg.type === 'DOCUMENT'" :href="getMediaUrl(msg.mediaUrl)" target="_blank" class="document-link">
@@ -118,8 +123,12 @@
           </div>
           
           <form @submit.prevent="sendMessage" class="chat-form">
-            <button type="button" class="btn-attach" @click="$refs.fileInput.click()">
+            <button type="button" class="btn-attach" @click="$refs.fileInput.click()" title="إرفاق ملف">
               <i class="fas fa-paperclip"></i>
+            </button>
+            <button type="button" class="btn-attach" @click="toggleRecording" :class="{'recording': isRecording}" title="تسجيل صوتي">
+              <i class="fas fa-microphone" v-if="!isRecording"></i>
+              <i class="fas fa-stop-circle text-danger" v-else></i>
             </button>
             <input 
               type="file" 
@@ -132,12 +141,12 @@
             <input 
               type="text" 
               v-model="newMessage" 
-              placeholder="Type a message..." 
+              :placeholder="isRecording ? 'جاري التسجيل...' : 'Type a message...'" 
               class="form-control msg-input"
-              :disabled="sending"
+              :disabled="sending || isRecording"
             />
             
-            <button type="submit" class="btn-send" :disabled="sending || (!newMessage.trim() && !attachment)">
+            <button type="submit" class="btn-send" :disabled="sending || isRecording || (!newMessage.trim() && !attachment)">
               <i class="fas fa-paper-plane" v-if="!sending"></i>
               <i class="fas fa-spinner fa-spin" v-else></i>
             </button>
@@ -175,6 +184,11 @@ const loadingThreads = ref(false)
 const loadingMessages = ref(false)
 const sending = ref(false)
 const messagesContainer = ref(null)
+
+// Audio Recording state
+const isRecording = ref(false)
+let mediaRecorder = null
+let audioChunks = []
 
 const fetchChannels = async () => {
   try {
@@ -250,6 +264,42 @@ const handleFileUpload = (event) => {
       return
     }
     attachment.value = file
+  }
+}
+
+const toggleRecording = async () => {
+  if (isRecording.value) {
+    // Stop recording
+    if (mediaRecorder) {
+      mediaRecorder.stop()
+    }
+    isRecording.value = false
+  } else {
+    // Start recording
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaRecorder = new MediaRecorder(stream)
+      audioChunks = []
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunks.push(e.data)
+      }
+      
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' })
+        // Create a File object to mimic file upload
+        const audioFile = new File([audioBlob], 'voice-message.webm', { type: audioBlob.type })
+        attachment.value = audioFile
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop())
+      }
+      
+      mediaRecorder.start()
+      isRecording.value = true
+    } catch (err) {
+      console.error('Error accessing microphone', err)
+      alert('لا يمكن الوصول للمايكروفون. يرجى التأكد من الصلاحيات.')
+    }
   }
 }
 
@@ -744,7 +794,7 @@ onUnmounted(() => {
   background: none;
   border: none;
   font-size: 1.2rem;
-  color: #666;
+  color: #4a4a4a;
   cursor: pointer;
   padding: 10px;
   transition: color 0.2s;
@@ -763,7 +813,7 @@ onUnmounted(() => {
 }
 
 .btn-send {
-  background: var(--primary-color);
+  background: #ff6b00;
   color: white;
   border: none;
   width: 45px;
@@ -784,5 +834,42 @@ onUnmounted(() => {
 .btn-send:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.image-container {
+  position: relative;
+  display: inline-block;
+}
+
+.btn-download-img {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-size: 0.8rem;
+  transition: background 0.2s;
+}
+
+.btn-download-img:hover {
+  background: rgba(0,0,0,0.9);
+  color: white;
+}
+
+.recording i {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
 }
 </style>
