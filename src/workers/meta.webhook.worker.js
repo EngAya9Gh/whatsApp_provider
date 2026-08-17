@@ -139,7 +139,7 @@ async function processStatusUpdate(channelId, tenantId, payload) {
     logger.error(`[MetaWebhookWorker] Message ${wamid} FAILED: ${updateData.errorMessage}`);
   }
 
-  const msgLog = await prisma.messageLog.findFirst({ where: { metaMessageId: wamid }, select: { campaignId: true, phone: true } });
+  const msgLog = await prisma.messageLog.findFirst({ where: { metaMessageId: wamid }, select: { phone: true } });
   await prisma.messageLog.updateMany({ where: { metaMessageId: wamid }, data: updateData });
 
   // Update Mongoose ChatMessage
@@ -153,9 +153,6 @@ async function processStatusUpdate(channelId, tenantId, payload) {
     logger.error(`[MetaWebhookWorker] Failed to update Mongoose ChatMessage status:`, e.message);
   }
 
-  if (msgLog?.campaignId && status === 'failed') {
-    await prisma.campaignTarget.updateMany({ where: { campaignId: msgLog.campaignId, phone: msgLog.phone }, data: { status: 'FAILED', error: updateData.errorMessage } });
-  }
   logger.info(`[MetaWebhookWorker] ✅ Updated status for wamid ${wamid} → ${status}`);
 }
 
