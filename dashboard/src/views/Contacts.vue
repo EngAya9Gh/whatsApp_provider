@@ -45,14 +45,22 @@
       <!-- Contacts List -->
       <div class="contacts-panel card">
         <div class="panel-header with-actions">
-          <h3>{{ currentGroupName }}</h3>
+          <div class="title-wrap">
+            <h3>{{ currentGroupName }}</h3>
+            <span class="muted-text text-sm ml-2">{{ contacts.length }} {{ isAr ? 'جهة اتصال' : 'contacts' }}</span>
+          </div>
           <div class="actions-row">
-            <input type="text" class="input-std search-input" v-model="searchQuery" @input="debounceSearch" :placeholder="isAr ? 'بحث بالاسم أو الرقم...' : 'Search name or phone...'" />
+            <div class="search-box">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" class="input-std search-input" v-model="searchQuery" @input="debounceSearch" :placeholder="isAr ? 'بحث بالاسم أو الرقم...' : 'Search name or phone...'" autocomplete="off" name="search_query_off" />
+            </div>
             <button @click="openContactModal()" class="btn-primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               {{ isAr ? 'إضافة' : 'Add Contact' }}
             </button>
             <button @click="showImportModal = true" class="btn-ghost">
-              {{ isAr ? 'استيراد CSV' : 'Import CSV' }}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              {{ isAr ? 'استيراد CSV/Excel' : 'Import CSV/Excel' }}
             </button>
           </div>
         </div>
@@ -128,17 +136,17 @@
           <div class="form-row">
             <div class="form-group">
               <label>{{ isAr ? 'الاسم' : 'Name' }} *</label>
-              <input v-model="contactForm.name" type="text" class="input-std" />
+              <input v-model="contactForm.name" type="text" class="input-std" autocomplete="off" />
             </div>
             <div class="form-group">
               <label>{{ isAr ? 'رقم الهاتف' : 'Phone' }} *</label>
-              <input v-model="contactForm.phone" type="text" class="input-std" :placeholder="isAr ? 'متضمناً رمز الدولة (مثال: 2010...)' : 'With country code (e.g. 2010...)'" />
+              <input v-model="contactForm.phone" type="text" class="input-std" :placeholder="isAr ? 'متضمناً رمز الدولة (مثال: 2010...)' : 'With country code (e.g. 2010...)'" autocomplete="new-password" />
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label>{{ isAr ? 'الإيميل' : 'Email' }}</label>
-              <input v-model="contactForm.email" type="email" class="input-std" />
+              <input v-model="contactForm.email" type="email" class="input-std" autocomplete="off" />
             </div>
             <div class="form-group">
               <label>{{ isAr ? 'المجموعة' : 'Group' }}</label>
@@ -171,7 +179,7 @@
           <button @click="showImportModal = false" class="modal-close">✕</button>
         </div>
         <div class="modal-body">
-          <p class="muted mb">{{ isAr ? 'ارفع ملف CSV يحتوي على الأعمدة: Phone, Name, Email وأي متغيرات أخرى مثل var1, var2' : 'Upload a CSV file containing columns: Phone, Name, Email, and any other variables like var1, var2' }}</p>
+          <p class="muted mb">{{ isAr ? 'ارفع ملف CSV أو Excel (.xlsx, .xls) يحتوي على الأعمدة: Phone, Name, Email وأي متغيرات أخرى مثل var1, var2' : 'Upload a CSV or Excel (.xlsx, .xls) file containing columns: Phone, Name, Email, and any other variables like var1, var2' }}</p>
           <div class="form-group">
             <label>{{ isAr ? 'إضافة إلى مجموعة' : 'Add to Group' }}</label>
             <select v-model="importGroupId" class="input-std">
@@ -180,8 +188,18 @@
             </select>
           </div>
           <div class="form-group">
-            <label>{{ isAr ? 'ملف CSV' : 'CSV File' }} *</label>
-            <input type="file" ref="fileInput" accept=".csv" class="input-std" />
+            <label>{{ isAr ? 'ملف CSV أو Excel' : 'CSV or Excel File' }} *</label>
+            <div class="file-drop-area" @click="$refs.fileInput.click()">
+              <input type="file" ref="fileInput" accept=".csv, .xlsx, .xls" class="hidden-input" @change="handleFileSelect" />
+              <div v-if="!selectedFileName" class="drop-content">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <p>{{ isAr ? 'اضغط لاختيار ملف' : 'Click to select a file' }}</p>
+              </div>
+              <div v-else class="drop-content selected">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <p class="file-name">{{ selectedFileName }}</p>
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -234,6 +252,7 @@ const groupForm = reactive({ name: '', description: '' })
 const contactForm = reactive({ name: '', phone: '', email: '', groupId: null, metadata: '' })
 const importGroupId = ref(null)
 const fileInput = ref(null)
+const selectedFileName = ref('')
 
 const toast = reactive({ show: false, message: '', type: 'success' })
 
@@ -426,7 +445,16 @@ async function deleteContact(id) {
   }
 }
 
-// --- Import CSV ---
+// --- Import CSV / Excel ---
+
+function handleFileSelect(e) {
+  const file = e.target.files[0]
+  if (file) {
+    selectedFileName.value = file.name
+  } else {
+    selectedFileName.value = ''
+  }
+}
 
 async function importCsv() {
   const file = fileInput.value?.files[0]
@@ -449,6 +477,7 @@ async function importCsv() {
     showToast(`${res.data.message}`)
     showImportModal.value = false
     fileInput.value.value = ''
+    selectedFileName.value = ''
     fetchContacts()
     fetchGroups()
   } catch (err) {
@@ -544,20 +573,65 @@ async function importCsv() {
 .contacts-panel {
   padding: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .panel-header.with-actions {
-  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
   border-bottom: 1px solid var(--border-color);
+  background: #fdfdfd;
 }
+.title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.title-wrap h3 {
+  margin: 0;
+  font-size: 18px;
+}
+.muted-text {
+  color: var(--text-secondary);
+}
+.text-sm { font-size: 0.85rem; }
+.ml-2 { margin-left: 0.5rem; }
+html[dir="rtl"] .ml-2 { margin-left: 0; margin-right: 0.5rem; }
+
 .actions-row {
   display: flex;
   gap: 12px;
+  align-items: center;
+}
+.search-box {
+  position: relative;
+  width: 280px;
+}
+.search-box .search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94A3B8;
+}
+html[dir="rtl"] .search-box .search-icon {
+  left: auto;
+  right: 12px;
 }
 .search-input {
-  width: 250px;
+  width: 100%;
+  padding-left: 40px !important;
 }
+html[dir="rtl"] .search-input {
+  padding-left: 1rem !important;
+  padding-right: 40px !important;
+}
+
 .table-container {
   overflow-x: auto;
+  min-height: 400px;
 }
 .data-table {
   width: 100%;
@@ -642,6 +716,43 @@ select.input-std { cursor: pointer; }
 @media (max-width: 540px) { .form-row { grid-template-columns: 1fr; } }
 .form-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
 .form-group label { font-size: 0.83rem; font-weight: 700; color: #334155; }
+
+.file-drop-area {
+  border: 2px dashed #CBD5E1;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #F8FAFC;
+}
+.file-drop-area:hover {
+  background: #F1F5F9;
+  border-color: #94A3B8;
+}
+.hidden-input {
+  display: none;
+}
+.drop-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #64748B;
+}
+.drop-content.selected {
+  color: #10B981;
+}
+.drop-content p {
+  margin: 0;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+.file-name {
+  font-weight: 700 !important;
+  color: #0F172A !important;
+  word-break: break-all;
+}
 
 /* ═══ MODAL ═══ */
 .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }

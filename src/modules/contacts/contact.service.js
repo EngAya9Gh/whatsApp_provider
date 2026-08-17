@@ -1,6 +1,8 @@
 const { PrismaClient } = require('@prisma/client');
 const fs = require('fs');
 const csv = require('csv-parser');
+const xlsx = require('xlsx');
+const path = require('path');
 
 const prisma = new PrismaClient();
 
@@ -128,54 +130,73 @@ class ContactService {
     }
 
     const contacts = [];
-    return new Promise((resolve, reject) => {
-      fs.createReadStream(filePath)
-        .pipe(csv())
-        .on('data', (row) => {
-          // Identify standard columns
-          const phone = row.phone || row.Phone || row.number || row.Number || row.whatsapp;
-          const name = row.name || row.Name || 'Unknown';
-          const email = row.email || row.Email || null;
-          
-          if (phone) {
-            // Collect any other variables from the row (var1, var2, etc.)
-            const metadata = {};
-            for (const key in row) {
-              if (!['phone', 'Phone', 'number', 'Number', 'whatsapp', 'name', 'Name', 'email', 'Email'].includes(key)) {
-                metadata[key] = row[key];
-              }
-            }
+    const ext = path.extname(filePath).toLowerCase();
 
-            contacts.push({
-              tenantId,
-              groupId: groupId || null,
-              name,
-              phone: String(phone).replace(/[^0-9]/g, ''),
-              email,
-              metadata: Object.keys(metadata).length > 0 ? metadata : null
-            });
-          }
-        })
-        .on('end', async () => {
-          fs.unlinkSync(filePath); // delete temp file
-          try {
-            if (contacts.length > 0) {
-              const result = await prisma.contact.createMany({
-                data: contacts,
-                skipDuplicates: true // Prisma doesn't strictly have uniqueness on phone+tenantId, but this avoids crashing if we add it later
-              });
-              resolve({ success: true, count: result.count });
-            } else {
-              resolve({ success: true, count: 0 });
+    return new Promise((resolve, reject) => {
+      const processRow = (row) => {
+        const phone = row.phone || row.Phone || row.number || row.Number || row.whatsapp;
+        const name = row.name || row.Name || 'Unknown';
+        const email = row.email || row.Email || null;
+        
+        if (phone) {
+          const metadata = {};
+          for (const key in row) {
+            if (!['phone', 'Phone', 'number', 'Number', 'whatsapp', 'name', 'Name', 'email', 'Email'].includes(key)) {
+              metadata[key] = row[key];
             }
-          } catch (error) {
-            reject(error);
           }
-        })
-        .on('error', (error) => {
-          fs.unlinkSync(filePath);
+          contacts.push({
+            tenantId,
+            groupId: groupId || null,
+            name,
+            phone: String(phone).replace(/[^0-9]/g, ''),
+            email,
+            metadata: Object.keys(metadata).length > 0 ? metadata : null
+          });
+        }
+      };
+
+      const finishProcessing = async () => {
+        try {
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath); // delete temp file
+          if (contacts.length > 0) {
+            const result = await prisma.contact.createMany({
+              data: contacts,
+              skipDuplicates: true
+            });
+            resolve({ success: true, count: result.count });
+          } else {
+            resolve({ success: true, count: 0 });
+          }
+        } catch (error) {
           reject(error);
-        });
+        }
+      };
+
+      if (ext === '.xlsx' || ext === '.xls') {
+        try {
+          const workbook = xlsx.readFile(filePath);
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const data = xlsx.utils.sheet_to_json(sheet);
+          
+          data.forEach(processRow);
+          finishProcessing();
+        } catch (err) {
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+          reject(err);
+        }
+      } else {
+        // CSV Parsing
+        fs.createReadStream(filePath)
+          .pipe(csv())
+          .on('data', processRow)
+          .on('end', finishProcessing)
+          .on('error', (error) => {
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            reject(error);
+          });
+      }
     });
   }
 }
