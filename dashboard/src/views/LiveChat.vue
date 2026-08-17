@@ -612,7 +612,7 @@ onUnmounted(() => {
 }
 
 .unread-badge {
-  background: var(--primary-color);
+  background: #25D366;
   color: white;
   font-size: 0.75rem;
   padding: 2px 6px;
