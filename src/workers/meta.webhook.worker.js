@@ -88,9 +88,9 @@ async function processIncomingMessage(channelId, tenantId, payload) {
             // Save the auto-reply to Mongoose (Live Chat)
             if (metaRes && metaRes.messages && metaRes.messages[0]) {
               const metaMessageId = metaRes.messages[0].id;
-              const ChatThread = require('../../models/mongo/ChatThread');
-              const ChatMessage = require('../../models/mongo/ChatMessage');
-              const socketService = require('../../services/socket.service');
+              const ChatThread = require('../models/mongo/ChatThread');
+              const ChatMessage = require('../models/mongo/ChatMessage');
+              const socketService = require('../services/socket.service');
               
               const thread = await ChatThread.findOne({ tenantId, channelId, contactPhone: from });
               if (thread) {
@@ -143,7 +143,7 @@ async function processStatusUpdate(channelId, tenantId, payload) {
   await prisma.messageLog.updateMany({ where: { metaMessageId: wamid }, data: updateData });
 
   // Update Mongoose ChatMessage
-  const ChatMessage = require('../../models/mongo/ChatMessage');
+  const ChatMessage = require('../models/mongo/ChatMessage');
   try {
     await ChatMessage.updateMany(
       { metaMessageId: wamid },
