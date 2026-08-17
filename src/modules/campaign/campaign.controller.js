@@ -3,7 +3,7 @@ const campaignService = require('./campaign.service');
 exports.createCampaign = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
-    const { name, message, templateId, templateName, templateLanguage, interactiveType, startDate, endDate, campaignType, channelId, metaCategory } = req.body;
+    const { name, message, templateId, templateName, templateLanguage, interactiveType, startDate, endDate, campaignType, channelId, metaCategory, contactGroupId } = req.body;
     const file = req.files?.file?.[0];
     const image = req.files?.image?.[0];
 
@@ -19,8 +19,8 @@ exports.createCampaign = async (req, res, next) => {
       }
     }
 
-    if (!file) {
-      return res.status(400).json({ error: 'Excel or CSV file is required' });
+    if (!file && !contactGroupId) {
+      return res.status(400).json({ error: 'Excel/CSV file or Contact Group is required' });
     }
     
     // For Meta campaigns, templateName is required instead of message
@@ -64,7 +64,8 @@ exports.createCampaign = async (req, res, next) => {
       endDate: endDate ? new Date(endDate) : null,
       campaignType: campaignType || 'BAILEYS',
       channelId: resolvedChannelId,
-      metaCategory
+      metaCategory,
+      contactGroupId
     });
 
     res.status(201).json(result);

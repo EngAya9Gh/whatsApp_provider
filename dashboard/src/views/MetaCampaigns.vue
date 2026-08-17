@@ -242,14 +242,34 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">{{ isAr ? 'ملف أرقام الهاتف (Excel / CSV)' : 'Phone Numbers File (Excel / CSV)' }}</label>
-                  <div class="file-drop" @click="$refs.fileInput.click()" :class="form.file ? 'has-file' : ''">
+                  <label class="form-label">{{ isAr ? 'مصدر الأرقام' : 'Audience Source' }}</label>
+                  <div class="launch-mode-grid" style="margin-bottom: 0.75rem;">
+                    <button type="button" @click="form.audienceSource = 'file'" :class="['launch-mode-btn', form.audienceSource === 'file' ? 'active' : '']" style="padding: 0.5rem; justify-content: center;">
+                      {{ isAr ? 'رفع ملف' : 'Upload File' }}
+                    </button>
+                    <button type="button" @click="form.audienceSource = 'group'" :class="['launch-mode-btn', form.audienceSource === 'group' ? 'active' : '']" style="padding: 0.5rem; justify-content: center;">
+                      {{ isAr ? 'مجموعة جهات اتصال' : 'Contact Group' }}
+                    </button>
+                  </div>
+
+                  <div v-if="form.audienceSource === 'file'" class="file-drop" @click="$refs.fileInput.click()" :class="form.file ? 'has-file' : ''">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     <span v-if="form.file" class="file-name">{{ form.file.name }}</span>
                     <span v-else>{{ isAr ? 'اضغط لرفع ملف' : 'Click to upload Excel or CSV' }}</span>
                     <small>{{ isAr ? 'A = الهاتف، B/C = المتغيرات' : 'Column A = Phone, B/C = Variables' }}</small>
                   </div>
                   <input ref="fileInput" type="file" @change="handleFileUpload" accept=".csv,.xlsx,.xls" style="display:none" />
+
+                  <div v-if="form.audienceSource === 'group'">
+                    <select v-model="form.contactGroupId" class="form-input">
+                      <option value="" disabled>{{ isAr ? '— اختر مجموعة —' : '— Select a group —' }}</option>
+                      <option value="all">{{ isAr ? 'جميع جهات الاتصال' : 'All Contacts' }}</option>
+                      <option value="unassigned">{{ isAr ? 'جهات اتصال غير معينة' : 'Unassigned Contacts' }}</option>
+                      <option v-for="g in contactGroups" :key="g.id" :value="g.id">
+                        {{ g.name }} ({{ g._count?.contacts || 0 }})
+                      </option>
+                    </select>
+                  </div>
                 </div>
 
                 <!-- ══ LAUNCH MODE ══ -->
@@ -317,6 +337,7 @@ import { useMetaChannel } from '../composables/useMetaChannel'
 const { activeMetaChannelId } = useMetaChannel()
 const campaigns = ref([])
 const metaTemplates = ref([])
+const contactGroups = ref([])
 const loading = ref(false)
 const { locale } = useI18n()
 const isAr = computed(() => locale.value === 'ar')
@@ -378,7 +399,7 @@ const filteredCampaigns = computed(() => {
   return list
 })
 
-const form = ref({ name: '', templateName: '', file: null, launchMode: 'immediate', scheduledAt: '' })
+const form = ref({ name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '' })
 
 const statusLabel = (status) => {
   const map = { PENDING: isAr.value ? 'مسودة' : 'Draft', RUNNING: isAr.value ? 'جارية' : 'Running', SCHEDULED: isAr.value ? 'مجدولة' : 'Scheduled', COMPLETED: isAr.value ? 'مكتملة' : 'Completed', FAILED: isAr.value ? 'فشلت' : 'Failed' }
@@ -430,22 +451,36 @@ const fetchTemplates = async () => {
   } catch (err) { console.error(err) }
 }
 
+const fetchGroups = async () => {
+  try {
+    const res = await axios.get('/api/contacts/groups', { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } })
+    contactGroups.value = res.data.data
+  } catch (e) {}
+}
+
 const handleFileUpload = (event) => { form.value.file = event.target.files[0] }
 
 const openModal = () => {
   showCreateModal.value = true
-  form.value = { name: '', templateName: '', file: null, launchMode: 'immediate', scheduledAt: '' }
+  form.value = { name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '' }
   if (activeMetaChannelId.value) fetchTemplates()
+  fetchGroups()
 }
 
 const closeModal = () => {
   showCreateModal.value = false
-  form.value = { name: '', templateName: '', file: null, launchMode: 'immediate', scheduledAt: '' }
+  form.value = { name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '' }
 }
 
 const createCampaign = async () => {
-  if (!form.value.name || !form.value.templateName || !form.value.file) {
-    showAlert(isAr.value ? 'يرجى ملء جميع الحقول ورفع ملف.' : 'Please fill all fields and upload a file.', 'error'); return
+  if (!form.value.name || !form.value.templateName) {
+    showAlert(isAr.value ? 'يرجى ملء الاسم والقالب.' : 'Please fill name and template.', 'error'); return
+  }
+  if (form.value.audienceSource === 'file' && !form.value.file) {
+    showAlert(isAr.value ? 'يرجى رفع ملف.' : 'Please upload a file.', 'error'); return
+  }
+  if (form.value.audienceSource === 'group' && !form.value.contactGroupId) {
+    showAlert(isAr.value ? 'يرجى اختيار مجموعة.' : 'Please select a group.', 'error'); return
   }
   if (!activeMetaChannelId.value) {
     showAlert(isAr.value ? 'يرجى تحديد قناة ميتا.' : 'Please select a Meta channel.', 'error'); return
@@ -468,10 +503,13 @@ const createCampaign = async () => {
     // Send the template language so the worker uses correct language code
     const langCode = tpl.language || (tpl.components?.[0]?.language) || 'ar'
     formData.append('templateLanguage', langCode)
-  }
-  formData.append('file', form.value.file)
-  if (form.value.launchMode === 'schedule' && form.value.scheduledAt) {
-    formData.append('startDate', new Date(form.value.scheduledAt).toISOString())
+    formData.append('campaignType', 'META')
+    if (form.value.audienceSource === 'file' && form.value.file) {
+      formData.append('file', form.value.file)
+    } else if (form.value.audienceSource === 'group' && form.value.contactGroupId) {
+      formData.append('contactGroupId', form.value.contactGroupId)
+    }
+    if (form.value.launchMode === 'schedule') formData.append('startDate', new Date(form.value.scheduledAt).toISOString())
   }
 
   try {

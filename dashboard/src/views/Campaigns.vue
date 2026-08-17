@@ -249,14 +249,36 @@
               </div>
 
               <div class="form-group" v-if="!editingCampaign">
-                <label class="form-label">Upload Contacts</label>
-                <div class="file-drop-zone" @click="$refs.fileInput.click()">
+                <label class="form-label">Audience Source</label>
+                <div class="type-selector" style="margin-bottom: 0.75rem;">
+                  <label class="type-opt" :class="formData.audienceSource === 'file' ? 'active' : ''">
+                    <input type="radio" v-model="formData.audienceSource" value="file" />
+                    Upload File
+                  </label>
+                  <label class="type-opt" :class="formData.audienceSource === 'group' ? 'active' : ''">
+                    <input type="radio" v-model="formData.audienceSource" value="group" />
+                    Saved Contact Group
+                  </label>
+                </div>
+
+                <div v-if="formData.audienceSource === 'file'" class="file-drop-zone" @click="$refs.fileInput.click()">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                   <span v-if="selectedFile">{{ selectedFile.name }}</span>
                   <span v-else>Click to upload Excel or CSV</span>
                   <small>System auto-detects phone number column</small>
                 </div>
-                <input ref="fileInput" type="file" @change="handleFileChange" accept=".csv,.xlsx,.xls" required style="display:none" />
+                <input ref="fileInput" type="file" @change="handleFileChange" accept=".csv,.xlsx,.xls" style="display:none" />
+
+                <div v-if="formData.audienceSource === 'group'">
+                  <select v-model="formData.contactGroupId" class="form-input">
+                    <option value="" disabled>Select a contact group...</option>
+                    <option value="all">All Contacts</option>
+                    <option value="unassigned">Unassigned Contacts</option>
+                    <option v-for="g in contactGroups" :key="g.id" :value="g.id">
+                      {{ g.name }} ({{ g._count?.contacts || 0 }})
+                    </option>
+                  </select>
+                </div>
               </div>
 
               <div class="form-group">
@@ -375,6 +397,7 @@ const campaigns = ref([])
 const templates = ref([])
 const metaTemplates = ref([])
 const channels = ref([])
+const contactGroups = ref([])
 const loading = ref(true)
 const error = ref('')
 const success = ref('')
@@ -420,6 +443,8 @@ const editingCampaign = ref(null)
 const formData = ref({
   name: '',
   channelId: '',
+  audienceSource: 'file',
+  contactGroupId: '',
   type: 'text',
   message: '',
   templateId: '',
@@ -449,6 +474,13 @@ const fetchChannels = async () => {
     const res = await axios.get('/api/v1/meta/channels', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
     channels.value = res.data.data
   } catch (err) {}
+}
+
+const fetchGroups = async () => {
+  try {
+    const res = await axios.get('/api/contacts/groups', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+    contactGroups.value = res.data.data
+  } catch (e) {}
 }
 
 const isMetaChannel = computed(() => {
@@ -496,7 +528,12 @@ const handleFileChange = (e) => { if (e.target.files?.[0]) selectedFile.value = 
 const handleImageChange = (e) => { if (e.target.files?.[0]) selectedImage.value = e.target.files[0] }
 
 const submitCampaign = async () => {
-  if (!editingCampaign.value && !selectedFile.value) return alert('Please upload an Excel/CSV file')
+  if (!editingCampaign.value && formData.value.audienceSource === 'file' && !selectedFile.value) {
+    return alert('Please upload an Excel/CSV file')
+  }
+  if (!editingCampaign.value && formData.value.audienceSource === 'group' && !formData.value.contactGroupId) {
+    return alert('Please select a contact group')
+  }
   saving.value = true
   error.value = ''
   success.value = ''
@@ -522,7 +559,13 @@ const submitCampaign = async () => {
       if (validButtons.length === 0) { saving.value = false; return alert('Please add at least one button') }
       form.append('buttons', JSON.stringify(validButtons))
     }
-    if (!editingCampaign.value) form.append('file', selectedFile.value)
+    if (!editingCampaign.value) {
+      if (formData.value.audienceSource === 'file' && selectedFile.value) {
+        form.append('file', selectedFile.value)
+      } else if (formData.value.audienceSource === 'group' && formData.value.contactGroupId) {
+        form.append('contactGroupId', formData.value.contactGroupId)
+      }
+    }
     if (selectedImage.value) form.append('image', selectedImage.value)
     if (formData.value.startDate) form.append('startDate', new Date(formData.value.startDate).toISOString())
     if (formData.value.endDate) form.append('endDate', new Date(formData.value.endDate).toISOString())
@@ -548,7 +591,7 @@ const closeCreateModal = () => {
   editingCampaign.value = null
   selectedFile.value = null
   selectedImage.value = null
-  formData.value = { name: '', channelId: '', type: 'text', message: '', templateId: '', buttons: [{ text: '', type: 'reply', url: '' }], startDate: '', endDate: '' }
+  formData.value = { name: '', channelId: '', audienceSource: 'file', contactGroupId: '', type: 'text', message: '', templateId: '', buttons: [{ text: '', type: 'reply', url: '' }], startDate: '', endDate: '' }
 }
 
 const toLocalString = (dateString) => {
@@ -614,8 +657,13 @@ onMounted(() => {
   fetchCampaigns()
   fetchTemplates()
   fetchChannels()
+  fetchGroups()
   pollInterval = setInterval(() => {
-    campaigns.value.filter(c => c.status === 'RUNNING').forEach(c => loadStats(c.id))
+    campaigns.value.forEach(c => {
+      if (c.status === 'RUNNING' || c.status === 'PENDING') {
+        loadStats(c.id)
+      }
+    })
   }, 10000)
 })
 

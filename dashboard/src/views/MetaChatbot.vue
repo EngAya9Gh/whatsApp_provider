@@ -294,6 +294,12 @@ const resetForm = () => {
   modalError.value = ''
 }
 
+const openModal = () => {
+  editingRule.value = null
+  resetForm()
+  showModal.value = true
+}
+
 const responseTypeIcon = (type) => {
   const found = responseTypes.find(r => r.value === type)
   return found ? found.icon : '💬'

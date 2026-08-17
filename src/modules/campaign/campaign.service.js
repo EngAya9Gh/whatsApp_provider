@@ -111,12 +111,38 @@ class CampaignService {
     return records;
   }
 
-  async createCampaign({ tenantId, name, message, templateId, templateLanguage, file, image, buttons, interactiveType, startDate, endDate, campaignType, channelId, metaCategory }) {
+  async createCampaign({ tenantId, name, message, templateId, templateLanguage, file, image, buttons, interactiveType, startDate, endDate, campaignType, channelId, metaCategory, contactGroupId }) {
     const isMeta = campaignType === 'META';
-    // 1. Parse phones and variables from file
-    const records = await this.parseFile(file, isMeta);
+    let records = [];
+
+    // 1. Parse phones and variables from file OR Contact Group
+    if (file) {
+      records = await this.parseFile(file, isMeta);
+    } else if (contactGroupId) {
+      const whereClause = { tenantId };
+      if (contactGroupId === 'unassigned') {
+        whereClause.groupId = null;
+      } else if (contactGroupId !== 'all') {
+        whereClause.groupId = contactGroupId;
+      }
+
+      const contacts = await prisma.contact.findMany({ where: whereClause });
+      records = contacts.map(c => {
+        const variables = [];
+        if (isMeta) {
+          if (c.name && c.name !== 'Unknown') variables.push(c.name);
+          if (c.metadata) {
+            Object.keys(c.metadata).sort().forEach(k => {
+              variables.push(String(c.metadata[k]));
+            });
+          }
+        }
+        return { phone: c.phone, variables };
+      });
+    }
+
     if (records.length === 0) {
-      throw { status: 400, message: 'No valid phone numbers found in the uploaded file (ensure phone is in the first column)' };
+      throw { status: 400, message: 'No valid phone numbers found in the uploaded file or selected group' };
     }
 
     // 2. Calculate Cost & Deduct Wallet
