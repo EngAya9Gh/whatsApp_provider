@@ -78,11 +78,37 @@ async function processIncomingMessage(channelId, tenantId, payload) {
         if (isMatch) {
           try {
             const rT = rule.responseType;
-            if (rT === 'META_TEMPLATE' && rule.metaTemplateName) await metaService.sendTemplateViaApi(channelRecord, from, rule.metaTemplateName, rule.metaTemplateLang || 'ar');
-            else if ((rT === 'IMAGE' || rT === 'QR_CODE') && rule.mediaUrl) await metaService.sendImageViaApi(channelRecord, from, rule.mediaUrl, rule.message || '');
-            else if (rT === 'VIDEO' && rule.mediaUrl) await metaService.sendVideoViaApi(channelRecord, from, rule.mediaUrl, rule.message || '');
-            else if (rT === 'DOCUMENT' && rule.mediaUrl) await metaService.sendDocumentViaApi(channelRecord, from, rule.mediaUrl, 'document', rule.message || '');
-            else if (rule.message) await metaService.sendTextViaApi(channelRecord, from, rule.message);
+            let metaRes = null;
+            if (rT === 'META_TEMPLATE' && rule.metaTemplateName) metaRes = await metaService.sendTemplateViaApi(channelRecord, from, rule.metaTemplateName, rule.metaTemplateLang || 'ar');
+            else if ((rT === 'IMAGE' || rT === 'QR_CODE') && rule.mediaUrl) metaRes = await metaService.sendImageViaApi(channelRecord, from, rule.mediaUrl, rule.message || '');
+            else if (rT === 'VIDEO' && rule.mediaUrl) metaRes = await metaService.sendVideoViaApi(channelRecord, from, rule.mediaUrl, rule.message || '');
+            else if (rT === 'DOCUMENT' && rule.mediaUrl) metaRes = await metaService.sendDocumentViaApi(channelRecord, from, rule.mediaUrl, 'document', rule.message || '');
+            else if (rule.message) metaRes = await metaService.sendTextViaApi(channelRecord, from, rule.message);
+
+            // Save the auto-reply to Mongoose (Live Chat)
+            if (metaRes && metaRes.messages && metaRes.messages[0]) {
+              const metaMessageId = metaRes.messages[0].id;
+              const ChatThread = require('../../models/mongo/ChatThread');
+              const ChatMessage = require('../../models/mongo/ChatMessage');
+              const socketService = require('../../services/socket.service');
+              
+              const thread = await ChatThread.findOne({ tenantId, channelId, contactPhone: from });
+              if (thread) {
+                const newMsg = await ChatMessage.create({
+                  threadId: thread._id,
+                  direction: 'OUTBOUND',
+                  type: rT === 'META_TEMPLATE' ? 'TEMPLATE' : rT,
+                  content: rule.message || rule.metaTemplateName || '[Auto Reply]',
+                  hasMedia: ['IMAGE', 'VIDEO', 'DOCUMENT', 'QR_CODE'].includes(rT),
+                  mediaUrl: rule.mediaUrl || null,
+                  metaMessageId,
+                  status: 'SENT'
+                });
+                const msgData = newMsg.toObject();
+                msgData.id = msgData._id.toString();
+                socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
+              }
+            }
           } catch (e) { logger.error(`[MetaAutoResponder] Failed reply to ${from}`, e.message); }
           break;
         }
