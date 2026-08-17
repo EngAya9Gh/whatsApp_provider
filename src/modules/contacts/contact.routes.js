@@ -21,7 +21,7 @@ const upload = multer({
     }
   }
 });
-
+//
 // All routes require auth and 'can_manage_contacts' permission
 router.use(authMiddleware);
 router.use(requirePermission('can_manage_contacts'));

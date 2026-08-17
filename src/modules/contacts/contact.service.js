@@ -134,25 +134,38 @@ class ContactService {
 
     return new Promise((resolve, reject) => {
       const processRow = (row) => {
-        const phone = row.phone || row.Phone || row.number || row.Number || row.whatsapp;
-        const name = row.name || row.Name || 'Unknown';
-        const email = row.email || row.Email || null;
+        let phone = null;
+        let name = 'Unknown';
+        let email = null;
+        const metadata = {};
+
+        for (const rawKey in row) {
+          const key = rawKey.trim().toLowerCase();
+          const val = row[rawKey];
+          
+          if (!phone && ['phone', 'mobile', 'number', 'whatsapp', 'الهاتف', 'الجوال', 'رقم الهاتف', 'رقم الجوال', 'الموبايل', 'موبايل'].includes(key)) {
+            phone = val;
+          } else if (name === 'Unknown' && ['name', 'الاسم', 'اسم'].includes(key)) {
+            name = val;
+          } else if (!email && ['email', 'الايميل', 'البريد الالكتروني', 'البريد'].includes(key)) {
+            email = val;
+          } else {
+            metadata[rawKey.trim()] = val;
+          }
+        }
         
         if (phone) {
-          const metadata = {};
-          for (const key in row) {
-            if (!['phone', 'Phone', 'number', 'Number', 'whatsapp', 'name', 'Name', 'email', 'Email'].includes(key)) {
-              metadata[key] = row[key];
-            }
+          const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+          if (cleanPhone) {
+            contacts.push({
+              tenantId,
+              groupId: groupId || null,
+              name: String(name).trim() || 'Unknown',
+              phone: cleanPhone,
+              email: email ? String(email).trim() : null,
+              metadata: Object.keys(metadata).length > 0 ? metadata : null
+            });
           }
-          contacts.push({
-            tenantId,
-            groupId: groupId || null,
-            name,
-            phone: String(phone).replace(/[^0-9]/g, ''),
-            email,
-            metadata: Object.keys(metadata).length > 0 ? metadata : null
-          });
         }
       };
 
