@@ -8,13 +8,15 @@ const prisma = new PrismaClient();
 
 /**
  * Middleware رئيسي للمصادقة — يدعم:
- *  1. حسابات الـ Tenant (الأوونر)
- *  2. حسابات الـ SubUser (المستخدمون الفرعيون)
+ *  1. حسابات الـ Tenant (الأوونر) — JWT
+ *  2. حسابات الـ SubUser (المستخدمون الفرعيون) — JWT
+ *  3. مفاتيح API الخارجية (sk_...) — للعملاء الذين يربطون مشاريعهم (CRM, etc.)
  *
  * بعد التحقق يضيف للـ request:
  *  - req.tenant     → بيانات الـ tenant دائماً
  *  - req.subUser    → بيانات المستخدم الفرعي (إذا كان sub-user login)
  *  - req.isSubUser  → boolean
+ *  - req.isApiKey   → boolean (true إذا كان المصدر API Key خارجي)
  *  - req.channelId  → رقم القناة المخصصة (للـ sub-users)
  *  - req.userPerms  → كائن الصلاحيات المحلولة (للـ sub-users)
  */
@@ -31,6 +33,48 @@ const authMiddleware = async (req, res, next) => {
 
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized: No token provided' });
+    }
+
+    // ── API Key (sk_...) — External Client Access ─────────────────────────
+    // Allows clients using their API Key to access dashboard endpoints
+    // programmatically (e.g., for CRM integrations, chat widgets, invoices, etc.)
+    if (token.startsWith('sk_')) {
+      const crypto = require('crypto');
+      const rawKey = token.replace('sk_', '');
+      const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
+
+      const apiKey = await prisma.apiKey.findFirst({
+        where: { keyHash, isActive: true },
+        include: {
+          tenant: {
+            select: {
+              id: true, name: true, email: true, isActive: true,
+              sessionStatus: true, plan: true, metaEnabled: true,
+              customFeatures: true, companyName: true
+            }
+          }
+        }
+      });
+
+      if (!apiKey) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid API Key' });
+      }
+      if (!apiKey.tenant.isActive) {
+        return res.status(403).json({ error: 'Forbidden: Account is disabled' });
+      }
+
+      // Async update last used (fire and forget)
+      prisma.apiKey.update({
+        where: { id: apiKey.id },
+        data: { lastUsedAt: new Date() }
+      }).catch(err => logger.error('Failed to update API key lastUsedAt', err));
+
+      req.tenant    = apiKey.tenant;
+      req.tenantId  = apiKey.tenant.id;
+      req.isSubUser = false;
+      req.userPerms = null; // API Key grants full owner-level access
+      req.isApiKey  = true;  // Flag for traceability
+      return next();
     }
 
     const decoded = jwt.verify(token, config.jwt.secret);
