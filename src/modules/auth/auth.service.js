@@ -120,7 +120,13 @@ class AuthService {
       updateData.webhookUrl = data.webhookUrl;
     }
     if (data.webhookEvents !== undefined) {
-      updateData.webhookEvents = data.webhookEvents;
+      try {
+        updateData.webhookEvents = typeof data.webhookEvents === 'string' 
+          ? JSON.parse(data.webhookEvents) 
+          : data.webhookEvents;
+      } catch (e) {
+        updateData.webhookEvents = data.webhookEvents;
+      }
     }
 
     const updatedTenant = await prisma.tenant.update({
