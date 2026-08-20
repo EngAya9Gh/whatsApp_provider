@@ -111,12 +111,21 @@ class AuthService {
       }
     };
 
+    const updateData = {
+      companyName: data.companyName !== undefined ? data.companyName : existing.companyName,
+      customFeatures: updatedFeatures
+    };
+
+    if (data.webhookUrl !== undefined) {
+      updateData.webhookUrl = data.webhookUrl;
+    }
+    if (data.webhookEvents !== undefined) {
+      updateData.webhookEvents = data.webhookEvents;
+    }
+
     const updatedTenant = await prisma.tenant.update({
       where: { id: tenantId },
-      data: {
-        companyName: data.companyName !== undefined ? data.companyName : existing.companyName,
-        customFeatures: updatedFeatures
-      }
+      data: updateData
     });
 
     return updatedTenant;
