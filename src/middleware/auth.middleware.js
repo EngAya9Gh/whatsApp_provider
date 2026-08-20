@@ -88,7 +88,8 @@ const authMiddleware = async (req, res, next) => {
             select: {
               id: true, name: true, email: true, isActive: true,
               plan: true, metaEnabled: true, customFeatures: true,
-              sessionStatus: true, companyName: true
+              sessionStatus: true, companyName: true,
+              webhookUrl: true, webhookEvents: true
             }
           }
         }
@@ -119,7 +120,8 @@ const authMiddleware = async (req, res, next) => {
       where: { id: decoded.tenantId },
       select: {
         id: true, name: true, email: true, isActive: true,
-        sessionStatus: true, plan: true, metaEnabled: true, customFeatures: true
+        sessionStatus: true, plan: true, metaEnabled: true, customFeatures: true,
+        companyName: true, webhookUrl: true, webhookEvents: true
       }
     });
 
