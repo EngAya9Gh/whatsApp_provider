@@ -38,10 +38,12 @@ class ChatController {
       const { name } = req.body;
       const { PrismaClient } = require('@prisma/client');
       const prisma = new PrismaClient();
+      const ChatThread = require('../../models/mongo/ChatThread');
 
-      // Find the thread
-      const thread = await prisma.chatThread.findFirst({
-        where: { id: req.params.threadId, tenantId: req.tenant.id }
+      // Find the thread in MongoDB
+      const thread = await ChatThread.findOne({
+        _id: req.params.threadId,
+        tenantId: req.tenant.id
       });
 
       if (!thread) {
@@ -49,10 +51,10 @@ class ChatController {
       }
 
       // Update thread
-      await prisma.chatThread.update({
-        where: { id: thread.id },
-        data: { contactName: name }
-      });
+      await ChatThread.updateOne(
+        { _id: thread._id },
+        { $set: { contactName: name } }
+      );
 
       // Update contact if exists, or create a new one to persist this name
       const existingContact = await prisma.contact.findFirst({

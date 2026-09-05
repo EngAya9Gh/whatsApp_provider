@@ -72,10 +72,15 @@ class ContactService {
     });
 
     if (contact.name) {
-      await prisma.chatThread.updateMany({
-        where: { tenantId, contactPhone: contact.phone },
-        data: { contactName: contact.name }
-      });
+      try {
+        const ChatThread = require('../../models/mongo/ChatThread');
+        await ChatThread.updateMany(
+          { tenantId, contactPhone: contact.phone },
+          { $set: { contactName: contact.name } }
+        );
+      } catch (err) {
+        // Ignore or log
+      }
     }
 
     return contact;
@@ -122,11 +127,15 @@ class ContactService {
     });
 
     if (updated.name) {
-      // Async update threads (fire and forget is fine, but await is safer)
-      await prisma.chatThread.updateMany({
-        where: { tenantId, contactPhone: updated.phone },
-        data: { contactName: updated.name }
-      });
+      try {
+        const ChatThread = require('../../models/mongo/ChatThread');
+        await ChatThread.updateMany(
+          { tenantId, contactPhone: updated.phone },
+          { $set: { contactName: updated.name } }
+        );
+      } catch (err) {
+        // Ignore or log
+      }
     }
 
     return updated;
