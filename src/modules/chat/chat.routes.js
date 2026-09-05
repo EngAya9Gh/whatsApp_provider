@@ -25,6 +25,7 @@ const upload = multer({ storage });
 
 router.get('/threads', chatController.getThreads.bind(chatController));
 router.get('/threads/:threadId/messages', chatController.getMessages.bind(chatController));
+router.put('/threads/:threadId/name', chatController.renameThread.bind(chatController));
 router.post('/threads/:threadId/messages', chatController.sendMessage.bind(chatController));
 router.post('/upload', upload.single('file'), chatController.uploadMedia.bind(chatController));
 router.get('/media/:mediaId', chatController.getMediaProxy.bind(chatController));

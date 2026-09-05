@@ -33,6 +33,53 @@ class ChatController {
     }
   }
 
+  async renameThread(req, res, next) {
+    try {
+      const { name } = req.body;
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      // Find the thread
+      const thread = await prisma.chatThread.findFirst({
+        where: { id: req.params.threadId, tenantId: req.tenant.id }
+      });
+
+      if (!thread) {
+        return res.status(404).json({ success: false, message: 'Thread not found' });
+      }
+
+      // Update thread
+      await prisma.chatThread.update({
+        where: { id: thread.id },
+        data: { contactName: name }
+      });
+
+      // Update contact if exists, or create a new one to persist this name
+      const existingContact = await prisma.contact.findFirst({
+        where: { tenantId: req.tenant.id, phone: thread.contactPhone }
+      });
+
+      if (existingContact) {
+        await prisma.contact.update({
+          where: { id: existingContact.id },
+          data: { name: name }
+        });
+      } else {
+        await prisma.contact.create({
+          data: {
+            tenantId: req.tenant.id,
+            phone: thread.contactPhone,
+            name: name
+          }
+        });
+      }
+
+      res.json({ success: true, contactName: name });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async sendMessage(req, res, next) {
     try {
       const message = await chatService.sendMessage(

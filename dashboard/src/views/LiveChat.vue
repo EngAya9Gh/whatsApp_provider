@@ -65,7 +65,12 @@
               <i class="fas fa-user-circle"></i>
             </div>
             <div>
-              <h3>{{ selectedThread.contactName || selectedThread.contactPhone }}</h3>
+              <h3>
+                {{ selectedThread.contactName || selectedThread.contactPhone }}
+                <button @click="openRenameModal" class="btn-icon small rename-btn ml-2" title="تعديل الاسم">
+                  <i class="fas fa-pen"></i>
+                </button>
+              </h3>
               <span class="contact-phone">{{ selectedThread.contactPhone }}</span>
             </div>
           </div>
@@ -168,6 +173,28 @@
         <h3>Welcome to Live Chat</h3>
         <p>Select a conversation from the sidebar to start messaging.</p>
       </div>
+
+      <!-- Rename Modal -->
+      <div v-if="showRenameModal" class="modal-overlay" @click.self="showRenameModal = false">
+        <div class="modal-box small">
+          <div class="modal-header">
+            <h2>تعديل اسم العميل</h2>
+            <button @click="showRenameModal = false" class="modal-close">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>الاسم الجديد</label>
+              <input v-model="newContactName" type="text" class="form-control" placeholder="أدخل اسم العميل..." @keyup.enter="saveContactName" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button @click="showRenameModal = false" class="btn-ghost">إلغاء</button>
+            <button @click="saveContactName" class="btn-primary" :disabled="savingName">
+              {{ savingName ? '...' : 'حفظ' }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </FeatureLock>
 </template>
@@ -197,6 +224,11 @@ const loadingThreads = ref(false)
 const loadingMessages = ref(false)
 const sending = ref(false)
 const messagesContainer = ref(null)
+
+// Rename state
+const showRenameModal = ref(false)
+const newContactName = ref('')
+const savingName = ref(false)
 
 // Audio Recording state
 const isRecording = ref(false)
@@ -266,6 +298,33 @@ const scrollToBottom = () => {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
     }
   })
+}
+
+const openRenameModal = () => {
+  newContactName.value = selectedThread.value?.contactName || ''
+  showRenameModal.value = true
+}
+
+const saveContactName = async () => {
+  if (!newContactName.value.trim() || !selectedThread.value) return
+  savingName.value = true
+  try {
+    const res = await axios.put(`/api/v1/chat/threads/${selectedThread.value.id}/name`, {
+      name: newContactName.value.trim()
+    })
+    
+    // Update local state
+    selectedThread.value.contactName = res.data.contactName
+    const t = threads.value.find(th => th.id === selectedThread.value.id)
+    if (t) t.contactName = res.data.contactName
+    
+    showRenameModal.value = false
+  } catch (err) {
+    console.error('Rename error:', err)
+    alert('حدث خطأ أثناء تعديل الاسم')
+  } finally {
+    savingName.value = false
+  }
 }
 
 const onSelectEmoji = (emoji) => {
@@ -665,6 +724,17 @@ onUnmounted(() => {
 .chat-header-info h3 {
   margin: 0 0 5px 0;
   font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+}
+
+.rename-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #94a3b8 !important;
+}
+.rename-btn:hover {
+  color: #0f172a !important;
 }
 
 .contact-phone {

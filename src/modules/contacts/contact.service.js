@@ -60,7 +60,7 @@ class ContactService {
       if (!group) throw { status: 400, message: 'Invalid Contact Group' };
     }
 
-    return await prisma.contact.create({
+    const contact = await prisma.contact.create({
       data: {
         tenantId,
         groupId: data.groupId || null,
@@ -70,6 +70,15 @@ class ContactService {
         metadata: data.metadata || null,
       }
     });
+
+    if (contact.name) {
+      await prisma.chatThread.updateMany({
+        where: { tenantId, contactPhone: contact.phone },
+        data: { contactName: contact.name }
+      });
+    }
+
+    return contact;
   }
 
   async getContacts(tenantId, filters = {}) {
@@ -107,10 +116,20 @@ class ContactService {
     if (data.groupId !== undefined) updateData.groupId = data.groupId;
     if (data.metadata !== undefined) updateData.metadata = data.metadata;
 
-    return await prisma.contact.update({
+    const updated = await prisma.contact.update({
       where: { id: contactId },
       data: updateData
     });
+
+    if (updated.name) {
+      // Async update threads (fire and forget is fine, but await is safer)
+      await prisma.chatThread.updateMany({
+        where: { tenantId, contactPhone: updated.phone },
+        data: { contactName: updated.name }
+      });
+    }
+
+    return updated;
   }
 
   async deleteContact(tenantId, contactId) {
