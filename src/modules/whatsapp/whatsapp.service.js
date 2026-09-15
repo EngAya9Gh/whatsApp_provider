@@ -44,6 +44,12 @@ class WhatsAppService {
       await sock.sendPresenceUpdate('paused', formattedPhone);
 
       const result = await sock.sendMessage(formattedPhone, { text });
+      
+      try {
+        const webhookService = require('../webhook/webhook.service');
+        await webhookService.dispatchClientSync(tenantId, phone);
+      } catch(e) {}
+      
       return result;
     } catch (error) {
       logger.error(`Failed to send message for tenant ${tenantId}`, error);
@@ -84,6 +90,10 @@ class WhatsAppService {
       }
 
       const result = await sock.sendMessage(formattedPhone, messagePayload);
+      try {
+        const webhookService = require('../webhook/webhook.service');
+        await webhookService.dispatchClientSync(tenantId, phone);
+      } catch(e) {}
       return result;
     } catch (error) {
       logger.error(`Failed to send media for tenant ${tenantId}: ${error.message || error}`);
@@ -216,6 +226,10 @@ class WhatsAppService {
           address: address || ''
         }
       });
+      try {
+        const webhookService = require('../webhook/webhook.service');
+        await webhookService.dispatchClientSync(tenantId, phone);
+      } catch(e) {}
       return result;
     } catch (error) {
       logger.error(`Failed to send location for tenant ${tenantId}: ${error.message}`);

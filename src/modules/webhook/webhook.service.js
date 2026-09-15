@@ -82,6 +82,47 @@ class WebhookService {
       logger.error(`[WebhookService] Error dispatching delivery status: ${err.message}`);
     }
   }
+
+  /**
+   * Dispatch a client sync event to the CRM when an outgoing message is sent to a new number
+   */
+  async dispatchClientSync(tenantId, phone, name = 'WhatsApp Lead') {
+    try {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { webhookUrl: true, webhookEvents: true }
+      });
+
+      if (!tenant || !tenant.webhookUrl) return;
+
+      const payload = {
+        event: 'client.sync',
+        data: {
+          phone: phone,
+          name: name
+        }
+      };
+      
+      let events = tenant.webhookEvents;
+      if (typeof events === 'string') {
+        try { events = JSON.parse(events); } catch (e) { events = {}; }
+      }
+      events = events || {};
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (events.headers) {
+        if (events.headers.key1 && events.headers.value1) {
+          headers[events.headers.key1] = events.headers.value1;
+        }
+      }
+
+      axios.post(tenant.webhookUrl, payload, { headers, timeout: 5000 }).catch(err => {
+        logger.warn(`[WebhookService] Failed to send client sync webhook to ${tenant.webhookUrl}: ${err.message}`);
+      });
+    } catch (err) {
+      logger.error(`[WebhookService] Error dispatching client sync: ${err.message}`);
+    }
+  }
 }
 
 module.exports = new WebhookService();

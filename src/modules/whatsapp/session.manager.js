@@ -54,6 +54,12 @@ class SessionManager {
         // Some users reply using @lid, their real number is in remoteJidAlt
         const senderPhone = (msg.key.remoteJidAlt || msg.key.remoteJid || '').replace(/@.*$/, '');
 
+        // Sync incoming contact to CRM
+        try {
+          const webhookService = require('../webhook/webhook.service');
+          await webhookService.dispatchClientSync(tenantId, senderPhone, msg.pushName || 'WhatsApp Lead');
+        } catch (e) {}
+
         // Button Reply
         const btnReply = msg.message?.buttonsResponseMessage;
         if (btnReply) {
@@ -271,6 +277,10 @@ class SessionManager {
                 
                 if (Object.keys(payload).length > 0) {
                   await sock.sendMessage(msg.key.remoteJid, payload);
+                  try {
+                    const webhookService = require('../webhook/webhook.service');
+                    await webhookService.dispatchClientSync(tenantId, senderPhone);
+                  } catch(e) {}
                 }
                 break; // Stop after first match
               }

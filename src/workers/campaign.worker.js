@@ -77,6 +77,13 @@ const campaignWorker = new Worker('campaign-queue', async (job) => {
     // Wait for 5 seconds to simulate delay (Anti-Ban)
     await new Promise(resolve => setTimeout(resolve, 5000));
     
+    // Sync client to CRM
+    try {
+      const webhookService = require('../modules/webhook/webhook.service');
+      await webhookService.dispatchClientSync(tenantId, phone);
+    } catch (e) {
+      logger.error(`[Campaign] Failed to sync client: ${e.message}`);
+    }
   } catch (error) {
     logger.error(`[Campaign] Failed to send to ${phone}`, error);
     await prisma.campaignTarget.update({
