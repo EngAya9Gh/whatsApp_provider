@@ -403,19 +403,56 @@ const deleteMetaChannel = async (id) => {
 
 // ─── Socket + QR ──────────────────────────────────────────────
 const initSocket = () => {
+  if (socket) return
+  const tenantStr = localStorage.getItem('tenant')
+  const tenant = tenantStr ? JSON.parse(tenantStr) : null
+  if (!tenant || !tenant.id) return
+
   socket = io('/', { path: '/socket.io' })
-  socket.on('connect', () => { socket.emit('join-tenant', tenant.id) })
-  socket.on('qr', (data) => { qrCode.value = data.qr })
+  socket.on('connect', () => {
+    socket.emit('join-tenant', tenant.id)
+  })
+
+  socket.on('qr', (data) => {
+    qrCode.value = data.qr
+  })
+
   socket.on('status', (data) => {
     status.value = data.status
     if (data.phone) phone.value = data.phone
-    if (data.status === 'CONNECTED' || data.status === 'DISCONNECTED') {
+    
+    if (data.status === 'CONNECTED') {
       qrCode.value = ''
-      tenant.sessionStatus = data.status
-      if (data.phone) tenant.whatsappPhone = data.phone
-      localStorage.setItem('tenant', JSON.stringify(tenant))
+      stopQrPolling()
+      fetchGroups()
+    }
+    if (data.status === 'DISCONNECTED') {
+      stopQrPolling()
     }
   })
+}
+
+const startQrPolling = () => {
+  if (qrPollInterval) clearInterval(qrPollInterval)
+  qrPollInterval = setInterval(async () => {
+    if (status.value !== 'CONNECTING') return stopQrPolling()
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.get('/api/whatsapp/qr', { headers: { Authorization: `Bearer ${token}` } })
+      if (res.data && res.data.data) {
+        qrCode.value = res.data.data
+      }
+    } catch (e) {
+      // Ignore poll errors
+    }
+  }, 2000)
+}
+
+const stopQrPolling = () => {
+  if (qrPollInterval) {
+    clearInterval(qrPollInterval)
+    qrPollInterval = null
+  }
 }
 
 onMounted(async () => {
@@ -427,7 +464,10 @@ onMounted(async () => {
     const res = await axios.get('/api/whatsapp/status', { headers: { Authorization: `Bearer ${token}` } })
     status.value = res.data.data.sessionStatus
     phone.value = res.data.data.whatsappPhone
-    if (status.value === 'CONNECTING') initSocket()
+    if (status.value === 'CONNECTING') {
+      initSocket()
+      startQrPolling()
+    }
   } catch (err) { console.error('Failed to get status') }
 
   fetchMetaChannels()
@@ -444,7 +484,9 @@ const connect = async () => {
   try {
     await axios.post('/api/whatsapp/connect', {}, { headers: { Authorization: `Bearer ${token}` } })
     status.value = 'CONNECTING'
+    qrCode.value = ''
     initSocket()
+    startQrPolling()
   } catch (err) { console.error('Failed to connect', err) } finally { loading.value = false }
 }
 

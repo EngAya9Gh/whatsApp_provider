@@ -24,6 +24,16 @@ class WhatsAppController {
     }
   }
 
+  async getQr(req, res, next) {
+    try {
+      const tenantId = req.tenant.id;
+      const qr = await whatsappService.getQr(tenantId);
+      res.json({ data: qr });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getStatus(req, res, next) {
     try {
       const tenantId = req.tenant.id;

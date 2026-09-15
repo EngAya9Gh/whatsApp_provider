@@ -17,6 +17,7 @@ if (!fs.existsSync(SESSIONS_DIR)) {
 class SessionManager {
   constructor() {
     this.sessions = new Map(); // tenantId -> sock
+    this.qrs = new Map(); // tenantId -> latest qr
     this.io = null; // Socket.io instance for emitting QR codes
   }
 
@@ -306,6 +307,7 @@ class SessionManager {
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
+      if (qr) { this.qrs.set(tenantId, qr); }
       if (qr && this.io) {
         // Emit QR code to the dashboard for this specific tenant
         this.io.to(`tenant_${tenantId}`).emit('qr', { qr });
@@ -365,6 +367,10 @@ class SessionManager {
     });
 
     return sock;
+  }
+
+  getQr(tenantId) {
+    return this.qrs.get(tenantId);
   }
 
   getSession(tenantId) {

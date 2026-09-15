@@ -33,6 +33,10 @@ class WhatsAppService {
     return { status: 'DISCONNECTED' };
   }
 
+  async getQr(tenantId) {
+    return sessionManager.getQr(tenantId);
+  }
+
   async getStatus(tenantId) {
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
