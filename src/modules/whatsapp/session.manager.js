@@ -52,7 +52,10 @@ class SessionManager {
       auth: state,
       printQRInTerminal: false,
       logger: baileysLogger,
-      browser: Browsers.macOS('Desktop')
+      browser: ['Ubuntu', 'Chrome', '120.0.6099.109'],
+      connectTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000,
+      qrTimeout: 40000
     });
 
     this.sessions.set(tenantId, sock);

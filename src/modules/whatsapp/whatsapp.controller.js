@@ -28,6 +28,8 @@ class WhatsAppController {
     try {
       const tenantId = req.tenant.id;
       const qr = await whatsappService.getQr(tenantId);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
       res.json({ data: qr });
     } catch (error) {
       next(error);
