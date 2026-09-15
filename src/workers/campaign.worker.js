@@ -80,7 +80,7 @@ const campaignWorker = new Worker('campaign-queue', async (job) => {
     // Sync client to CRM
     try {
       const webhookService = require('../modules/webhook/webhook.service');
-      await webhookService.dispatchClientSync(tenantId, phone);
+      webhookService.dispatchClientSync(tenantId, phone);
     } catch (e) {
       logger.error(`[Campaign] Failed to sync client: ${e.message}`);
     }

@@ -78,7 +78,7 @@ class WhatsAppService {
       
       try {
         const webhookService = require('../webhook/webhook.service');
-        await webhookService.dispatchClientSync(tenantId, phone);
+        webhookService.dispatchClientSync(tenantId, phone);
       } catch(e) {}
       
       return result;
@@ -123,7 +123,7 @@ class WhatsAppService {
       const result = await sock.sendMessage(formattedPhone, messagePayload);
       try {
         const webhookService = require('../webhook/webhook.service');
-        await webhookService.dispatchClientSync(tenantId, phone);
+        webhookService.dispatchClientSync(tenantId, phone);
       } catch(e) {}
       return result;
     } catch (error) {
@@ -259,7 +259,7 @@ class WhatsAppService {
       });
       try {
         const webhookService = require('../webhook/webhook.service');
-        await webhookService.dispatchClientSync(tenantId, phone);
+        webhookService.dispatchClientSync(tenantId, phone);
       } catch(e) {}
       return result;
     } catch (error) {

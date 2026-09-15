@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
 const fs = require('fs');
@@ -30,7 +30,18 @@ class SessionManager {
     }
 
     const sessionPath = path.join(SESSIONS_DIR, tenantId);
-    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+    let state, saveCreds;
+    try {
+      const auth = await useMultiFileAuthState(sessionPath);
+      state = auth.state;
+      saveCreds = auth.saveCreds;
+    } catch (err) {
+      logger.warn(`Corrupt session for ${tenantId}, deleting...`);
+      fs.rmSync(sessionPath, { recursive: true, force: true });
+      const auth = await useMultiFileAuthState(sessionPath);
+      state = auth.state;
+      saveCreds = auth.saveCreds;
+    }
 
     // Use a quiet logger for Baileys to avoid spam
     const baileysLogger = pino({ level: 'silent' });
@@ -39,7 +50,7 @@ class SessionManager {
       auth: state,
       printQRInTerminal: false,
       logger: baileysLogger,
-      browser: ['WhatsApp Provider SaaS', 'Chrome', '1.0.0']
+      browser: Browsers.macOS('Desktop')
     });
 
     this.sessions.set(tenantId, sock);
@@ -57,7 +68,7 @@ class SessionManager {
         // Sync incoming contact to CRM
         try {
           const webhookService = require('../webhook/webhook.service');
-          await webhookService.dispatchClientSync(tenantId, senderPhone, msg.pushName || 'WhatsApp Lead');
+          webhookService.dispatchClientSync(tenantId, senderPhone, msg.pushName || 'WhatsApp Lead');
         } catch (e) {}
 
         // Button Reply
@@ -279,7 +290,7 @@ class SessionManager {
                   await sock.sendMessage(msg.key.remoteJid, payload);
                   try {
                     const webhookService = require('../webhook/webhook.service');
-                    await webhookService.dispatchClientSync(tenantId, senderPhone);
+                    webhookService.dispatchClientSync(tenantId, senderPhone);
                   } catch(e) {}
                 }
                 break; // Stop after first match
