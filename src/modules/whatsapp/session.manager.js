@@ -45,12 +45,12 @@ class SessionManager {
       saveCreds = auth.saveCreds;
     }
 
-    // Use a quiet logger for Baileys to avoid spam
-    const baileysLogger = pino({ level: 'silent' });
+    // Temporarily use info logging to diagnose QR issues
+    const baileysLogger = pino({ level: 'info' });
 
     const sock = makeWASocket({
       auth: state,
-      printQRInTerminal: false,
+      printQRInTerminal: true,
       logger: baileysLogger,
       browser: ['Ubuntu', 'Chrome', '120.0.6099.109'],
       connectTimeoutMs: 60000,
@@ -324,7 +324,7 @@ class SessionManager {
 
         const shouldReconnect = !isLoggedOut;
 
-        logger.warn(`Tenant ${tenantId} connection closed. Reconnecting: ${shouldReconnect}`);
+        logger.warn(`Tenant ${tenantId} connection closed. StatusCode: ${lastDisconnect?.error?.output?.statusCode} | Error: ${lastDisconnect?.error?.message} | Reconnecting: ${shouldReconnect}`);
         
         if (shouldReconnect) {
           const attempts = (this.reconnectAttempts.get(tenantId) || 0) + 1;
