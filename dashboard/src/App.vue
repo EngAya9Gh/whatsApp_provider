@@ -1,13 +1,20 @@
 <template>
   <div class="app-root">
+    
+    <!-- Mobile Overlay -->
+    <div v-if="showSidebar && isMobileMenuOpen" class="mobile-overlay" @click="closeMobileMenu"></div>
+
     <!-- Sidebar -->
-    <aside v-if="showSidebar" class="sidebar">
+    <aside v-if="showSidebar" class="sidebar" :class="{ 'sidebar-open': isMobileMenuOpen }">
       <!-- Logo -->
       <a href="/" target="_blank" class="sidebar-logo">
         <img src="/logo.svg" alt="wakeel" class="logo-img" />
+        <button class="mobile-close-btn" @click="closeMobileMenu">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </a>
 
-      <nav class="sidebar-nav">
+      <nav class="sidebar-nav" @click="handleNavClick">
         <!-- GENERAL -->
         <div class="nav-section-title">General</div>
         <router-link to="/dashboard" class="nav-item" exact-active-class="active">
@@ -129,6 +136,14 @@
 
     <!-- Main Content -->
     <div class="main-content" :class="{ 'full-width': !showSidebar }">
+      <!-- Mobile Header (Visible only on small screens) -->
+      <div v-if="showSidebar" class="mobile-header">
+        <button class="mobile-menu-btn" @click="toggleMobileMenu">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <img src="/logo.svg" alt="wakeel" class="mobile-logo-img" />
+      </div>
+
       <router-view />
     </div>
   </div>
@@ -147,6 +162,16 @@ const route = useRoute()
 const { locale } = useI18n()
 const currentLang = ref(locale.value)
 const tenant = ref({})
+
+// Mobile Menu State
+const isMobileMenuOpen = ref(false)
+const toggleMobileMenu = () => { isMobileMenuOpen.value = !isMobileMenuOpen.value }
+const closeMobileMenu = () => { isMobileMenuOpen.value = false }
+const handleNavClick = (e) => {
+  if (e.target.closest('.nav-item')) {
+    closeMobileMenu()
+  }
+}
 
 const loadTenant = () => {
   try { tenant.value = JSON.parse(localStorage.getItem('tenant') || '{}') } catch { tenant.value = {} }
@@ -448,5 +473,85 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0;
+}
+
+/* Mobile Header */
+.mobile-header {
+  display: none;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  margin: -2rem -2rem 2rem -2rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.mobile-menu-btn {
+  background: none;
+  border: none;
+  color: var(--brand-dark);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mobile-logo-img {
+  height: 28px;
+}
+.mobile-close-btn {
+  display: none;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Overlay */
+.mobile-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 90;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .rtl .sidebar {
+    transform: translateX(100%);
+  }
+  .sidebar-open {
+    transform: translateX(0) !important;
+  }
+  
+  .sidebar-logo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .mobile-close-btn {
+    display: flex;
+  }
+
+  .main-content {
+    margin-inline-start: 0;
+    padding: 1.5rem;
+  }
+  .mobile-header {
+    display: flex;
+    margin: -1.5rem -1.5rem 1.5rem -1.5rem;
+  }
 }
 </style>
