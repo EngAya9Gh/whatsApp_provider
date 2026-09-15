@@ -5,6 +5,18 @@ const { generateWAMessageFromContent, proto, prepareWAMessageMedia } = require('
 
 const prisma = new PrismaClient();
 
+function formatPhoneOrGroup(phone) {
+  if (!phone) return phone;
+  let formatted = phone.toString().trim();
+  if (formatted.endsWith('@g.us') || formatted.endsWith('@s.whatsapp.net')) {
+    return formatted;
+  }
+  if (formatted.includes('-')) {
+    return formatted.replace(/[^0-9-]/g, '') + '@g.us';
+  }
+  return formatted.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+}
+
 class WhatsAppService {
   async connect(tenantId) {
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
@@ -27,14 +39,33 @@ class WhatsAppService {
     return tenant;
   }
 
+  async getGroups(tenantId) {
+    const sock = sessionManager.getSession(tenantId);
+    if (!sock) {
+      throw { status: 400, message: 'WhatsApp session is not connected' };
+    }
+    
+    try {
+      const groups = await sock.groupFetchAllParticipating();
+      return Object.values(groups).map(g => ({
+        id: g.id,
+        name: g.subject,
+        participantsCount: g.participants?.length || g.size,
+        creation: g.creation
+      }));
+    } catch (error) {
+      logger.error(`Failed to fetch groups for tenant ${tenantId}`, error);
+      throw { status: 500, message: 'Failed to fetch WhatsApp groups' };
+    }
+  }
+
   async sendTextMessage(tenantId, phone, text) {
     const sock = sessionManager.getSession(tenantId);
     if (!sock) {
       throw { status: 400, message: 'WhatsApp session is not connected' };
     }
 
-    // Format phone to WhatsApp JID format (e.g. 966500000000@s.whatsapp.net)
-    const formattedPhone = phone.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+    const formattedPhone = formatPhoneOrGroup(phone);
 
     try {
       // Small delay to simulate human typing and prevent bans
@@ -63,7 +94,7 @@ class WhatsAppService {
       throw { status: 400, message: 'WhatsApp session is not connected' };
     }
 
-    const formattedPhone = phone.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+    const formattedPhone = formatPhoneOrGroup(phone);
 
     try {
       await sock.presenceSubscribe(formattedPhone);
@@ -104,7 +135,7 @@ class WhatsAppService {
     const sock = sessionManager.getSession(tenantId);
     if (!sock) throw { status: 400, message: 'WhatsApp session is not connected' };
 
-    const formattedPhone = phone.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+    const formattedPhone = formatPhoneOrGroup(phone);
 
     try {
       await sock.presenceSubscribe(formattedPhone);
@@ -155,7 +186,7 @@ class WhatsAppService {
     const sock = sessionManager.getSession(tenantId);
     if (!sock) throw { status: 400, message: 'WhatsApp session is not connected' };
 
-    const formattedPhone = phone.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+    const formattedPhone = formatPhoneOrGroup(phone);
 
     try {
       await sock.presenceSubscribe(formattedPhone);
@@ -210,7 +241,7 @@ class WhatsAppService {
     const sock = sessionManager.getSession(tenantId);
     if (!sock) throw { status: 400, message: 'WhatsApp session is not connected' };
 
-    const formattedPhone = phone.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+    const formattedPhone = formatPhoneOrGroup(phone);
 
     try {
       await sock.presenceSubscribe(formattedPhone);

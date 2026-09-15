@@ -10,5 +10,6 @@ router.use(authMiddleware);
 router.post('/connect', whatsappController.connect);
 router.post('/disconnect', whatsappController.disconnect);
 router.get('/status', whatsappController.getStatus);
+router.get('/groups', whatsappController.getGroups);
 
 module.exports = router;

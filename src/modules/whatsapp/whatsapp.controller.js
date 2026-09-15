@@ -33,6 +33,16 @@ class WhatsAppController {
       next(error);
     }
   }
+
+  async getGroups(req, res, next) {
+    try {
+      const tenantId = req.tenant.id;
+      const result = await whatsappService.getGroups(tenantId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new WhatsAppController();
