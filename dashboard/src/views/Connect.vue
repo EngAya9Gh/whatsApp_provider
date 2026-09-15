@@ -43,7 +43,31 @@
               <span class="sc-lbl">WhatsApp Phone Number</span>
               <strong class="sc-val">{{ phone }}</strong>
             </div>
-            <button @click="disconnect" class="btn-disconnect">Disconnect QR Session</button>
+            
+            <div class="groups-section">
+              <div class="groups-header">
+                <h3>Your WhatsApp Groups</h3>
+                <button @click="fetchGroups" class="btn-fetch-groups" :disabled="loadingGroups">
+                  {{ loadingGroups ? 'Fetching...' : 'Fetch Groups' }}
+                </button>
+              </div>
+              <div v-if="groups.length > 0" class="groups-list">
+                <div v-for="group in groups" :key="group.id" class="group-item">
+                  <div class="group-info">
+                    <strong>{{ group.name || 'Unnamed Group' }}</strong>
+                    <span class="group-id">{{ group.id }}</span>
+                  </div>
+                  <div class="group-meta">
+                    <span class="group-badge">👥 {{ group.participantsCount || 0 }} Members</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else-if="groupsFetched" class="groups-empty">
+                No groups found for this WhatsApp account.
+              </div>
+            </div>
+
+            <button @click="disconnect" class="btn-disconnect mt-4">Disconnect QR Session</button>
           </div>
 
           <div v-else-if="status === 'CONNECTING'" class="state-qr">
@@ -186,6 +210,28 @@ const phone = ref(tenant.whatsappPhone || '')
 const qrCode = ref('')
 const loading = ref(false)
 let socket = null
+
+const groups = ref([])
+const loadingGroups = ref(false)
+const groupsFetched = ref(false)
+
+const fetchGroups = async () => {
+  loadingGroups.value = true
+  groupsFetched.value = false
+  const token = localStorage.getItem('token')
+  try {
+    const res = await axios.get('/api/v1/whatsapp/groups', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    groups.value = res.data.data || []
+    groupsFetched.value = true
+  } catch (err) {
+    console.error('Failed to fetch groups', err)
+    alert('Failed to fetch WhatsApp groups. Make sure you are connected.')
+  } finally {
+    loadingGroups.value = false
+  }
+}
 
 const goToUpgrade = () => { window.location.href = '/' }
 
@@ -494,6 +540,25 @@ const disconnect = async () => {
 .sc-val { font-size: 1.5rem; color: #0F172A; font-weight: 900; }
 .btn-disconnect { background: white; color: #DC2626; border: 1.5px solid #FCA5A5; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: inherit; }
 .btn-disconnect:hover { background: #FEF2F2; border-color: #EF4444; }
+
+/* Groups UI */
+.groups-section { margin-top: 2rem; background: white; padding: 1.5rem; border-radius: 16px; border: 1px solid #E2E8F0; text-align: left; }
+.groups-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.groups-header h3 { margin: 0; font-size: 1.1rem; color: #0F172A; font-weight: 800; }
+.btn-fetch-groups { background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+.btn-fetch-groups:hover:not(:disabled) { background: #E2E8F0; color: #0F172A; }
+.btn-fetch-groups:disabled { opacity: 0.5; cursor: wait; }
+.groups-list { display: flex; flex-direction: column; gap: 0.75rem; max-height: 300px; overflow-y: auto; }
+.group-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-radius: 10px; border: 1px solid #E2E8F0; background: #F8FAFC; transition: all 0.2s; }
+.group-item:hover { border-color: #CBD5E1; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+.group-info { display: flex; flex-direction: column; gap: 4px; }
+.group-info strong { color: #1E293B; font-size: 0.95rem; }
+.group-id { font-family: monospace; color: #64748B; font-size: 0.8rem; background: #E2E8F0; padding: 2px 6px; border-radius: 4px; display: inline-block; user-select: all; cursor: copy; }
+.group-id::after { content: ' (Click to copy)'; font-family: 'Inter', sans-serif; font-size: 0.65rem; color: #94A3B8; opacity: 0; transition: opacity 0.2s; }
+.group-id:hover::after { opacity: 1; }
+.group-meta { font-size: 0.85rem; color: #475569; font-weight: 600; }
+.groups-empty { text-align: center; color: #94A3B8; padding: 1.5rem; border: 1px dashed #CBD5E1; border-radius: 10px; font-size: 0.9rem; }
+.mt-4 { margin-top: 1.5rem; }
 
 .state-qr { text-align: center; padding: 2rem; }
 .qr-inst { font-size: 0.95rem; font-weight: 600; color: #475569; margin-bottom: 1.5rem; }
