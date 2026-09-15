@@ -22,6 +22,8 @@ class WhatsAppService {
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw { status: 404, message: 'Tenant not found' };
 
+    await sessionManager.deleteSession(tenantId);
+    await new Promise(r => setTimeout(r, 1000));
     await sessionManager.createSession(tenantId);
     return { status: 'CONNECTING' };
   }

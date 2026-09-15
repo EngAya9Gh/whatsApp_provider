@@ -1,5 +1,5 @@
 <template>
-  <div class="app-root">
+  <div class="app-root" :class="{ 'rtl-mode': currentLang === 'ar' }">
     
     <!-- Mobile Overlay -->
     <div v-if="showSidebar && isMobileMenuOpen" class="mobile-overlay" @click="closeMobileMenu"></div>
@@ -529,10 +529,13 @@ body {
     transform: translateX(-100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .rtl .sidebar {
+  .rtl-mode .sidebar {
     transform: translateX(100%);
   }
   .sidebar-open {
+    transform: translateX(0) !important;
+  }
+  .rtl-mode .sidebar-open {
     transform: translateX(0) !important;
   }
   
