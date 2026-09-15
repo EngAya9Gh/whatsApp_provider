@@ -472,26 +472,26 @@ body {
 /* ── Main Content ── */
 .main-content {
   margin-left: var(--sidebar-width);
+  flex: 1;
+  padding: 2rem;
+  min-height: 100vh;
   transition: margin 0.3s ease;
 }
 
 .rtl-mode .main-content {
   margin-left: 0;
   margin-right: var(--sidebar-width);
-  flex: 1;
-  padding: 2rem;
-  min-height: 100vh;
 }
 
 .main-content.full-width {
   margin-left: 0;
-}
-.rtl-mode .main-content.full-width {
-  margin-right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+}
+.rtl-mode .main-content.full-width {
+  margin-right: 0;
 }
 
 /* Mobile Header */

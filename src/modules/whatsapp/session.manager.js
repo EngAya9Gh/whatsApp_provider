@@ -18,6 +18,7 @@ class SessionManager {
   constructor() {
     this.sessions = new Map(); // tenantId -> sock
     this.qrs = new Map(); // tenantId -> latest qr
+    this.reconnectAttempts = new Map(); // tenantId -> attempt count
     this.io = null; // Socket.io instance for emitting QR codes
   }
 
@@ -314,13 +315,37 @@ class SessionManager {
       }
 
       if (connection === 'close') {
-        const shouldReconnect = (lastDisconnect.error instanceof Boom)
-          ? lastDisconnect.error.output?.statusCode !== DisconnectReason.loggedOut
-          : true;
+        const isLoggedOut = (lastDisconnect.error instanceof Boom)
+          ? lastDisconnect.error.output?.statusCode === DisconnectReason.loggedOut
+          : false;
+
+        const shouldReconnect = !isLoggedOut;
 
         logger.warn(`Tenant ${tenantId} connection closed. Reconnecting: ${shouldReconnect}`);
         
         if (shouldReconnect) {
+          const attempts = (this.reconnectAttempts.get(tenantId) || 0) + 1;
+          this.reconnectAttempts.set(tenantId, attempts);
+
+          // Stop infinite loop: if no QR was ever generated after 3 attempts, give up
+          if (attempts >= 3 && !this.qrs.get(tenantId)) {
+            logger.error(`Tenant ${tenantId} failed to get QR after ${attempts} attempts. Marking DISCONNECTED.`);
+            this.sessions.delete(tenantId);
+            this.reconnectAttempts.delete(tenantId);
+            // Delete empty session folder so next connect starts fresh
+            if (fs.existsSync(sessionPath)) {
+              try { fs.rmSync(sessionPath, { recursive: true, force: true }); } catch(e) {}
+            }
+            await prisma.tenant.update({
+              where: { id: tenantId },
+              data: { sessionStatus: 'DISCONNECTED' }
+            }).catch(() => {});
+            if (this.io) {
+              this.io.to(`tenant_${tenantId}`).emit('status', { status: 'DISCONNECTED' });
+            }
+            return;
+          }
+
           this.sessions.delete(tenantId);
           setTimeout(() => this.createSession(tenantId), 3000);
         } else {
@@ -351,6 +376,8 @@ class SessionManager {
         }
       } else if (connection === 'open') {
         logger.info(`Tenant ${tenantId} connected successfully!`);
+        // Reset reconnect counter on successful connection
+        this.reconnectAttempts.delete(tenantId);
         
         // Extract phone number from the session
         const phone = sock.user.id.split(':')[0];
