@@ -210,6 +210,7 @@ const phone = ref(tenant.whatsappPhone || '')
 const qrCode = ref('')
 const loading = ref(false)
 let socket = null
+let qrPollInterval = null
 
 const groups = ref([])
 const loadingGroups = ref(false)
