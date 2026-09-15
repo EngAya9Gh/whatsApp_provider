@@ -221,7 +221,7 @@ const fetchGroups = async () => {
   groupsFetched.value = false
   const token = localStorage.getItem('token')
   try {
-    const res = await axios.get('/api/v1/whatsapp/groups', {
+    const res = await axios.get('/api/whatsapp/groups', {
       headers: { Authorization: `Bearer ${token}` }
     })
     groups.value = res.data.data || []
