@@ -116,6 +116,8 @@ class WebhookService {
         }
       }
 
+      logger.info(`[WebhookService] Sending client sync to ${tenant.webhookUrl} with headers: ${JSON.stringify(headers)}`);
+
       axios.post(tenant.webhookUrl, payload, { headers, timeout: 5000 }).catch(err => {
         logger.warn(`[WebhookService] Failed to send client sync webhook to ${tenant.webhookUrl}: ${err.message}`);
       });
