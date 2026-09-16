@@ -47,9 +47,15 @@ class BillingService {
       select: { monthlyLimit: true, plan: true }
     });
 
-    // Override the DB limit with the dynamic config limit, so any change in plans.js applies instantly
+    // Use the tenant's specific monthly limit from DB (customizable in admin panel). 
+    // Fallback to plans.js if not set.
     const plansConfig = require('../../config/plans');
-    const dynamicLimit = plansConfig[tenant.plan]?.limit ?? tenant.monthlyLimit;
+    const defaultPlanLimit = plansConfig[tenant.plan]?.limit;
+    
+    // Prioritize tenant.monthlyLimit if it exists, otherwise use plan default
+    const dynamicLimit = tenant.monthlyLimit !== undefined && tenant.monthlyLimit !== null 
+                         ? tenant.monthlyLimit 
+                         : defaultPlanLimit;
 
     return {
       plan: tenant.plan,
