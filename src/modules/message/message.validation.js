@@ -9,15 +9,15 @@ const validate = (schema) => (req, res, next) => {
 };
 
 const sendMessageSchema = Joi.object({
-  phone: Joi.string().required().min(10).max(15).pattern(/^[0-9]+$/).messages({
-    'string.pattern.base': 'Phone number must contain only digits'
+  phone: Joi.string().required().min(10).max(45).pattern(/^[0-9\-a-zA-Z\.@_]+$/).messages({
+    'string.pattern.base': 'Invalid phone or group ID format'
   }),
   message: Joi.string().required().min(1).max(4000)
 });
 
 const sendMediaSchema = Joi.object({
-  phone: Joi.string().required().min(10).max(15).pattern(/^[0-9]+$/).messages({
-    'string.pattern.base': 'Phone number must contain only digits'
+  phone: Joi.string().required().min(10).max(45).pattern(/^[0-9\-a-zA-Z\.@_]+$/).messages({
+    'string.pattern.base': 'Invalid phone or group ID format'
   }),
   type: Joi.string().valid('image', 'pdf').required(),
   url: Joi.string().uri().required(),
@@ -25,15 +25,15 @@ const sendMediaSchema = Joi.object({
 });
 
 const uploadMediaSchema = Joi.object({
-  phone: Joi.string().required().min(10).max(15).pattern(/^[0-9]+$/).messages({
-    'string.pattern.base': 'Phone number must contain only digits'
+  phone: Joi.string().required().min(10).max(45).pattern(/^[0-9\-a-zA-Z\.@_]+$/).messages({
+    'string.pattern.base': 'Invalid phone or group ID format'
   }),
   type: Joi.string().valid('image', 'pdf').required(),
   caption: Joi.string().max(1024).optional().allow('')
 });
 
 const sendButtonsSchema = Joi.object({
-  phone: Joi.string().required().min(10).max(15).pattern(/^[0-9]+$/),
+  phone: Joi.string().required().min(10).max(45).pattern(/^[0-9\-a-zA-Z\.@_]+$/),
   text: Joi.string().required().min(1).max(4000),
   buttons: Joi.array().items(
     Joi.object({
@@ -46,7 +46,7 @@ const sendButtonsSchema = Joi.object({
 });
 
 const sendListSchema = Joi.object({
-  phone: Joi.string().required().min(10).max(15).pattern(/^[0-9]+$/),
+  phone: Joi.string().required().min(10).max(45).pattern(/^[0-9\-a-zA-Z\.@_]+$/),
   title: Joi.string().required().max(60),
   body: Joi.string().required().max(1024),
   buttonText: Joi.string().required().max(20),
@@ -65,7 +65,7 @@ const sendListSchema = Joi.object({
 });
 
 const sendLocationSchema = Joi.object({
-  phone: Joi.string().required().min(10).max(15).pattern(/^[0-9]+$/),
+  phone: Joi.string().required().min(10).max(45).pattern(/^[0-9\-a-zA-Z\.@_]+$/),
   latitude: Joi.number().required().min(-90).max(90),
   longitude: Joi.number().required().min(-180).max(180),
   name: Joi.string().optional().max(100).allow(''),
