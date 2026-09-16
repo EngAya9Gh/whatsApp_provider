@@ -8,8 +8,12 @@ const prisma = new PrismaClient();
 
 class MessageService {
   async _getChannel(channelId) {
-    if (!channelId) return null;
-    return await prisma.whatsAppChannel.findUnique({ where: { id: channelId } });
+    if (!channelId || channelId === 'default' || String(channelId).trim() === '') return null;
+    try {
+      return await prisma.whatsAppChannel.findUnique({ where: { id: channelId } });
+    } catch(e) {
+      return null;
+    }
   }
 
   async sendCustomMessage(tenantId, phone, message, channelId = null) {
@@ -17,6 +21,7 @@ class MessageService {
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached. Please upgrade your plan.' };
 
     const channel = await this._getChannel(channelId);
+    channelId = channel ? channel.id : null;
     try {
       let metaMessageId = null;
       if (channel && channel.providerType === 'META_CLOUD') {
@@ -46,6 +51,7 @@ class MessageService {
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
     const channel = await this._getChannel(channelId);
+    channelId = channel ? channel.id : null;
     if (!channel || channel.providerType !== 'META_CLOUD') {
       throw { status: 400, message: 'Invalid Meta Cloud channel' };
     }
@@ -74,6 +80,7 @@ class MessageService {
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
     const channel = await this._getChannel(channelId);
+    channelId = channel ? channel.id : null;
     try {
       if (channel && channel.providerType === 'META_CLOUD') {
         // TODO: Implement Meta Media
@@ -97,6 +104,7 @@ class MessageService {
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
     const channel = await this._getChannel(channelId);
+    channelId = channel ? channel.id : null;
     try {
       if (channel && channel.providerType === 'META_CLOUD') {
         await metaService.sendButtons(channel, phone, text, buttons);
@@ -119,6 +127,7 @@ class MessageService {
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
     const channel = await this._getChannel(channelId);
+    channelId = channel ? channel.id : null;
     try {
       if (channel && channel.providerType === 'META_CLOUD') {
         await metaService.sendFlow(channel, phone, flowId, flowCta, flowBody, flowFooter, flowScreen);
@@ -141,6 +150,7 @@ class MessageService {
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
     const channel = await this._getChannel(channelId);
+    channelId = channel ? channel.id : null;
     try {
       if (channel && channel.providerType === 'META_CLOUD') {
         await metaService.sendList(channel, phone, title, body, buttonText, sections);
@@ -163,6 +173,7 @@ class MessageService {
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
     const channel = await this._getChannel(channelId);
+    channelId = channel ? channel.id : null;
     try {
       if (channel && channel.providerType === 'META_CLOUD') {
         throw new Error('Location sending via Meta Cloud is not yet implemented');
