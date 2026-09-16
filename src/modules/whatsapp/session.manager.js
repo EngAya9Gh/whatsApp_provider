@@ -66,15 +66,18 @@ class SessionManager {
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type !== 'notify') return;
       for (const msg of messages) {
-        if (!msg.message || msg.key.fromMe) continue;
+        if (!msg.message) continue;
         // Some users reply using @lid, their real number is in remoteJidAlt
         const senderPhone = (msg.key.remoteJidAlt || msg.key.remoteJid || '').replace(/@.*$/, '');
 
-        // Sync incoming contact to CRM
+        // Sync contact to CRM for both incoming and outgoing messages
         try {
           const webhookService = require('../webhook/webhook.service');
           webhookService.dispatchClientSync(tenantId, senderPhone, msg.pushName || 'WhatsApp Lead');
         } catch (e) {}
+
+        // If the message was sent by us (outgoing), skip button replies and auto-responders
+        if (msg.key.fromMe) continue;
 
         // Button Reply
         const btnReply = msg.message?.buttonsResponseMessage;
