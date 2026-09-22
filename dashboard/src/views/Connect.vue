@@ -51,8 +51,11 @@
                   {{ loadingGroups ? 'Fetching...' : 'Fetch Groups' }}
                 </button>
               </div>
-              <div v-if="groups.length > 0" class="groups-list">
-                <div v-for="group in groups" :key="group.id" class="group-item">
+              <div v-if="groups.length > 0" class="groups-search" style="margin-bottom: 12px;">
+                <input type="text" v-model="searchGroupQuery" placeholder="Search groups by name or ID..." style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px;" />
+              </div>
+              <div v-if="filteredGroups.length > 0" class="groups-list">
+                <div v-for="group in filteredGroups" :key="group.id" class="group-item">
                   <div class="group-info">
                     <strong>{{ group.name || 'Unnamed Group' }}</strong>
                     <span class="group-id">{{ group.id }}</span>
@@ -193,7 +196,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { io } from 'socket.io-client'
 import QrcodeVue from 'qrcode.vue'
@@ -213,6 +216,15 @@ let socket = null
 let qrPollInterval = null
 
 const groups = ref([])
+const searchGroupQuery = ref('')
+const filteredGroups = computed(() => {
+  if (!searchGroupQuery.value) return groups.value
+  const query = searchGroupQuery.value.toLowerCase()
+  return groups.value.filter(g => 
+    (g.name && g.name.toLowerCase().includes(query)) || 
+    (g.id && g.id.toLowerCase().includes(query))
+  )
+})
 const loadingGroups = ref(false)
 const groupsFetched = ref(false)
 
