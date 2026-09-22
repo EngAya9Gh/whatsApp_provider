@@ -246,6 +246,12 @@ body {
   background: #F8FAFC;
   color: #1E293B;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  width: 100%;
+}
+html {
+  overflow-x: hidden;
+  width: 100%;
 }
 
 :root {
@@ -265,6 +271,9 @@ body {
 .app-root {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+  position: relative;
 }
 
 /* ── Sidebar ── */
@@ -537,9 +546,11 @@ body {
 .mobile-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 90;
+  transition: opacity 0.3s ease;
 }
 
 /* Responsive adjustments */
