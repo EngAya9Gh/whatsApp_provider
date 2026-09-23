@@ -65,8 +65,12 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// PM2 Logs endpoint (For easy debugging from browser)
+// PM2 Logs endpoint (For easy debugging from browser, Protected by secret)
 app.get('/api/health/logs', (req, res) => {
+  if (req.query.secret !== 'wakeel_admin_2024') {
+    return res.status(403).send('Forbidden: Invalid or missing secret token.');
+  }
+
   const path = require('path');
   const os = require('os');
   const { exec } = require('child_process');
