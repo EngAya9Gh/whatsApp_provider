@@ -78,12 +78,16 @@ app.get('/api/system/logs', (req, res) => {
     const os = require('os');
     const { exec } = require('child_process');
     
-    const logPath = path.join(os.homedir(), '.pm2', 'logs', 'whatsapp-api-out.log');
+    // Allow selecting between 'out' (normal) and 'error' logs securely
+    const logType = req.query.type === 'error' ? 'error' : 'out';
+    const logPath = path.join(os.homedir(), '.pm2', 'logs', `whatsapp-api-${logType}.log`);
     
     exec(`tail -n 1500 "${logPath}"`, (err, stdout, stderr) => {
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       if (err) return res.send(`Error reading log file: ${err.message}`);
-      res.send(stdout || "Log is empty.");
+      
+      const header = `=== Showing ${logType.toUpperCase()} Logs (Last 1500 lines) ===\n(Use ?type=error or ?type=out in the URL to switch)\n\n`;
+      res.send(header + (stdout || "Log is empty."));
     });
   } else {
     res.set('WWW-Authenticate', 'Basic realm="Wakeel System Logs"');
