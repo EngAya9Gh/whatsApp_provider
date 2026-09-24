@@ -65,6 +65,32 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Secure System Logs Endpoint (Basic Auth)
+app.get('/api/system/logs', (req, res) => {
+  const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+  const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
+
+  const USERNAME = process.env.LOGS_USER || 'admin';
+  const PASSWORD = process.env.LOGS_PASS || 'wakeel_2026';
+
+  if (login && password && login === USERNAME && password === PASSWORD) {
+    const path = require('path');
+    const os = require('os');
+    const { exec } = require('child_process');
+    
+    const logPath = path.join(os.homedir(), '.pm2', 'logs', 'whatsapp-api-out.log');
+    
+    exec(`tail -n 1500 "${logPath}"`, (err, stdout, stderr) => {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      if (err) return res.send(`Error reading log file: ${err.message}`);
+      res.send(stdout || "Log is empty.");
+    });
+  } else {
+    res.set('WWW-Authenticate', 'Basic realm="Wakeel System Logs"');
+    res.status(401).send('Authentication required. Please enter username and password.');
+  }
+});
+
 //
 
 // Error handling middleware (should be last)
