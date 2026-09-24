@@ -78,15 +78,22 @@ app.get('/api/system/logs', (req, res) => {
     const os = require('os');
     const { exec } = require('child_process');
     
-    // Allow selecting between 'out' (normal) and 'error' logs securely
-    const logType = req.query.type === 'error' ? 'error' : 'out';
-    const logPath = path.join(os.homedir(), '.pm2', 'logs', `whatsapp-api-${logType}.log`);
+    let logPath;
+    let logTitle = req.query.type || 'out';
+    
+    if (req.query.type === 'pm2') {
+      logPath = path.join(os.homedir(), '.pm2', 'pm2.log');
+    } else {
+      const logType = req.query.type === 'error' ? 'error' : 'out';
+      logTitle = logType;
+      logPath = path.join(os.homedir(), '.pm2', 'logs', `whatsapp-api-${logType}.log`);
+    }
     
     exec(`tail -n 1500 "${logPath}"`, (err, stdout, stderr) => {
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      if (err) return res.send(`Error reading log file: ${err.message}`);
+      if (err) return res.send(`Error reading log file at ${logPath}: ${err.message}`);
       
-      const header = `=== Showing ${logType.toUpperCase()} Logs (Last 1500 lines) ===\n(Use ?type=error or ?type=out in the URL to switch)\n\n`;
+      const header = `=== Showing ${logTitle.toUpperCase()} Logs (Last 1500 lines) ===\n(Use ?type=error, ?type=out, or ?type=pm2 in the URL to switch)\n\n`;
       res.send(header + (stdout || "Log is empty."));
     });
   } else {
