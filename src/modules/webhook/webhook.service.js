@@ -125,6 +125,102 @@ class WebhookService {
       logger.error(`[WebhookService] Error dispatching client sync: ${err.message}`);
     }
   }
+  /**
+   * Sync a contact with the CRM (Find or Create)
+   */
+  async syncCrmContact(tenantId, phone, name = 'WhatsApp Lead') {
+    try {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { crmBaseUrl: true, crmApiToken: true }
+      });
+
+      if (!tenant || !tenant.crmBaseUrl) return null;
+
+      const payload = { phone, name };
+      const headers = { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tenant.crmApiToken || ''}`
+      };
+
+      const url = `${tenant.crmBaseUrl.replace(/\/$/, '')}/api/v1/integrations/provider/sync-contact`;
+
+      const response = await axios.post(url, payload, { headers, timeout: 5000 });
+      return response.data; // { is_new: boolean, client_id: number }
+
+    } catch (err) {
+      logger.error(`[WebhookService] Error syncing contact with CRM: ${err.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Open a new ticket in the CRM
+   */
+  async openCrmTicket(tenantId, crmClientId, categoryId = 1, source = 'whatsapp', title = 'محادثة واتساب - دعم فني') {
+    try {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { crmBaseUrl: true, crmApiToken: true }
+      });
+
+      if (!tenant || !tenant.crmBaseUrl || !crmClientId) return null;
+
+      const payload = {
+        client_id: crmClientId,
+        category_id: categoryId,
+        source: source,
+        title: title
+      };
+
+      const headers = { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tenant.crmApiToken || ''}`
+      };
+
+      const url = `${tenant.crmBaseUrl.replace(/\/$/, '')}/api/v1/tickets`;
+
+      const response = await axios.post(url, payload, { headers, timeout: 5000 });
+      return response.data; // Expecting CRM to return ticket data
+
+    } catch (err) {
+      logger.error(`[WebhookService] Error opening CRM ticket: ${err.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Close a ticket in the CRM
+   */
+  async closeCrmTicket(tenantId, crmTicketId, description = 'تم إغلاق المحادثة من المزود') {
+    try {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { crmBaseUrl: true, crmApiToken: true }
+      });
+
+      if (!tenant || !tenant.crmBaseUrl || !crmTicketId) return null;
+
+      const payload = {
+        status: 'closed',
+        description: description
+      };
+
+      const headers = { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tenant.crmApiToken || ''}`
+      };
+
+      const url = `${tenant.crmBaseUrl.replace(/\/$/, '')}/api/v1/tickets/${crmTicketId}`;
+
+      const response = await axios.put(url, payload, { headers, timeout: 5000 });
+      return response.data;
+
+    } catch (err) {
+      logger.error(`[WebhookService] Error closing CRM ticket: ${err.message}`);
+      return null;
+    }
+  }
 }
 
 module.exports = new WebhookService();
