@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ticketsController = require('./tickets.controller');
-const authMiddleware = require('../../middlewares/auth.middleware');
+const { authMiddleware } = require('../../middleware/auth.middleware');
 
 router.use(authMiddleware);
 
@@ -19,5 +19,8 @@ router.post('/:id/close', ticketsController.closeTicket);
 
 // Assign a ticket
 router.post('/:id/assign', ticketsController.assignTicket);
+
+// Toggle autoCreateTickets for a channel
+router.put('/channels/:channelId/auto-create', ticketsController.toggleAutoCreate);
 
 module.exports = router;

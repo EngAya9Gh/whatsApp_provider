@@ -255,6 +255,7 @@ class MetaController {
           metaPhoneNumberId: true,
           metaWabaId: true,
           status: true,
+          autoCreateTickets: true,
           createdAt: true
         }
       });

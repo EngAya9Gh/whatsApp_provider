@@ -157,6 +157,31 @@ class TicketsController {
       next(error);
     }
   }
+
+  /**
+   * Toggle autoCreateTickets for a channel
+   */
+  async toggleAutoCreate(req, res, next) {
+    try {
+      const tenantId = req.tenant.id;
+      const channelId = req.params.channelId;
+      const { autoCreateTickets } = req.body;
+
+      const channel = await prisma.whatsAppChannel.updateMany({
+        where: { id: channelId, tenantId },
+        data: { autoCreateTickets }
+      });
+
+      if (channel.count === 0) {
+        return res.status(404).json({ error: 'Channel not found' });
+      }
+
+      res.status(200).json({ success: true, message: 'Channel updated successfully' });
+    } catch (error) {
+      logger.error('Error toggling autoCreateTickets:', error);
+      next(error);
+    }
+  }
 }
 
 module.exports = new TicketsController();
