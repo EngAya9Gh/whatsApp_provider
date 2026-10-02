@@ -29,6 +29,8 @@ model Tenant {
   sessionStatus    SessionStatus     @default(DISCONNECTED) @map("session_status")
   webhookUrl       String?           @map("webhook_url") @db.Text
   webhookEvents    Json?             @map("webhook_events")
+  crmBaseUrl       String?           @map("crm_base_url") @db.Text
+  crmApiToken      String?           @map("crm_api_token") @db.Text
   walletBalance    Float             @default(0) @map("wallet_balance")
   deductBalance    Boolean           @default(true) @map("deduct_balance")
   currency         String            @default("SAR")
