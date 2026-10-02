@@ -48,6 +48,8 @@ model Tenant {
   channels         WhatsAppChannel[]
   chatThreads      ChatThread[]
   tickets          Ticket[]
+  ticketCategories TicketCategory[]
+  quickReplies     QuickReply[]
   subUsers         SubUser[]
   contactGroups    ContactGroup[]
   contacts         Contact[]
@@ -374,6 +376,9 @@ model Ticket {
   priority        String   @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
   assignedToId    String?  @map("assigned_to_id")
   subject         String?  @db.Text
+  categoryId      String?  @map("category_id")
+  rating          Int?     // 1 to 5
+  summary         String?  @db.Text // AI generated summary of the conversation
   crmTicketId     String?  @map("crm_ticket_id")
   crmClientId     String?  @map("crm_client_id")
   crmContactId    String?  @map("crm_contact_id")
@@ -386,13 +391,44 @@ model Ticket {
   channel  WhatsAppChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   thread   ChatThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
   assignee SubUser?        @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  category TicketCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   messages ChatMessage[]
 
   @@index([tenantId], map: "tickets_tenant_id_fkey")
   @@index([threadId], map: "tickets_thread_id_fkey")
   @@index([assignedToId], map: "tickets_assigned_to_id_fkey")
+  @@index([categoryId], map: "tickets_category_id_fkey")
   @@map("tickets")
+}
+
+model TicketCategory {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tickets Ticket[]
+
+  @@index([tenantId], map: "ticket_categories_tenant_id_fkey")
+  @@map("ticket_categories")
+}
+
+model QuickReply {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  shortcut  String   // e.g. "welcome", "pricing"
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "quick_replies_tenant_id_fkey")
+  @@map("quick_replies")
 }
 
 model SystemSetting {

@@ -21,7 +21,7 @@ class TicketsService {
   /**
    * Auto-create a ticket if channel settings allow it and no active ticket exists
    */
-  async autoCreateTicketIfNeeded(tenantId, channelId, threadId, crmClientId) {
+  async autoCreateTicketIfNeeded(tenantId, channelId, threadId, crmClientId, firstMessageText = '') {
     try {
       const channel = await prisma.whatsAppChannel.findUnique({
         where: { id: channelId },
@@ -39,7 +39,9 @@ class TicketsService {
       }
 
       logger.info(`[TicketsService] Auto-creating ticket for thread ${threadId} on channel ${channelId}`);
-      return this.createTicket(tenantId, channelId, threadId, crmClientId, 'تم فتح التذكرة آلياً');
+      
+      const subject = firstMessageText ? firstMessageText.substring(0, 100) : 'محادثة دعم فني';
+      return this.createTicket(tenantId, channelId, threadId, crmClientId, subject);
 
     } catch (error) {
       logger.error(`[TicketsService] Error auto-creating ticket: ${error.message}`);

@@ -255,7 +255,7 @@ class ChatService {
     // 2. Check/Auto-create Ticket
     const ticketsService = require('../tickets/tickets.service');
     const threadIdStr = thread._id.toString();
-    const activeTicket = await ticketsService.autoCreateTicketIfNeeded(tenantId, channelId, threadIdStr, crmClientId);
+    const activeTicket = await ticketsService.autoCreateTicketIfNeeded(tenantId, channelId, threadIdStr, crmClientId, text);
     const ticketId = activeTicket ? activeTicket.id : null;
 
     // 3. Save Message
