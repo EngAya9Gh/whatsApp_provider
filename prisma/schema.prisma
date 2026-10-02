@@ -335,7 +335,7 @@ model ChatThread {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   messages ChatMessage[]
-  tickets  Ticket[]
+  // tickets  Ticket[]
   tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   channel  WhatsAppChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
@@ -389,7 +389,8 @@ model Ticket {
 
   tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   channel  WhatsAppChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  thread   ChatThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  // Removed relation because ChatThread is now in MongoDB
+  // thread   ChatThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
   assignee SubUser?        @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
   category TicketCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 

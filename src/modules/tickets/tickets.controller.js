@@ -26,8 +26,7 @@ class TicketsController {
       if (search) {
         where.OR = [
           { ticketNumber: { contains: search } },
-          { subject: { contains: search } },
-          { thread: { contactPhone: { contains: search } } }
+          { subject: { contains: search } }
         ];
       }
 
