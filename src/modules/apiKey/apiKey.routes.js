@@ -1,7 +1,7 @@
 const express = require('express');
 const apiKeyController = require('./apiKey.controller');
 const { authMiddleware } = require('../../middleware/auth.middleware');
-const requireFeature = require('../../middlewares/requireFeature');
+const requireFeature = require('../../middleware/requireFeature');
 
 const router = express.Router();
 

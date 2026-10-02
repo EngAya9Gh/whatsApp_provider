@@ -8,7 +8,7 @@ const { validate, createTemplateSchema, sendTemplateSchema } = require('./templa
 const { apiKeyMiddleware } = require('../../middleware/apiKey.middleware');
 const { authMiddleware } = require('../../middleware/auth.middleware');
 const { otpRateLimiter } = require('../../middleware/rateLimiter.middleware');
-const requireFeature = require('../../middlewares/requireFeature');
+const requireFeature = require('../../middleware/requireFeature');
 
 const router = express.Router();
 

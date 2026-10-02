@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const campaignController = require('./campaign.controller');
 const { authMiddleware } = require('../../middleware/auth.middleware');
-const requireFeature = require('../../middlewares/requireFeature');
+const requireFeature = require('../../middleware/requireFeature');
 
 const router = express.Router();
 
