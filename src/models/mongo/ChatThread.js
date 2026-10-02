@@ -5,6 +5,7 @@ const ChatThreadSchema = new mongoose.Schema({
   channelId: { type: String, required: true, index: true },
   contactPhone: { type: String, required: true },
   contactName: { type: String },
+  crmClientId: { type: String },
   lastMessageAt: { type: Date, default: Date.now },
   unreadCount: { type: Number, default: 0 }
 }, {
