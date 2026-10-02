@@ -119,6 +119,12 @@ class AuthService {
     if (data.webhookUrl !== undefined) {
       updateData.webhookUrl = data.webhookUrl;
     }
+    if (data.crmBaseUrl !== undefined) {
+      updateData.crmBaseUrl = data.crmBaseUrl;
+    }
+    if (data.crmApiToken !== undefined) {
+      updateData.crmApiToken = data.crmApiToken;
+    }
     if (data.webhookEvents !== undefined) {
       try {
         updateData.webhookEvents = typeof data.webhookEvents === 'string' 

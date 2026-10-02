@@ -97,6 +97,31 @@
           </div>
         </div>
 
+        <hr class="border-slate-100 my-8" />
+
+        <!-- CRM Integration -->
+        <div class="bg-indigo-50 p-5 rounded-xl border border-indigo-100">
+          <div class="mb-5">
+            <h4 class="font-bold text-indigo-900 mb-1 flex items-center gap-2">
+              <span>🔄</span> {{ isAr ? 'الربط الذكي مع نظام CRM (اختياري)' : 'Smart CRM Integration (Optional)' }}
+            </h4>
+            <p class="text-sm text-indigo-700/80">{{ isAr ? 'إذا كنت تستخدم نظام Wakeel CRM أو أي نظام متوافق، ضع الرابط هنا ليتم مزامنة جهات الاتصال وفتح التذاكر آلياً.' : 'If you use Wakeel CRM or a compatible system, enter the details here to automatically sync contacts and tickets.' }}</p>
+          </div>
+          
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">{{ isAr ? 'الرابط الأساسي للـ CRM (Base URL)' : 'CRM Base URL' }}</label>
+              <input type="url" v-model="form.crmBaseUrl" placeholder="https://app.wakeel.cc" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm outline-none transition-all font-mono" />
+            </div>
+            
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">{{ isAr ? 'رمز الوصول (API Token)' : 'API Token' }}</label>
+              <input type="password" v-model="form.crmApiToken" placeholder="••••••••••••••••••••" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm outline-none transition-all font-mono" />
+              <p class="text-xs text-slate-500 mt-2">{{ isAr ? 'سيتم إرساله كـ Bearer Token مع جميع طلبات الـ CRM.' : 'Will be sent as a Bearer token with all CRM requests.' }}</p>
+            </div>
+          </div>
+        </div>
+
         <div class="flex items-center gap-4 pt-4 border-t border-slate-100">
           <button type="submit" :disabled="loading" class="bg-[#FF6600] hover:bg-[#cc5200] text-white px-8 py-3 rounded-xl font-bold shadow-sm transition-all hover:-translate-y-0.5 border-none cursor-pointer disabled:opacity-50 flex items-center gap-2">
             <div v-if="loading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -125,6 +150,8 @@ const saved = ref(false)
 
 const form = ref({
   webhookUrl: '',
+  crmBaseUrl: '',
+  crmApiToken: '',
   webhookEvents: {
     incoming: 'ALL',
     statuses: true,
@@ -142,6 +169,8 @@ const fetchSettings = async () => {
     if (res.data?.data) {
       const tenant = res.data.data
       form.value.webhookUrl = tenant.webhookUrl || ''
+      form.value.crmBaseUrl = tenant.crmBaseUrl || ''
+      form.value.crmApiToken = tenant.crmApiToken || ''
       if (tenant.webhookEvents) {
         let eventsStr = tenant.webhookEvents;
         if (typeof eventsStr === 'string') {
@@ -168,6 +197,8 @@ const saveSettings = async () => {
     const token = localStorage.getItem('token')
     await axios.put('/api/auth/profile', {
       webhookUrl: form.value.webhookUrl,
+      crmBaseUrl: form.value.crmBaseUrl,
+      crmApiToken: form.value.crmApiToken,
       webhookEvents: JSON.stringify(form.value.webhookEvents)
     }, {
       headers: { Authorization: `Bearer ${token}` }
