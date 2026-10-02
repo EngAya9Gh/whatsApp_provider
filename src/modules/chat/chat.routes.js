@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const chatController = require('./chat.controller');
 const { authMiddleware } = require('../../middleware/auth.middleware');
-const requireFeature = require('../../middlewares/requireFeature');
+const requireFeature = require('../../middleware/requireFeature');
 
 router.use(authMiddleware);
 router.use(requireFeature('LIVE_CHAT'));
@@ -29,5 +29,10 @@ router.put('/threads/:threadId/name', chatController.renameThread.bind(chatContr
 router.post('/threads/:threadId/messages', chatController.sendMessage.bind(chatController));
 router.post('/upload', upload.single('file'), chatController.uploadMedia.bind(chatController));
 router.get('/media/:mediaId', chatController.getMediaProxy.bind(chatController));
+
+// Quick Replies
+router.get('/quick-replies', chatController.getQuickReplies.bind(chatController));
+router.post('/quick-replies', chatController.createQuickReply.bind(chatController));
+router.delete('/quick-replies/:id', chatController.deleteQuickReply.bind(chatController));
 
 module.exports = router;

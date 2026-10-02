@@ -40,6 +40,11 @@
           <span class="nav-text">{{ isAr ? 'التذاكر' : 'Tickets' }}</span>
         </router-link>
 
+        <router-link v-if="!isSubUser || subUserPerms?.can_view_live_chat" to="/quick-replies" class="nav-item" active-class="active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <span class="nav-text">{{ isAr ? 'الردود السريعة' : 'Quick Replies' }}</span>
+        </router-link>
+
         <!-- STANDARD (QR WEB) -->
         <template v-if="$hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('SEND_MESSAGE') || $hasFeature('BAILEYS_CAMPAIGN') || $hasFeature('TEMPLATES') || $hasFeature('BAILEYS_AUTORESPONDER')">
           <div class="nav-section-title mt-4">{{ $t('sidebar.standard_mode') }}</div>

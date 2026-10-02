@@ -155,69 +155,41 @@ class WebhookService {
   }
 
   /**
-   * Open a new ticket in the CRM
+   * Sync a ticket state with the CRM
+   * data: { phone, name, thread_id, category_name, status }
    */
-  async openCrmTicket(tenantId, crmClientId, categoryId = 1, source = 'whatsapp', title = 'محادثة واتساب - دعم فني') {
+  async syncCrmTicket(tenantId, data) {
     try {
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
         select: { crmBaseUrl: true, crmApiToken: true }
       });
 
-      if (!tenant || !tenant.crmBaseUrl || !crmClientId) return null;
+      if (!tenant || !tenant.crmBaseUrl) return null;
 
       const payload = {
-        client_id: crmClientId,
-        category_id: categoryId,
-        source: source,
-        title: title
+        event: "ticket.sync",
+        data: {
+          phone: data.phone,
+          name: data.name || "عميل",
+          thread_id: data.thread_id,
+          category_name: data.category_name || "عام",
+          status: data.status // 'open', 'resolved', 'closed'
+        }
       };
 
       const headers = { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${tenant.crmApiToken || ''}`
+        'X-Webhook-Key': tenant.crmApiToken || ''
       };
 
-      const url = `${tenant.crmBaseUrl.replace(/\/$/, '')}/api/v1/tickets`;
+      const url = `${tenant.crmBaseUrl.replace(/\/$/, '')}/api/v1/integrations/provider/webhook/whatsapp/${tenantId}`;
 
       const response = await axios.post(url, payload, { headers, timeout: 5000 });
       return response.data; // Expecting CRM to return ticket data
 
     } catch (err) {
-      logger.error(`[WebhookService] Error opening CRM ticket: ${err.message}`);
-      return null;
-    }
-  }
-
-  /**
-   * Close a ticket in the CRM
-   */
-  async closeCrmTicket(tenantId, crmTicketId, description = 'تم إغلاق المحادثة من المزود') {
-    try {
-      const tenant = await prisma.tenant.findUnique({
-        where: { id: tenantId },
-        select: { crmBaseUrl: true, crmApiToken: true }
-      });
-
-      if (!tenant || !tenant.crmBaseUrl || !crmTicketId) return null;
-
-      const payload = {
-        status: 'closed',
-        description: description
-      };
-
-      const headers = { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${tenant.crmApiToken || ''}`
-      };
-
-      const url = `${tenant.crmBaseUrl.replace(/\/$/, '')}/api/v1/tickets/${crmTicketId}`;
-
-      const response = await axios.put(url, payload, { headers, timeout: 5000 });
-      return response.data;
-
-    } catch (err) {
-      logger.error(`[WebhookService] Error closing CRM ticket: ${err.message}`);
+      logger.error(`[WebhookService] Error syncing CRM ticket: ${err.response?.data?.message || err.message}`);
       return null;
     }
   }

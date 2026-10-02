@@ -18,6 +18,42 @@ class TicketsService {
     });
   }
 
+  async getRecentClosedUnratedTicket(tenantId, threadId) {
+    // A ticket closed within the last 24 hours that doesn't have a rating
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return prisma.ticket.findFirst({
+      where: {
+        tenantId,
+        threadId,
+        status: 'CLOSED',
+        rating: null,
+        resolvedAt: { gte: oneDayAgo }
+      },
+      orderBy: { resolvedAt: 'desc' }
+    });
+  }
+
+  async saveTicketRating(tenantId, ticketId, ratingValue) {
+    // Save to DB
+    const updated = await prisma.ticket.update({
+      where: { id: ticketId, tenantId },
+      data: { rating: ratingValue }
+    });
+
+    // Notify CRM
+    try {
+      const webhookService = require('../webhook/webhook.service');
+      // If we have a generic webhook for rating or update CRM ticket
+      if (updated.crmTicketId) {
+        // Send a custom payload or use a new method in webhookService
+        logger.info(`[TicketsService] Sending rating ${ratingValue} to CRM for ticket ${updated.crmTicketId}`);
+      }
+    } catch (err) {
+      logger.error(`[TicketsService] Failed to sync rating to CRM: ${err.message}`);
+    }
+    return updated;
+  }
+
   /**
    * Auto-create a ticket if channel settings allow it and no active ticket exists
    */
@@ -58,10 +94,20 @@ class TicketsService {
       const count = await prisma.ticket.count({ where: { tenantId } });
       const ticketNumber = `#TK-${String(count + 1).padStart(4, '0')}`;
 
-      // 2. Open ticket in CRM (if crmClientId exists)
+      // 2. Sync ticket to CRM (if crmClientId exists)
       let crmTicketId = null;
       if (crmClientId) {
-        const crmResponse = await webhookService.openCrmTicket(tenantId, crmClientId, 1, 'whatsapp', subject);
+        const { ChatThread } = require('../../models/mongo/ChatThread');
+        const thread = await ChatThread.findById(threadId);
+        
+        const crmResponse = await webhookService.syncCrmTicket(tenantId, {
+          phone: thread ? thread.contactPhone : '',
+          name: thread ? thread.contactName : '',
+          thread_id: threadId,
+          category_name: "عام",
+          status: 'open'
+        });
+
         if (crmResponse && crmResponse.ticket_id) {
           crmTicketId = String(crmResponse.ticket_id);
         }
@@ -94,7 +140,8 @@ class TicketsService {
   async closeTicket(tenantId, ticketId, description = 'تم حل المشكلة') {
     try {
       const ticket = await prisma.ticket.findUnique({
-        where: { id: ticketId, tenantId }
+        where: { id: ticketId, tenantId },
+        include: { channel: true }
       });
 
       if (!ticket) throw new Error('Ticket not found');
@@ -110,7 +157,50 @@ class TicketsService {
 
       // Close in CRM
       if (ticket.crmTicketId) {
-        await webhookService.closeCrmTicket(tenantId, ticket.crmTicketId, description);
+        const { ChatThread } = require('../../models/mongo/ChatThread');
+        const thread = await ChatThread.findById(ticket.threadId);
+        
+        await webhookService.syncCrmTicket(tenantId, {
+          phone: thread ? thread.contactPhone : '',
+          name: thread ? thread.contactName : '',
+          thread_id: ticket.threadId,
+          category_name: "عام", // Need to get category dynamically later
+          status: 'closed'
+        });
+      }
+
+      // Send Rating Message
+      try {
+        const { ChatThread } = require('../../models/mongo/ChatThread');
+        const chatService = require('../chat/chat.service');
+        const thread = await ChatThread.findById(ticket.threadId);
+        
+        if (thread && ticket.channel) {
+          const ratingText = "تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).";
+          
+          if (ticket.channel.providerType === 'META_CLOUD') {
+            // Interactive message for Meta
+            const metaService = require('../meta/meta.service');
+            await metaService.sendButtons(
+              ticket.channel,
+              thread.contactPhone,
+              ratingText,
+              [
+                { id: `RATE_${ticket.id}_1`, text: "1 ⭐" },
+                { id: `RATE_${ticket.id}_3`, text: "3 ⭐" },
+                { id: `RATE_${ticket.id}_5`, text: "5 ⭐" }
+              ]
+            );
+          } else {
+            // Text message for Baileys
+            await chatService.sendMessage(tenantId, ticket.threadId, {
+              content: ratingText + "\nللتقييم، أرسل رقم التقييم كرسالة (مثال: 5).",
+              type: 'text'
+            });
+          }
+        }
+      } catch (err) {
+        logger.error(`[TicketsService] Error sending rating message: ${err.message}`);
       }
 
       return updated;

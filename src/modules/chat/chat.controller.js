@@ -2,6 +2,34 @@ const chatService = require('./chat.service');
 const logger = require('../../utils/logger');
 
 class ChatController {
+  async getQuickReplies(req, res, next) {
+    try {
+      const result = await chatService.getQuickReplies(req.tenant.id);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createQuickReply(req, res, next) {
+    try {
+      const { shortcut, content } = req.body;
+      if (!shortcut || !content) return res.status(400).json({ error: 'Shortcut and content required' });
+      const result = await chatService.createQuickReply(req.tenant.id, shortcut, content);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteQuickReply(req, res, next) {
+    try {
+      await chatService.deleteQuickReply(req.tenant.id, req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
   async getThreads(req, res, next) {
     try {
       const { page, limit, search, channelId } = req.query;

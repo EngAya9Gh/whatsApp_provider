@@ -74,6 +74,11 @@
               <span class="contact-phone">{{ selectedThread.contactPhone }}</span>
             </div>
           </div>
+          <div class="chat-header-actions">
+            <button @click="createManualTicket" class="btn btn-outline-primary btn-sm" :disabled="creatingTicket">
+              <i class="fas fa-ticket-alt mr-2"></i> {{ creatingTicket ? 'جاري الفتح...' : 'فتح تذكرة' }}
+            </button>
+          </div>
         </div>
 
         <div class="chat-messages" ref="messagesContainer">
@@ -126,6 +131,22 @@
             <span>{{ attachment.name }}</span>
             <button @click="attachment = null" class="btn-clear"><i class="fas fa-times"></i></button>
           </div>
+
+          <!-- Quick Replies Popup -->
+          <div v-if="showQuickReplies && filteredQuickReplies.length > 0" class="quick-replies-popup absolute bottom-full left-4 bg-white border border-slate-200 shadow-lg rounded-xl mb-2 w-72 max-h-64 overflow-y-auto z-50">
+            <div class="p-2 border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-500">
+              الردود السريعة
+            </div>
+            <div 
+              v-for="reply in filteredQuickReplies" 
+              :key="reply.id"
+              @click="insertQuickReply(reply)"
+              class="p-3 hover:bg-[#FF6600]/10 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
+            >
+              <div class="font-bold text-[#FF6600] text-sm mb-1">/{{ reply.shortcut }}</div>
+              <div class="text-xs text-slate-600 truncate">{{ reply.content }}</div>
+            </div>
+          </div>
           
           <form @submit.prevent="sendMessage" class="chat-form">
             <div class="emoji-wrapper" ref="emojiWrapper">
@@ -155,6 +176,7 @@
             <input 
               type="text" 
               v-model="newMessage" 
+              @input="handleInput"
               :placeholder="isRecording ? 'جاري التسجيل...' : 'Type a message...'" 
               class="form-control msg-input"
               :disabled="sending || isRecording"
@@ -215,12 +237,16 @@ const searchQuery = ref('')
 const channels = ref([])
 const selectedChannel = ref('')
 const newMessage = ref('')
+const quickReplies = ref([])
+const showQuickReplies = ref(false)
+const filteredQuickReplies = ref([])
 const attachment = ref(null)
 const fileInput = ref(null)
 const showEmojiPicker = ref(false)
 const emojiWrapper = ref(null)
 
 const loadingThreads = ref(false)
+const creatingTicket = ref(false)
 const loadingMessages = ref(false)
 const sending = ref(false)
 const messagesContainer = ref(null)
@@ -242,6 +268,32 @@ const fetchChannels = async () => {
   } catch (e) {
     console.error('Error fetching channels:', e)
   }
+}
+
+const fetchQuickReplies = async () => {
+  try {
+    const res = await axios.get('/api/v1/chat/quick-replies')
+    quickReplies.value = res.data.data
+  } catch (error) {
+    console.error('Error fetching quick replies:', error)
+  }
+}
+
+const handleInput = () => {
+  if (newMessage.value.startsWith('/')) {
+    const term = newMessage.value.substring(1).toLowerCase();
+    filteredQuickReplies.value = quickReplies.value.filter(qr => 
+      qr.shortcut.toLowerCase().includes(term) || qr.content.toLowerCase().includes(term)
+    );
+    showQuickReplies.value = filteredQuickReplies.value.length > 0;
+  } else {
+    showQuickReplies.value = false;
+  }
+}
+
+const insertQuickReply = (reply) => {
+  newMessage.value = reply.content;
+  showQuickReplies.value = false;
 }
 
 const fetchThreads = async () => {
@@ -274,6 +326,25 @@ const selectThread = async (thread) => {
   thread.unreadCount = 0 // Optimistic update
   await fetchMessages(thread.id)
 }
+
+const createManualTicket = async () => {
+  if (!selectedThread.value) return;
+  try {
+    creatingTicket.value = true;
+    await axios.post('/api/v1/tickets', {
+      channelId: selectedThread.value.channelId,
+      threadId: selectedThread.value.id,
+      crmClientId: selectedThread.value.crmClientId,
+      subject: 'محادثة واتساب - فتح يدوي'
+    });
+    alert(isAr.value ? 'تم إنشاء التذكرة بنجاح' : 'Ticket created successfully');
+  } catch (error) {
+    console.error('Error creating ticket:', error);
+    alert(isAr.value ? 'حدث خطأ أثناء إنشاء التذكرة' : 'Error creating ticket');
+  } finally {
+    creatingTicket.value = false;
+  }
+};
 
 const fetchMessages = async (threadId) => {
   loadingMessages.value = true
@@ -496,6 +567,7 @@ onMounted(() => {
   document.addEventListener('click', closeEmojiPicker)
   fetchChannels()
   fetchThreads()
+  fetchQuickReplies()
 
   // Initialize Socket.io
   const baseURL = axios.defaults.baseURL || window.location.origin

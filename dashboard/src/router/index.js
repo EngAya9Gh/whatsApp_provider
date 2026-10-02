@@ -11,6 +11,7 @@ import Chatbot from '../views/Chatbot.vue'
 import SubUsers from '../views/SubUsers.vue'
 import Contacts from '../views/Contacts.vue'
 import Tickets from '../views/Tickets.vue'
+import QuickReplies from '../views/QuickReplies.vue'
 
 import Landing from '../views/Landing.vue'
 import InvoiceView from '../views/InvoiceView.vue'
@@ -42,6 +43,7 @@ const routes = [
   { path: '/connect', component: Connect, meta: { requiresAuth: true } },
   { path: '/live-chat', component: LiveChat, meta: { requiresAuth: true } },
   { path: '/tickets', component: Tickets, meta: { requiresAuth: true } },
+  { path: '/quick-replies', component: QuickReplies, meta: { requiresAuth: true } },
   { path: '/send-message', component: MessageSend, meta: { requiresAuth: true } },
   { path: '/chatbot', component: Chatbot, meta: { requiresAuth: true } },
   { path: '/templates', component: Templates, meta: { requiresAuth: true } },

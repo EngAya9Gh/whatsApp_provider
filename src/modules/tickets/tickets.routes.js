@@ -8,6 +8,11 @@ router.use(authMiddleware);
 // Get all tickets
 router.get('/', ticketsController.getTickets);
 
+// Categories
+router.get('/categories', ticketsController.getCategories);
+router.post('/categories', ticketsController.createCategory);
+router.delete('/categories/:id', ticketsController.deleteCategory);
+
 // Get a single ticket
 router.get('/:id', ticketsController.getTicket);
 

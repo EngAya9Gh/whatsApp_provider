@@ -182,6 +182,50 @@ class TicketsController {
       next(error);
     }
   }
+
+  // --- Categories ---
+
+  async getCategories(req, res, next) {
+    try {
+      const tenantId = req.tenant.id;
+      const categories = await prisma.ticketCategory.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' }
+      });
+      res.json({ success: true, data: categories });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createCategory(req, res, next) {
+    try {
+      const tenantId = req.tenant.id;
+      const { name, description } = req.body;
+      if (!name) return res.status(400).json({ error: 'Name is required' });
+
+      const category = await prisma.ticketCategory.create({
+        data: { tenantId, name, description }
+      });
+      res.status(201).json({ success: true, data: category });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteCategory(req, res, next) {
+    try {
+      const tenantId = req.tenant.id;
+      const id = req.params.id;
+
+      await prisma.ticketCategory.deleteMany({
+        where: { id, tenantId }
+      });
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new TicketsController();

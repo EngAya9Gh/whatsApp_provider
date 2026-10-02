@@ -8,6 +8,31 @@ const ChatThread = require('../../models/mongo/ChatThread');
 const ChatMessage = require('../../models/mongo/ChatMessage');
 
 class ChatService {
+  async getQuickReplies(tenantId) {
+    return prisma.quickReply.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async createQuickReply(tenantId, shortcut, content) {
+    // Ensure shortcut doesn't have slash, we'll add it in UI
+    const cleanShortcut = shortcut.replace(/^\//, '').trim();
+    return prisma.quickReply.create({
+      data: {
+        tenantId,
+        shortcut: cleanShortcut,
+        content
+      }
+    });
+  }
+
+  async deleteQuickReply(tenantId, id) {
+    return prisma.quickReply.delete({
+      where: { id, tenantId }
+    });
+  }
+
   async getThreads(tenantId, page = 1, limit = 50, search = '', channelId = null) {
     const skip = (page - 1) * limit;
     
@@ -222,7 +247,7 @@ class ChatService {
           $set: { lastMessageAt: new Date(), contactName: contactName || thread.contactName },
           $inc: { unreadCount: 1 }
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
     } else {
       thread = await ChatThread.create({
@@ -247,16 +272,53 @@ class ChatService {
         thread = await ChatThread.findOneAndUpdate(
           { _id: thread._id },
           { $set: { crmClientId: crmClientId } },
-          { new: true }
+          { returnDocument: 'after' }
         );
       }
     }
 
-    // 2. Check/Auto-create Ticket
+    // Check for Ticket Rating
     const ticketsService = require('../tickets/tickets.service');
     const threadIdStr = thread._id.toString();
-    const activeTicket = await ticketsService.autoCreateTicketIfNeeded(tenantId, channelId, threadIdStr, crmClientId, text);
-    const ticketId = activeTicket ? activeTicket.id : null;
+    
+    let ratingValue = null;
+    let targetTicketId = null;
+    // msg.interactive check needs to look at the raw payload since content might be just the text
+    let interactiveId = null;
+    if (msg.type === 'interactive') {
+       if (msg.interactive.type === 'button_reply') interactiveId = msg.interactive.button_reply.id;
+       else if (msg.interactive.type === 'list_reply') interactiveId = msg.interactive.list_reply.id;
+    }
+
+    if (interactiveId && interactiveId.startsWith('RATE_')) {
+      const parts = interactiveId.split('_');
+      if (parts.length === 3) {
+        targetTicketId = parts[1];
+        ratingValue = parseInt(parts[2]);
+      }
+    } else if (type === 'TEXT' && ['1','2','3','4','5'].includes(content.trim())) {
+      const recentClosedTicket = await ticketsService.getRecentClosedUnratedTicket(tenantId, threadIdStr);
+      if (recentClosedTicket) {
+        targetTicketId = recentClosedTicket.id;
+        ratingValue = parseInt(content.trim());
+      }
+    }
+
+    let ticketId = null;
+    if (ratingValue && targetTicketId) {
+      await ticketsService.saveTicketRating(tenantId, targetTicketId, ratingValue);
+      content = `[العميل قام بتقييم التذكرة: ${ratingValue} نجوم]`;
+      
+      // Optional: send thank you message
+      this.sendMessage(tenantId, threadIdStr, {
+        content: "شكراً لتقييمك! نحن سعداء بخدمتك.",
+        type: 'text'
+      }).catch(e => console.log('Error sending thank you:', e.message));
+    } else {
+      // 2. Check/Auto-create Ticket if not a rating
+      const activeTicket = await ticketsService.autoCreateTicketIfNeeded(tenantId, channelId, threadIdStr, crmClientId, content);
+      ticketId = activeTicket ? activeTicket.id : null;
+    }
 
     // 3. Save Message
     const existingMsg = await ChatMessage.findOne({ metaMessageId });
