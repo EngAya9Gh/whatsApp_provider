@@ -113,6 +113,9 @@ class ChatService {
     // Determine type
     const msgType = payload.type || 'text'; // text, image, document, audio, video
     
+    const ticketsService = require('../tickets/tickets.service');
+    const activeTicket = await ticketsService.getActiveTicket(tenantId, thread._id.toString());
+
     let metaResponse;
     try {
       if (payload.hasMedia && payload.mediaUrl) {
@@ -142,7 +145,8 @@ class ChatService {
         mediaUrl: payload.mediaUrl || null,
         mediaMime: payload.mediaMime || null,
         status: 'SENT',
-        metaMessageId: metaResponse?.messages?.[0]?.id || null
+        metaMessageId: metaResponse?.messages?.[0]?.id || null,
+        ticketId: activeTicket ? activeTicket.id : null
       });
 
       await ChatThread.updateOne(
@@ -166,7 +170,8 @@ class ChatService {
         content: payload.content || '',
         hasMedia: payload.hasMedia || false,
         mediaUrl: payload.mediaUrl || null,
-        status: 'FAILED'
+        status: 'FAILED',
+        ticketId: activeTicket ? activeTicket.id : null
       });
       
       const failedMsgData = failedMessage.toObject();
@@ -230,7 +235,30 @@ class ChatService {
       });
     }
 
-    // Save Message
+    // 1. Sync Contact with CRM (Background Fire & Forget, but we await to get clientId if fast)
+    const webhookService = require('../webhook/webhook.service');
+    let crmClientId = thread.crmClientId;
+    
+    // We only need to sync if we don't have the crmClientId yet (e.g. first message ever)
+    if (!crmClientId) {
+      const crmData = await webhookService.syncCrmContact(tenantId, contactPhone, contactName || contactPhone);
+      if (crmData && crmData.client_id) {
+        crmClientId = String(crmData.client_id);
+        thread = await ChatThread.findOneAndUpdate(
+          { _id: thread._id },
+          { $set: { crmClientId: crmClientId } },
+          { new: true }
+        );
+      }
+    }
+
+    // 2. Check/Auto-create Ticket
+    const ticketsService = require('../tickets/tickets.service');
+    const threadIdStr = thread._id.toString();
+    const activeTicket = await ticketsService.autoCreateTicketIfNeeded(tenantId, channelId, threadIdStr, crmClientId);
+    const ticketId = activeTicket ? activeTicket.id : null;
+
+    // 3. Save Message
     const existingMsg = await ChatMessage.findOne({ metaMessageId });
 
     if (!existingMsg) {
@@ -243,7 +271,8 @@ class ChatService {
         mediaUrl,
         mediaMime,
         metaMessageId,
-        status: 'DELIVERED'
+        status: 'DELIVERED',
+        ticketId: ticketId
       });
 
       const threadData = thread.toObject();
