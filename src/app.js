@@ -40,6 +40,7 @@ const chatRoutes = require('./modules/chat/chat.routes');
 const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
 const subUserRoutes = require('./modules/subuser/subuser.routes');
 const contactRoutes = require('./modules/contacts/contact.routes');
+const ticketsRoutes = require('./modules/tickets/tickets.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/keys', apiKeyRoutes);
@@ -56,6 +57,7 @@ app.use('/api/plans', planRoutes);
 app.use('/api/v1/chatbot', chatbotRoutes);
 app.use('/api/v1/meta', metaRoutes);
 app.use('/api/v1/chat', chatRoutes);
+app.use('/api/v1/tickets', ticketsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/sub-users', subUserRoutes);
 app.use('/api/contacts', contactRoutes);

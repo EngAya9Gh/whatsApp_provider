@@ -10,6 +10,7 @@ import Settings from '../views/Settings.vue'
 import Chatbot from '../views/Chatbot.vue'
 import SubUsers from '../views/SubUsers.vue'
 import Contacts from '../views/Contacts.vue'
+import Tickets from '../views/Tickets.vue'
 
 import Landing from '../views/Landing.vue'
 import InvoiceView from '../views/InvoiceView.vue'
@@ -40,6 +41,7 @@ const routes = [
   { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/connect', component: Connect, meta: { requiresAuth: true } },
   { path: '/live-chat', component: LiveChat, meta: { requiresAuth: true } },
+  { path: '/tickets', component: Tickets, meta: { requiresAuth: true } },
   { path: '/send-message', component: MessageSend, meta: { requiresAuth: true } },
   { path: '/chatbot', component: Chatbot, meta: { requiresAuth: true } },
   { path: '/templates', component: Templates, meta: { requiresAuth: true } },
@@ -104,6 +106,7 @@ router.beforeEach((to, from, next) => {
       '/settings': perms.can_manage_settings,
       '/connect': perms.can_manage_settings,
       '/live-chat': perms.can_view_live_chat,
+      '/tickets': perms.can_view_live_chat, // Using live-chat permission for tickets for now, or true
       '/contacts': perms.can_manage_contacts,
       
       '/send-message': perms.can_send_message,

@@ -35,6 +35,11 @@
           <span class="nav-text">{{ isAr ? 'جهات الاتصال' : 'Contacts' }}</span>
         </router-link>
 
+        <router-link v-if="!isSubUser || subUserPerms?.can_view_live_chat" to="/tickets" class="nav-item" active-class="active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5v2"/><path d="M15 11v2"/><path d="M15 17v2"/><path d="M5 5h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7a2 2 0 0 1 2-2z"/></svg>
+          <span class="nav-text">{{ isAr ? 'التذاكر' : 'Tickets' }}</span>
+        </router-link>
+
         <!-- STANDARD (QR WEB) -->
         <template v-if="$hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('SEND_MESSAGE') || $hasFeature('BAILEYS_CAMPAIGN') || $hasFeature('TEMPLATES') || $hasFeature('BAILEYS_AUTORESPONDER')">
           <div class="nav-section-title mt-4">{{ $t('sidebar.standard_mode') }}</div>
