@@ -111,12 +111,12 @@
           <div class="space-y-4">
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-2">{{ isAr ? 'الرابط الأساسي للـ CRM (Base URL)' : 'CRM Base URL' }}</label>
-              <input type="url" v-model="form.crmBaseUrl" placeholder="https://app.wakeel.cc" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm outline-none transition-all font-mono" />
+              <input type="text" autocomplete="off" data-lpignore="true" v-model="form.crmBaseUrl" placeholder="https://app.wakeel.cc" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm outline-none transition-all font-mono" />
             </div>
             
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-2">{{ isAr ? 'رمز الوصول (API Token)' : 'API Token' }}</label>
-              <input type="password" v-model="form.crmApiToken" placeholder="••••••••••••••••••••" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm outline-none transition-all font-mono" />
+              <input type="password" autocomplete="new-password" data-lpignore="true" v-model="form.crmApiToken" placeholder="••••••••••••••••••••" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm outline-none transition-all font-mono" />
               <p class="text-xs text-slate-500 mt-2">{{ isAr ? 'سيتم إرساله كـ Bearer Token مع جميع طلبات الـ CRM.' : 'Will be sent as a Bearer token with all CRM requests.' }}</p>
             </div>
           </div>
