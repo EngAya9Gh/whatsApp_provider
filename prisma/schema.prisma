@@ -45,6 +45,7 @@ model Tenant {
   usageRecords     UsageRecord[]
   channels         WhatsAppChannel[]
   chatThreads      ChatThread[]
+  tickets          Ticket[]
   subUsers         SubUser[]
   contactGroups    ContactGroup[]
   contacts         Contact[]
@@ -67,6 +68,7 @@ model WhatsAppChannel {
   // Human-readable label for this channel (e.g. "Support Line", "+966500000000")
   name               String? @default("") @map("name")
   displayPhoneNumber String? @map("display_phone_number") // from Meta Business Manager
+  autoCreateTickets  Boolean @default(false) @map("auto_create_tickets") // Automatically create tickets for incoming messages
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -75,6 +77,7 @@ model WhatsAppChannel {
   campaigns      Campaign[]
   messageLogs    MessageLog[]
   chatThreads    ChatThread[]
+  tickets        Ticket[]
   autoResponders AutoResponder[]
   subUsers       SubUser[]
 
@@ -321,12 +324,14 @@ model ChatThread {
   channelId     String   @map("channel_id")
   contactPhone  String   @map("contact_phone")
   contactName   String?  @map("contact_name")
+  crmClientId   String?  @map("crm_client_id")
   lastMessageAt DateTime @default(now()) @map("last_message_at")
   unreadCount   Int      @default(0) @map("unread_count")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   messages ChatMessage[]
+  tickets  Ticket[]
   tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   channel  WhatsAppChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
@@ -346,12 +351,46 @@ model ChatMessage {
   mediaMime     String?  @map("media_mime")
   status        String? // "SENT", "DELIVERED", "READ", "FAILED" for outbound
   metaMessageId String?  @map("meta_message_id")
+  ticketId      String?  @map("ticket_id")
   createdAt     DateTime @default(now()) @map("created_at")
 
   thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  ticket Ticket?    @relation(fields: [ticketId], references: [id], onDelete: SetNull)
 
   @@index([threadId], map: "chat_messages_thread_id_fkey")
+  @@index([ticketId], map: "chat_messages_ticket_id_fkey")
   @@map("chat_messages")
+}
+
+model Ticket {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  channelId       String   @map("channel_id")
+  threadId        String   @map("thread_id")
+  ticketNumber    String   @map("ticket_number")
+  status          String   @default("OPEN") // OPEN, PENDING, RESOLVED, CLOSED
+  priority        String   @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  assignedToId    String?  @map("assigned_to_id")
+  subject         String?  @db.Text
+  crmTicketId     String?  @map("crm_ticket_id")
+  crmClientId     String?  @map("crm_client_id")
+  crmContactId    String?  @map("crm_contact_id")
+  resolvedAt      DateTime? @map("resolved_at")
+  firstResponseAt DateTime? @map("first_response_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel  WhatsAppChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  thread   ChatThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  assignee SubUser?        @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  messages ChatMessage[]
+
+  @@index([tenantId], map: "tickets_tenant_id_fkey")
+  @@index([threadId], map: "tickets_thread_id_fkey")
+  @@index([assignedToId], map: "tickets_assigned_to_id_fkey")
+  @@map("tickets")
 }
 
 model SystemSetting {
@@ -384,6 +423,7 @@ model SubUser {
 
   tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   channel WhatsAppChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  assignedTickets Ticket[]
 
   @@index([tenantId], map: "sub_users_tenant_id_fkey")
   @@index([channelId], map: "sub_users_channel_id_fkey")
