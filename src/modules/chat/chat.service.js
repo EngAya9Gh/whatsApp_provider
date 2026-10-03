@@ -146,7 +146,7 @@ class ChatService {
       try {
         const activeTicket = await ticketsService.getActiveTicket(tenantId, threadId);
         if (activeTicket && !activeTicket.assignedToId) {
-          const prisma = require('../../config/prisma');
+
           await prisma.ticket.update({
             where: { id: activeTicket.id },
             data: { assignedToId: payload.senderId }

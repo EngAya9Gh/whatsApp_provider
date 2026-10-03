@@ -1,6 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const logger = require('../../utils/logger');
-const prisma = require('../../config/prisma');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 const { ChatMessage } = require('../../models/mongo/ChatMessage');
 
 class AIService {
