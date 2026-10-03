@@ -138,7 +138,26 @@ class ChatService {
     // Determine type
     const msgType = payload.type || 'text'; // text, image, document, audio, video
     
+
     const ticketsService = require('../tickets/tickets.service');
+    
+    // Auto-assign ticket if unassigned and sender is a sub-user
+    if (payload.senderId) {
+      try {
+        const activeTicket = await ticketsService.getActiveTicket(tenantId, threadId);
+        if (activeTicket && !activeTicket.assignedToId) {
+          const prisma = require('../../config/prisma');
+          await prisma.ticket.update({
+            where: { id: activeTicket.id },
+            data: { assignedToId: payload.senderId }
+          });
+          logger.info(`[ChatService] Auto-assigned ticket ${activeTicket.id} to user ${payload.senderId}`);
+        }
+      } catch(err) {
+        logger.error('[ChatService] Error auto-assigning ticket: ' + err.message);
+      }
+    }
+
     const activeTicket = await ticketsService.getActiveTicket(tenantId, thread._id.toString());
 
     let metaResponse;

@@ -8,6 +8,7 @@ router.use(authMiddleware);
 
 // الأوونر فقط يستطيع إدارة المستخدمين الفرعيين
 router.get('/defaults', subUserController.getDefaults);
+router.get('/team', subUserController.getTeam);
 router.get('/', ownerOnly, subUserController.list);
 router.get('/:id', ownerOnly, subUserController.getById);
 router.post('/', ownerOnly, subUserController.create);

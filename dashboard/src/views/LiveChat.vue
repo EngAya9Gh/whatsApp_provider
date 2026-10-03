@@ -241,6 +241,7 @@ import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import { io } from 'socket.io-client'
+import { useI18n } from 'vue-i18n'
 import FeatureLock from '../components/FeatureLock.vue'
 import EmojiPicker from 'vue3-emoji-picker'
 import 'vue3-emoji-picker/css'
@@ -261,6 +262,18 @@ const fileInput = ref(null)
 const showEmojiPicker = ref(false)
 const activeTicket = ref(null)
 const isInternal = ref(false)
+const { locale } = useI18n()
+const isAr = computed(() => locale.value === 'ar')
+
+const fetchTeamMembers = async () => {
+  try {
+    const res = await axios.get('/api/v1/subusers/team');
+    teamMembers.value = res.data.data || [];
+  } catch(e) {
+    console.error('Error fetching team members:', e);
+  }
+}
+
 
 const isTicketRecentlyClosed = computed(() => {
   if (!activeTicket.value || activeTicket.value.status !== 'CLOSED') return false;
@@ -348,6 +361,7 @@ const onSearch = () => {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
     fetchThreads()
+  fetchTeamMembers()
   }, 500)
 }
 
@@ -413,6 +427,66 @@ const closeActiveTicket = async () => {
 }
 
 
+
+
+const assignThreadTicket = async (thread) => {
+  try {
+    // Check if open ticket exists
+    const res = await axios.get('/api/v1/tickets?threadId=' + thread.id + '&limit=1');
+    let ticket = res.data.data[0];
+    
+    if (!ticket || ticket.status !== 'OPEN') {
+      const confirm = await Swal.fire({
+        title: isAr.value ? 'فتح تذكرة؟' : 'Open Ticket?',
+        text: isAr.value ? 'لا توجد تذكرة مفتوحة لهذه المحادثة. هل تريد فتح تذكرة جديدة لإسنادها؟' : 'No open ticket for this chat. Create one to assign?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: isAr.value ? 'نعم، افتح تذكرة' : 'Yes, open ticket',
+        cancelButtonText: isAr.value ? 'إلغاء' : 'Cancel'
+      });
+      if (!confirm.isConfirmed) return;
+      
+      const createRes = await axios.post('/api/v1/tickets', {
+        channelId: thread.channelId,
+        threadId: thread.id,
+        crmClientId: thread.crmClientId,
+        subject: 'محادثة واتساب'
+      });
+      ticket = createRes.data.data;
+      if (selectedThread.value && selectedThread.value.id === thread.id) {
+        await fetchActiveTicket(thread.id);
+      }
+    }
+
+    const { value: assignedToId } = await Swal.fire({
+      title: isAr.value ? 'إسناد التذكرة' : 'Assign Ticket',
+      html:
+        '<select id="swal-assign" class="swal2-select" style="display: flex; width: 100%;">' +
+        '<option value="">' + (isAr.value ? 'غير مسندة' : 'Unassigned') + '</option>' +
+        teamMembers.value.map(u => '<option value="' + u.id + '" ' + (ticket.assignedToId === u.id ? 'selected' : '') + '>' + u.name + '</option>').join('') +
+        '</select>',
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: isAr.value ? 'حفظ' : 'Save',
+      cancelButtonText: isAr.value ? 'إلغاء' : 'Cancel',
+      preConfirm: () => document.getElementById('swal-assign').value
+    });
+
+    if (assignedToId === undefined) return; // cancelled
+    
+    const finalAssignId = assignedToId === '' ? null : assignedToId;
+    await axios.post('/api/v1/tickets/' + ticket.id + '/assign', { assignedToId: finalAssignId });
+    
+    if (selectedThread.value && selectedThread.value.id === thread.id && activeTicket.value) {
+      activeTicket.value.assignedToId = finalAssignId;
+    }
+    
+    Swal.fire({ icon: 'success', title: isAr.value ? 'تم إسناد التذكرة' : 'Assigned', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+  } catch(e) {
+    console.error(e);
+    Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', text: e.message });
+  }
+}
 
 const assignTicket = async (userId) => {
   if (!activeTicket.value) return;

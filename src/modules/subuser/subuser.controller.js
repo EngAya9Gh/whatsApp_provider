@@ -103,4 +103,20 @@ class SubUserController {
   }
 }
 
+
+  async getTeam(req, res, next) {
+    try {
+      const prisma = require('../../config/prisma');
+      const team = await prisma.subUser.findMany({
+        where: { tenantId: req.tenant.id },
+        select: { id: true, name: true, email: true }
+      });
+      // Add owner as a team member option too
+      team.push({ id: req.tenant.id, name: 'Owner (' + req.tenant.name + ')' });
+      res.json({ success: true, data: team });
+    } catch (err) {
+      next(err);
+    }
+  }
+
 module.exports = new SubUserController();
