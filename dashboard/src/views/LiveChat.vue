@@ -74,8 +74,11 @@
               <span class="contact-phone">{{ selectedThread.contactPhone }}</span>
             </div>
           </div>
-          <div class="chat-header-actions">
-            <button @click="createManualTicket" class="btn btn-outline-primary btn-sm" :disabled="creatingTicket">
+          <div class="chat-header-actions flex gap-2">
+            <button v-if="activeTicket" @click="closeActiveTicket" class="btn btn-outline-danger btn-sm" :disabled="creatingTicket">
+              <i class="fas fa-times-circle mr-2"></i> إغلاق التذكرة
+            </button>
+            <button v-else @click="createManualTicket" class="btn btn-outline-primary btn-sm" :disabled="creatingTicket">
               <i class="fas fa-ticket-alt mr-2"></i> {{ creatingTicket ? 'جاري الفتح...' : 'فتح تذكرة' }}
             </button>
           </div>
@@ -243,6 +246,7 @@ const filteredQuickReplies = ref([])
 const attachment = ref(null)
 const fileInput = ref(null)
 const showEmojiPicker = ref(false)
+const activeTicket = ref(null)
 const emojiWrapper = ref(null)
 
 const loadingThreads = ref(false)
@@ -321,10 +325,38 @@ const onSearch = () => {
   }, 500)
 }
 
+const fetchActiveTicket = async (threadId) => {
+  try {
+    // Search tickets by threadId string (using our existing getTickets endpoint with search or fetch by ID if we had an endpoint)
+    // Actually we can just do a GET /api/v1/tickets and search in the UI, or we need a new endpoint.
+    // Wait, let's just make a new endpoint to get active ticket by threadId
+    const res = await axios.get('/api/v1/tickets?status=OPEN');
+    activeTicket.value = res.data.data.find(t => t.threadId === threadId) || null;
+  } catch(e) {
+    console.error(e);
+  }
+}
+
 const selectThread = async (thread) => {
   selectedThread.value = thread
   thread.unreadCount = 0 // Optimistic update
   await fetchMessages(thread.id)
+  await fetchActiveTicket(thread.id)
+}
+
+const closeActiveTicket = async () => {
+  if (!activeTicket.value) return;
+  if (!confirm('هل أنت متأكد من إغلاق التذكرة؟')) return;
+  try {
+    creatingTicket.value = true;
+    await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/close');
+    activeTicket.value = null;
+    alert('تم إغلاق التذكرة بنجاح!');
+  } catch (err) {
+    alert('حدث خطأ أثناء إغلاق التذكرة');
+  } finally {
+    creatingTicket.value = false;
+  }
 }
 
 const createManualTicket = async () => {
@@ -900,6 +932,7 @@ onUnmounted(() => {
   padding: 15px 20px;
   background: #f0f2f5;
   border-top: 1px solid #ddd;
+  position: relative;
 }
 
 .attachment-preview {

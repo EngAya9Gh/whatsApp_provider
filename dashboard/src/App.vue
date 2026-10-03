@@ -40,6 +40,11 @@
           <span class="nav-text">{{ isAr ? 'التذاكر' : 'Tickets' }}</span>
         </router-link>
 
+        <router-link v-if="!isSubUser || subUserPerms?.can_manage_settings" to="/ticket-categories" class="nav-item" active-class="active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+          <span class="nav-text">{{ isAr ? 'تصنيفات التذاكر' : 'Ticket Categories' }}</span>
+        </router-link>
+
         <router-link v-if="!isSubUser || subUserPerms?.can_view_live_chat" to="/quick-replies" class="nav-item" active-class="active">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
           <span class="nav-text">{{ isAr ? 'الردود السريعة' : 'Quick Replies' }}</span>
