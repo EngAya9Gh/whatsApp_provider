@@ -82,12 +82,14 @@
             <button v-if="activeTicket && activeTicket.status === 'OPEN'" @click="closeActiveTicket" class="btn btn-outline-danger btn-sm" :disabled="creatingTicket">
               <i class="fas fa-times-circle mr-2"></i> إغلاق التذكرة
             </button>
-            <button v-else-if="isTicketRecentlyClosed" @click="reopenActiveTicket" class="btn btn-outline-success btn-sm" :disabled="creatingTicket">
-              <i class="fas fa-redo mr-2"></i> إعادة الفتح
-            </button>
-            <button v-else @click="createManualTicket" class="btn btn-outline-primary btn-sm" :disabled="creatingTicket">
-              <i class="fas fa-ticket-alt mr-2"></i> {{ creatingTicket ? 'جاري الفتح...' : 'فتح تذكرة' }}
-            </button>
+            <template v-else>
+              <button v-if="isTicketRecentlyClosed" @click="reopenActiveTicket" class="btn btn-outline-success btn-sm me-2" :disabled="creatingTicket">
+                <i class="fas fa-redo mr-2"></i> إعادة الفتح
+              </button>
+              <button @click="createManualTicket" class="btn btn-outline-primary btn-sm" :disabled="creatingTicket">
+                <i class="fas fa-ticket-alt mr-2"></i> {{ creatingTicket ? 'جاري الفتح...' : 'فتح تذكرة' + (isTicketRecentlyClosed ? ' جديدة' : '') }}
+              </button>
+            </template>
           </div>
         </div>
 
