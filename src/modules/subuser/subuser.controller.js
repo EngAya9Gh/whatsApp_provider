@@ -101,8 +101,6 @@ class SubUserController {
       next(err);
     }
   }
-}
-
 
   async getTeam(req, res, next) {
     try {
@@ -118,5 +116,6 @@ class SubUserController {
       next(err);
     }
   }
+}
 
 module.exports = new SubUserController();
