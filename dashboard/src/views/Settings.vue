@@ -105,6 +105,20 @@
               <input type="text" v-model="form.postalCode" :placeholder="isAr ? 'مثال: 12381' : 'e.g. 12381'" class="input-std" />
             </div>
 
+            <div class="form-divider full-width">
+              <span>{{ isAr ? 'إعدادات النظام والذكاء الاصطناعي' : 'System & AI Settings' }}</span>
+            </div>
+
+            <div class="form-group full-width">
+              <label>{{ isAr ? 'رسالة التقييم بعد الإغلاق' : 'Rating Message after Close' }}</label>
+              <textarea v-model="form.ratingMessageText" :placeholder="isAr ? 'رسالة التقييم التي ستصل للعميل' : 'Rating message to send'" class="input-std" rows="2"></textarea>
+            </div>
+
+            <div class="form-group full-width">
+              <label>{{ isAr ? 'مفتاح Gemini (للذكاء الاصطناعي)' : 'Gemini AI Key' }}</label>
+              <input type="text" v-model="form.geminiKey" placeholder="AIzaSyB..." class="input-std" />
+            </div>
+
             <div class="form-actions full-width">
               <button type="submit" class="btn-save" :disabled="loadingTax">
                 <span v-if="loadingTax" class="spinner-sm"></span>

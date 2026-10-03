@@ -111,7 +111,7 @@ class SubUserController {
         select: { id: true, name: true, email: true }
       });
       // Add owner as a team member option too
-      team.push({ id: req.tenant.id, name: 'Owner (' + req.tenant.name + ')' });
+      // REMOVED: Cannot assign to owner because assignedToId is a foreign key to SubUser.
       res.json({ success: true, data: team });
     } catch (err) {
       next(err);

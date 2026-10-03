@@ -174,7 +174,10 @@ class WebhookService {
           name: data.name || "عميل",
           thread_id: data.thread_id,
           category_name: data.category_name || "عام",
-          status: data.status // 'open', 'resolved', 'closed'
+          status: data.status, // 'open', 'resolved', 'closed'
+          subject: data.subject,
+          description: data.description,
+          summary: data.summary
         }
       };
 

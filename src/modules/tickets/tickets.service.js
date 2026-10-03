@@ -265,7 +265,7 @@ class TicketsService {
           if (ticket.channel.providerType === 'META_CLOUD') {
             // Interactive message for Meta
             const metaService = require('../meta/meta.service');
-            await metaService.sendButtons(
+            const metaRes = await metaService.sendButtons(
               ticket.channel,
               thread.contactPhone,
               ratingText,
@@ -275,6 +275,18 @@ class TicketsService {
                 { id: `RATE_${ticket.id}_5`, text: "5 ⭐" }
               ]
             );
+            // Save to DB so it shows in Dashboard
+            const { ChatMessage } = require('../../models/mongo/ChatMessage');
+            await ChatMessage.create({
+              threadId: ticket.threadId,
+              tenantId: tenantId,
+              direction: 'OUTBOUND',
+              type: 'text',
+              content: '[تم إرسال رسالة التقييم للعميل]\n' + ratingText,
+              messageId: metaRes?.messages?.[0]?.id || 'local_' + Date.now(),
+              status: 'sent',
+              createdAt: new Date()
+            });
           } else {
             // Text message for Baileys
             await chatService.sendMessage(tenantId, ticket.threadId, {

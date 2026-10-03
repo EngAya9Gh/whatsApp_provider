@@ -115,7 +115,7 @@ class ChatController {
       const message = await chatService.sendMessage(
         req.tenant.id,
         req.params.threadId,
-        { ...req.body, senderId: req.subUser ? req.subUser.id : req.tenant.id }
+        { ...req.body, senderId: req.subUser ? req.subUser.id : null }
       );
       res.json({ success: true, data: message });
     } catch (error) {
