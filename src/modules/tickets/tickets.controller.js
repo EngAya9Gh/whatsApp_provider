@@ -11,7 +11,7 @@ class TicketsController {
   async getTickets(req, res, next) {
     try {
       const tenantId = req.tenant.id;
-      let { page = 1, limit = 50, status, channelId, assignedToId, search } = req.query;
+      let { page = 1, limit = 50, status, channelId, assignedToId, search, threadId } = req.query;
       
       page = parseInt(page);
       limit = parseInt(limit);
@@ -22,6 +22,7 @@ class TicketsController {
       if (status) where.status = status;
       if (channelId) where.channelId = channelId;
       if (assignedToId) where.assignedToId = assignedToId;
+      if (threadId) where.threadId = threadId;
       
       if (search) {
         where.OR = [
@@ -97,6 +98,21 @@ class TicketsController {
   /**
    * Close a ticket
    */
+
+  async reopenTicket(req, res, next) {
+    try {
+      const tenantId = req.tenant.id;
+      const ticketId = req.params.id;
+
+      const updatedTicket = await ticketsService.reopenTicket(tenantId, ticketId);
+
+      res.status(200).json({ success: true, data: updatedTicket });
+    } catch (error) {
+      logger.error('Error reopening ticket:', error);
+      next(error);
+    }
+  }
+
   async closeTicket(req, res, next) {
     try {
       const tenantId = req.tenant.id;

@@ -68,13 +68,29 @@ class TicketsService {
         return null; // Not enabled for this channel
       }
 
+
       // Check if there is already an active ticket
       const activeTicket = await this.getActiveTicket(tenantId, threadId);
       if (activeTicket) {
         return activeTicket;
       }
 
+      // Check if there is a recently closed ticket (less than 24h)
+      const lastClosedTicket = await prisma.ticket.findFirst({
+        where: { tenantId, threadId, status: 'CLOSED' },
+        orderBy: { resolvedAt: 'desc' }
+      });
+
+      if (lastClosedTicket && lastClosedTicket.resolvedAt) {
+        const diffHours = (new Date() - new Date(lastClosedTicket.resolvedAt)) / (1000 * 60 * 60);
+        if (diffHours < 24) {
+          logger.info(`[TicketsService] Auto-reopening ticket ${lastClosedTicket.id} for thread ${threadId}`);
+          return this.reopenTicket(tenantId, lastClosedTicket.id);
+        }
+      }
+
       logger.info(`[TicketsService] Auto-creating ticket for thread ${threadId} on channel ${channelId}`);
+
       
       const subject = firstMessageText ? firstMessageText.substring(0, 100) : 'محادثة دعم فني';
       return this.createTicket(tenantId, channelId, threadId, crmClientId, subject);
@@ -96,7 +112,7 @@ class TicketsService {
 
       // 2. Sync ticket to CRM
       let crmTicketId = null;
-      const { ChatThread } = require('../../models/mongo/ChatThread');
+      const ChatThread = require('../../models/mongo/ChatThread');
       const thread = await ChatThread.findById(threadId);
       
       let categoryName = "عام";
@@ -138,6 +154,56 @@ class TicketsService {
     }
   }
 
+
+  /**
+   * Reopen a ticket
+   */
+  async reopenTicket(tenantId, ticketId) {
+    try {
+      const ticket = await prisma.ticket.findUnique({
+        where: { id: ticketId, tenantId },
+        include: { channel: true }
+      });
+
+      if (!ticket) throw new Error('Ticket not found');
+      if (ticket.status !== 'CLOSED' && ticket.status !== 'RESOLVED') {
+        throw new Error('Only closed tickets can be reopened');
+      }
+
+      // Update in local DB
+      const updated = await prisma.ticket.update({
+        where: { id: ticketId },
+        data: {
+          status: 'OPEN',
+          resolvedAt: null
+        }
+      });
+
+      // Sync to CRM
+      const ChatThread = require('../../models/mongo/ChatThread');
+      const thread = await ChatThread.findById(ticket.threadId);
+      
+      let categoryName = "عام";
+      if (ticket.categoryId) {
+        const cat = await prisma.ticketCategory.findUnique({ where: { id: ticket.categoryId } });
+        if (cat) categoryName = cat.name;
+      }
+      
+      await webhookService.syncCrmTicket(tenantId, {
+        phone: thread ? thread.contactPhone : '',
+        name: thread ? thread.contactName : '',
+        thread_id: ticket.threadId,
+        category_name: categoryName,
+        status: 'open'
+      });
+
+      return updated;
+    } catch (error) {
+      logger.error('Error in reopenTicket service:', error);
+      throw error;
+    }
+  }
+
   /**
    * Close a ticket
    */
@@ -160,8 +226,18 @@ class TicketsService {
         }
       });
 
+      // Generate AI Summary
+      const aiService = require('../ai/ai.service');
+      const summaryText = await aiService.summarizeTicket(tenantId, ticket.threadId);
+      if (summaryText) {
+        await prisma.ticket.update({
+          where: { id: ticketId },
+          data: { summary: summaryText }
+        });
+      }
+
       // Close in CRM
-      const { ChatThread } = require('../../models/mongo/ChatThread');
+      const ChatThread = require('../../models/mongo/ChatThread');
       const thread = await ChatThread.findById(ticket.threadId);
       
       await webhookService.syncCrmTicket(tenantId, {
@@ -172,12 +248,12 @@ class TicketsService {
         status: 'closed',
         subject: ticket.subject || 'بدون عنوان',
         description: description,
-        summary: ticket.summary || ''
+        summary: summaryText || ticket.summary || ''
       });
 
       // Send Rating Message
       try {
-        const { ChatThread } = require('../../models/mongo/ChatThread');
+        const ChatThread = require('../../models/mongo/ChatThread');
         const chatService = require('../chat/chat.service');
         const thread = await ChatThread.findById(ticket.threadId);
         

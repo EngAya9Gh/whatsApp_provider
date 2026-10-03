@@ -74,9 +74,16 @@
               <span class="contact-phone">{{ selectedThread.contactPhone }}</span>
             </div>
           </div>
-          <div class="chat-header-actions flex gap-2">
-            <button v-if="activeTicket" @click="closeActiveTicket" class="btn btn-outline-danger btn-sm" :disabled="creatingTicket">
+          <div class="chat-header-actions flex gap-2 items-center">
+            <select v-if="activeTicket && activeTicket.status === 'OPEN'" v-model="activeTicket.assignedToId" @change="assignTicket(activeTicket.assignedToId)" class="form-control form-control-sm text-sm py-1 px-2 h-8 w-32 border-slate-300 rounded-lg">
+              <option :value="null">{{ isAr ? 'غير مسندة' : 'Unassigned' }}</option>
+              <option v-for="user in teamMembers" :key="user.id" :value="user.id">{{ user.name }}</option>
+            </select>
+            <button v-if="activeTicket && activeTicket.status === 'OPEN'" @click="closeActiveTicket" class="btn btn-outline-danger btn-sm" :disabled="creatingTicket">
               <i class="fas fa-times-circle mr-2"></i> إغلاق التذكرة
+            </button>
+            <button v-else-if="isTicketRecentlyClosed" @click="reopenActiveTicket" class="btn btn-outline-success btn-sm" :disabled="creatingTicket">
+              <i class="fas fa-redo mr-2"></i> إعادة الفتح
             </button>
             <button v-else @click="createManualTicket" class="btn btn-outline-primary btn-sm" :disabled="creatingTicket">
               <i class="fas fa-ticket-alt mr-2"></i> {{ creatingTicket ? 'جاري الفتح...' : 'فتح تذكرة' }}
@@ -252,7 +259,18 @@ const fileInput = ref(null)
 const showEmojiPicker = ref(false)
 const activeTicket = ref(null)
 const isInternal = ref(false)
+
+const isTicketRecentlyClosed = computed(() => {
+  if (!activeTicket.value || activeTicket.value.status !== 'CLOSED') return false;
+  if (!activeTicket.value.resolvedAt) return true; // Fallback
+  const resolvedTime = new Date(activeTicket.value.resolvedAt).getTime();
+  const now = new Date().getTime();
+  const diffHours = (now - resolvedTime) / (1000 * 60 * 60);
+  return diffHours < 24; // Less than 24 hours
+});
+
 const ticketCategories = ref([])
+const teamMembers = ref([])
 const emojiWrapper = ref(null)
 
 const loadingThreads = ref(false)
@@ -336,8 +354,8 @@ const fetchActiveTicket = async (threadId) => {
     // Search tickets by threadId string (using our existing getTickets endpoint with search or fetch by ID if we had an endpoint)
     // Actually we can just do a GET /api/v1/tickets and search in the UI, or we need a new endpoint.
     // Wait, let's just make a new endpoint to get active ticket by threadId
-    const res = await axios.get('/api/v1/tickets?status=OPEN');
-    activeTicket.value = res.data.data.find(t => t.threadId === threadId) || null;
+    const res = await axios.get('/api/v1/tickets?threadId=' + threadId + '&limit=1');
+    activeTicket.value = res.data.data[0] || null;
   } catch(e) {
     console.error(e);
   }
@@ -359,7 +377,7 @@ const closeActiveTicket = async () => {
       '<textarea id="swal-desc" class="swal2-textarea" placeholder="' + (isAr.value ? 'وصف أو سبب الإغلاق' : 'Resolution description') + '" style="margin-bottom: 10px;"></textarea>' +
       '<select id="swal-cat" class="swal2-select" style="display: flex; width: 100%;">' +
       '<option value="" disabled selected>' + (isAr.value ? 'تحديث التصنيف (اختياري)' : 'Update Category (Optional)') + '</option>' +
-      ticketCategories.value.map(c => '<option value="' + c.id + '" ' + (activeTicket.value.categoryId === c.id ? 'selected' : '') + '>' + c.name + '</option>').join('') +
+      (ticketCategories.value || []).map(c => '<option value="' + c.id + '" ' + (activeTicket.value.categoryId === c.id ? 'selected' : '') + '>' + c.name + '</option>').join('') +
       '</select>',
     focusConfirm: false,
     showCancelButton: true,
@@ -392,24 +410,57 @@ const closeActiveTicket = async () => {
   }
 }
 
+
+
+const assignTicket = async (userId) => {
+  if (!activeTicket.value) return;
+  try {
+    await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/assign', { assignedToId: userId });
+    activeTicket.value.assignedToId = userId;
+    Swal.fire({ icon: 'success', title: isAr.value ? 'تم إسناد التذكرة' : 'Ticket Assigned', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+  } catch(e) {
+    console.error(e);
+    Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+  }
+}
+
+const reopenActiveTicket = async () => {
+  if (!activeTicket.value) return;
+  try {
+    creatingTicket.value = true;
+    await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/reopen');
+    Swal.fire({ icon: 'success', title: isAr.value ? 'تم إعادة فتح التذكرة!' : 'Ticket Reopened!', timer: 1500, showConfirmButton: false });
+    await fetchActiveTicket(selectedThread.value.id);
+  } catch (err) {
+    console.error(err);
+    Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', text: err.response?.data?.error || err.message });
+  } finally {
+    creatingTicket.value = false;
+  }
+}
+
+
 const createManualTicket = async () => {
   if (!selectedThread.value) return;
+  
   try {
     creatingTicket.value = true;
     await axios.post('/api/v1/tickets', {
       channelId: selectedThread.value.channelId,
       threadId: selectedThread.value.id,
       crmClientId: selectedThread.value.crmClientId,
-      subject: 'محادثة واتساب - فتح يدوي'
+      subject: 'محادثة واتساب'
     });
-    alert(isAr.value ? 'تم إنشاء التذكرة بنجاح' : 'Ticket created successfully');
-  } catch (error) {
-    console.error('Error creating ticket:', error);
-    alert(isAr.value ? 'حدث خطأ أثناء إنشاء التذكرة' : 'Error creating ticket');
+    Swal.fire({ icon: 'success', title: isAr.value ? 'تم فتح التذكرة بنجاح!' : 'Ticket Opened!', timer: 1500, showConfirmButton: false });
+    await fetchActiveTicket(selectedThread.value.id);
+  } catch (err) {
+    console.error(err);
+    Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', text: err.response?.data?.error || err.message });
   } finally {
     creatingTicket.value = false;
   }
-};
+}
+;
 
 const fetchMessages = async (threadId) => {
   loadingMessages.value = true
@@ -554,8 +605,8 @@ const sendMessage = async () => {
     }
 
     const payload = {
-      content: newMessage.value,
-      isInternal: isInternal.value.trim(),
+      content: newMessage.value.trim(),
+      isInternal: isInternal.value,
       type,
       hasMedia: !!mediaUrl,
       mediaUrl,

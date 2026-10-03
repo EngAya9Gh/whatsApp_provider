@@ -22,6 +22,9 @@ router.post('/', ticketsController.createTicket);
 // Close a ticket
 router.post('/:id/close', ticketsController.closeTicket);
 
+// Reopen a ticket
+router.post('/:id/reopen', ticketsController.reopenTicket);
+
 // Assign a ticket
 router.post('/:id/assign', ticketsController.assignTicket);
 

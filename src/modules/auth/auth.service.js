@@ -110,7 +110,10 @@ class AuthService {
         postalCode: data.postalCode !== undefined ? data.postalCode : (currentFeatures.companyDetails?.postalCode || '')
       },
       ticketSettings: {
-        ratingMessageText: data.ratingMessageText !== undefined ? data.ratingMessageText : (currentFeatures.ticketSettings?.ratingMessageText || 'تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).')
+        ratingMessageText: data.ticketSettings?.ratingMessageText !== undefined ? data.ticketSettings.ratingMessageText : (currentFeatures.ticketSettings?.ratingMessageText || 'تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).')
+      },
+      aiSettings: {
+        geminiKey: data.aiSettings?.geminiKey !== undefined ? data.aiSettings.geminiKey : currentFeatures.aiSettings?.geminiKey
       }
     };
 
