@@ -162,10 +162,10 @@ class WebhookService {
     try {
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: { crmBaseUrl: true, crmApiToken: true }
+        select: { crmBaseUrl: true, crmApiToken: true, webhookUrl: true }
       });
 
-      if (!tenant || !tenant.crmBaseUrl) return null;
+      if (!tenant || !tenant.webhookUrl) return null;
 
       const payload = {
         event: "ticket.sync",
@@ -183,7 +183,7 @@ class WebhookService {
         'X-Webhook-Key': tenant.crmApiToken || ''
       };
 
-      const url = `${tenant.crmBaseUrl.replace(/\/$/, '')}/api/v1/integrations/provider/webhook/whatsapp/${tenantId}`;
+      const url = tenant.webhookUrl;
 
       const response = await axios.post(url, payload, { headers, timeout: 5000 });
       return response.data; // Expecting CRM to return ticket data

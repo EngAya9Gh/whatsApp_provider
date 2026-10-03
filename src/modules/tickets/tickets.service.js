@@ -94,23 +94,21 @@ class TicketsService {
       const count = await prisma.ticket.count({ where: { tenantId } });
       const ticketNumber = `#TK-${String(count + 1).padStart(4, '0')}`;
 
-      // 2. Sync ticket to CRM (if crmClientId exists)
+      // 2. Sync ticket to CRM
       let crmTicketId = null;
-      if (crmClientId) {
-        const { ChatThread } = require('../../models/mongo/ChatThread');
-        const thread = await ChatThread.findById(threadId);
-        
-        const crmResponse = await webhookService.syncCrmTicket(tenantId, {
-          phone: thread ? thread.contactPhone : '',
-          name: thread ? thread.contactName : '',
-          thread_id: threadId,
-          category_name: "عام",
-          status: 'open'
-        });
+      const { ChatThread } = require('../../models/mongo/ChatThread');
+      const thread = await ChatThread.findById(threadId);
+      
+      const crmResponse = await webhookService.syncCrmTicket(tenantId, {
+        phone: thread ? thread.contactPhone : '',
+        name: thread ? thread.contactName : '',
+        thread_id: threadId,
+        category_name: "عام",
+        status: 'open'
+      });
 
-        if (crmResponse && crmResponse.ticket_id) {
-          crmTicketId = String(crmResponse.ticket_id);
-        }
+      if (crmResponse && crmResponse.ticket_id) {
+        crmTicketId = String(crmResponse.ticket_id);
       }
 
       // 3. Create ticket in Provider DB
@@ -156,18 +154,16 @@ class TicketsService {
       });
 
       // Close in CRM
-      if (ticket.crmTicketId) {
-        const { ChatThread } = require('../../models/mongo/ChatThread');
-        const thread = await ChatThread.findById(ticket.threadId);
-        
-        await webhookService.syncCrmTicket(tenantId, {
-          phone: thread ? thread.contactPhone : '',
-          name: thread ? thread.contactName : '',
-          thread_id: ticket.threadId,
-          category_name: "عام", // Need to get category dynamically later
-          status: 'closed'
-        });
-      }
+      const { ChatThread } = require('../../models/mongo/ChatThread');
+      const thread = await ChatThread.findById(ticket.threadId);
+      
+      await webhookService.syncCrmTicket(tenantId, {
+        phone: thread ? thread.contactPhone : '',
+        name: thread ? thread.contactName : '',
+        thread_id: ticket.threadId,
+        category_name: "عام", // Need to get category dynamically later
+        status: 'closed'
+      });
 
       // Send Rating Message
       try {

@@ -89,7 +89,8 @@ const authMiddleware = async (req, res, next) => {
               id: true, name: true, email: true, isActive: true,
               plan: true, metaEnabled: true, customFeatures: true,
               sessionStatus: true, companyName: true,
-              webhookUrl: true, webhookEvents: true
+              webhookUrl: true, webhookEvents: true,
+              crmBaseUrl: true, crmApiToken: true
             }
           }
         }
@@ -121,7 +122,8 @@ const authMiddleware = async (req, res, next) => {
       select: {
         id: true, name: true, email: true, isActive: true,
         sessionStatus: true, plan: true, metaEnabled: true, customFeatures: true,
-        companyName: true, webhookUrl: true, webhookEvents: true
+        companyName: true, webhookUrl: true, webhookEvents: true,
+        crmBaseUrl: true, crmApiToken: true
       }
     });
 
