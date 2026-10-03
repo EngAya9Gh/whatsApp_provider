@@ -101,9 +101,10 @@ class TicketsController {
     try {
       const tenantId = req.tenant.id;
       const ticketId = req.params.id;
-      const { description } = req.body;
+      const description = req.body ? req.body.description : undefined;
+      const categoryId = req.body ? req.body.categoryId : undefined;
 
-      const updatedTicket = await ticketsService.closeTicket(tenantId, ticketId, description);
+      const updatedTicket = await ticketsService.closeTicket(tenantId, ticketId, description, categoryId);
 
       res.status(200).json({ success: true, data: updatedTicket });
     } catch (error) {
@@ -118,13 +119,13 @@ class TicketsController {
   async createTicket(req, res, next) {
     try {
       const tenantId = req.tenant.id;
-      const { channelId, threadId, crmClientId, subject } = req.body;
+      const { channelId, threadId, crmClientId, subject, categoryId } = req.body;
 
       if (!channelId || !threadId) {
         return res.status(400).json({ error: 'channelId and threadId are required' });
       }
 
-      const ticket = await ticketsService.createTicket(tenantId, channelId, threadId, crmClientId, subject);
+      const ticket = await ticketsService.createTicket(tenantId, channelId, threadId, crmClientId, subject, categoryId);
 
       res.status(201).json({ success: true, data: ticket });
     } catch (error) {

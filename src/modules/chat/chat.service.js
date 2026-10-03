@@ -143,35 +143,40 @@ class ChatService {
 
     let metaResponse;
     try {
-      if (payload.hasMedia && payload.mediaUrl) {
-        metaResponse = await metaService.sendMedia(
-          channel,
-          thread.contactPhone,
-          msgType,
-          payload.mediaUrl,
-          payload.content
-        );
+      if (payload.isInternal) {
+        // Internal Note: Do not send to Meta, do not increment billing
+        metaResponse = null;
       } else {
-        metaResponse = await metaService.sendText(
-          channel,
-          thread.contactPhone,
-          payload.content
-        );
+        if (payload.hasMedia && payload.mediaUrl) {
+          metaResponse = await metaService.sendMedia(
+            channel,
+            thread.contactPhone,
+            msgType,
+            payload.mediaUrl,
+            payload.content
+          );
+        } else {
+          metaResponse = await metaService.sendText(
+            channel,
+            thread.contactPhone,
+            payload.content
+          );
+        }
+        await billingService.incrementUsage(tenantId, 'sent');
       }
-
-      await billingService.incrementUsage(tenantId, 'sent');
       
       const message = await ChatMessage.create({
         threadId: thread._id,
         direction: 'OUTBOUND',
-        type: msgType.toUpperCase(),
+        type: payload.isInternal ? 'INTERNAL_NOTE' : msgType.toUpperCase(),
         content: payload.content || '',
         hasMedia: payload.hasMedia || false,
         mediaUrl: payload.mediaUrl || null,
         mediaMime: payload.mediaMime || null,
-        status: 'SENT',
+        status: payload.isInternal ? 'READ' : 'SENT', // Internal notes are instantly "READ"
         metaMessageId: metaResponse?.messages?.[0]?.id || null,
-        ticketId: activeTicket ? activeTicket.id : null
+        ticketId: activeTicket ? activeTicket.id : null,
+        isInternal: payload.isInternal || false
       });
 
       await ChatThread.updateOne(

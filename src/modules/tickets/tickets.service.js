@@ -88,7 +88,7 @@ class TicketsService {
   /**
    * Create a new ticket (manually or automatically)
    */
-  async createTicket(tenantId, channelId, threadId, crmClientId, subject = 'محادثة واتساب') {
+  async createTicket(tenantId, channelId, threadId, crmClientId, subject = 'محادثة واتساب', categoryId = null) {
     try {
       // 1. Generate local ticket number
       const count = await prisma.ticket.count({ where: { tenantId } });
@@ -99,11 +99,17 @@ class TicketsService {
       const { ChatThread } = require('../../models/mongo/ChatThread');
       const thread = await ChatThread.findById(threadId);
       
+      let categoryName = "عام";
+      if (categoryId) {
+        const cat = await prisma.ticketCategory.findUnique({ where: { id: categoryId } });
+        if (cat) categoryName = cat.name;
+      }
+      
       const crmResponse = await webhookService.syncCrmTicket(tenantId, {
         phone: thread ? thread.contactPhone : '',
         name: thread ? thread.contactName : '',
         thread_id: threadId,
-        category_name: "عام",
+        category_name: categoryName,
         status: 'open'
       });
 
@@ -135,7 +141,7 @@ class TicketsService {
   /**
    * Close a ticket
    */
-  async closeTicket(tenantId, ticketId, description = 'تم حل المشكلة') {
+  async closeTicket(tenantId, ticketId, description = 'تم حل المشكلة', categoryId = null) {
     try {
       const ticket = await prisma.ticket.findUnique({
         where: { id: ticketId, tenantId },
@@ -149,7 +155,8 @@ class TicketsService {
         where: { id: ticketId },
         data: {
           status: 'CLOSED',
-          resolvedAt: new Date()
+          resolvedAt: new Date(),
+          ...(categoryId ? { categoryId } : {})
         }
       });
 
@@ -161,8 +168,11 @@ class TicketsService {
         phone: thread ? thread.contactPhone : '',
         name: thread ? thread.contactName : '',
         thread_id: ticket.threadId,
-        category_name: "عام", // Need to get category dynamically later
-        status: 'closed'
+        category_name: categoryId ? (await prisma.ticketCategory.findUnique({ where: { id: categoryId } }))?.name || "عام" : "عام",
+        status: 'closed',
+        subject: ticket.subject || 'بدون عنوان',
+        description: description,
+        summary: ticket.summary || ''
       });
 
       // Send Rating Message
@@ -172,7 +182,9 @@ class TicketsService {
         const thread = await ChatThread.findById(ticket.threadId);
         
         if (thread && ticket.channel) {
-          const ratingText = "تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).";
+          const tenantData = await prisma.tenant.findUnique({ where: { id: tenantId } });
+          const customFeatures = typeof tenantData.customFeatures === 'object' ? tenantData.customFeatures : {};
+          const ratingText = customFeatures?.ticketSettings?.ratingMessageText || "تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).";
           
           if (ticket.channel.providerType === 'META_CLOUD') {
             // Interactive message for Meta

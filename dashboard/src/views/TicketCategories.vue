@@ -5,7 +5,7 @@
         <h1 class="text-2xl font-bold text-slate-800">{{ isAr ? 'تصنيفات التذاكر' : 'Ticket Categories' }}</h1>
         <p class="text-slate-500 mt-1">{{ isAr ? 'إدارة تصنيفات التذاكر لتنظيم الدعم الفني.' : 'Manage ticket categories to organize your support.' }}</p>
       </div>
-      <button @click="showAddModal = true" class="btn btn-primary px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-500/30 hover:-translate-y-0.5 transition-all">
+      <button @click="showAddModal = true" class="btn btn-primary px-6 py-2.5 rounded-xl shadow-lg shadow-brand-primary/30 hover:-translate-y-0.5 transition-all">
         <i class="fas fa-plus mr-2"></i> {{ isAr ? 'إضافة تصنيف' : 'Add Category' }}
       </button>
     </div>
@@ -62,18 +62,18 @@
         <form @submit.prevent="saveCategory" class="p-6">
           <div class="mb-4">
             <label class="block text-sm font-semibold text-slate-700 mb-2">{{ isAr ? 'الاسم' : 'Name' }} *</label>
-            <input v-model="form.name" required type="text" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm outline-none transition-all" />
+            <input v-model="form.name" required type="text" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-[#FF6600]/20 focus:border-[#FF6600] text-sm outline-none transition-all" />
           </div>
           <div class="mb-6">
             <label class="block text-sm font-semibold text-slate-700 mb-2">{{ isAr ? 'الوصف' : 'Description' }}</label>
-            <textarea v-model="form.description" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm outline-none transition-all min-h-[80px] resize-y"></textarea>
+            <textarea v-model="form.description" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-[#FF6600]/20 focus:border-[#FF6600] text-sm outline-none transition-all min-h-[80px] resize-y"></textarea>
           </div>
           
           <div class="flex gap-3">
             <button type="button" @click="showAddModal = false" class="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-colors">
               {{ isAr ? 'إلغاء' : 'Cancel' }}
             </button>
-            <button type="submit" :disabled="saving" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+            <button type="submit" :disabled="saving" class="flex-1 bg-[#FF6600] hover:bg-[#E65C00] text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
               <i v-if="saving" class="fas fa-spinner fa-spin"></i>
               <span>{{ isAr ? 'حفظ' : 'Save' }}</span>
             </button>

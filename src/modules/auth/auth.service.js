@@ -108,6 +108,9 @@ class AuthService {
         country: data.country !== undefined ? data.country : (currentFeatures.companyDetails?.country || ''),
         buildingNo: data.buildingNo !== undefined ? data.buildingNo : (currentFeatures.companyDetails?.buildingNo || ''),
         postalCode: data.postalCode !== undefined ? data.postalCode : (currentFeatures.companyDetails?.postalCode || '')
+      },
+      ticketSettings: {
+        ratingMessageText: data.ratingMessageText !== undefined ? data.ratingMessageText : (currentFeatures.ticketSettings?.ratingMessageText || 'تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).')
       }
     };
 

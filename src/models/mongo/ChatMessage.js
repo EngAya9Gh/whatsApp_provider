@@ -10,7 +10,8 @@ const ChatMessageSchema = new mongoose.Schema({
   mediaMime: { type: String },
   status: { type: String }, 
   metaMessageId: { type: String, index: true },
-  ticketId: { type: String, index: true }
+  ticketId: { type: String, index: true },
+  isInternal: { type: Boolean, default: false }
 }, {
   timestamps: true,
   collection: 'chat_messages'

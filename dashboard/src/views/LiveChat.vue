@@ -164,6 +164,9 @@
             <button type="button" class="btn-attach" @click="$refs.fileInput.click()" title="إرفاق ملف">
               <i class="fas fa-paperclip"></i>
             </button>
+            <button type="button" class="btn-attach" @click="isInternal = !isInternal" :class="{'text-[#FF6600]': isInternal}" :title="isInternal ? 'إلغاء الملاحظة الداخلية' : 'ملاحظة داخلية'">
+              <i class="fas fa-lock"></i>
+            </button>
             <button type="button" class="btn-attach" @click="toggleRecording" :class="{'recording': isRecording}" title="تسجيل صوتي">
               <i class="fas fa-microphone" v-if="!isRecording"></i>
               <i class="fas fa-stop-circle text-danger" v-else></i>
@@ -227,6 +230,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import axios from 'axios'
+import Swal from 'sweetalert2'
 import { io } from 'socket.io-client'
 import FeatureLock from '../components/FeatureLock.vue'
 import EmojiPicker from 'vue3-emoji-picker'
@@ -247,6 +251,8 @@ const attachment = ref(null)
 const fileInput = ref(null)
 const showEmojiPicker = ref(false)
 const activeTicket = ref(null)
+const isInternal = ref(false)
+const ticketCategories = ref([])
 const emojiWrapper = ref(null)
 
 const loadingThreads = ref(false)
@@ -346,14 +352,41 @@ const selectThread = async (thread) => {
 
 const closeActiveTicket = async () => {
   if (!activeTicket.value) return;
-  if (!confirm('هل أنت متأكد من إغلاق التذكرة؟')) return;
+  
+  const { value: formValues } = await Swal.fire({
+    title: isAr.value ? 'إغلاق التذكرة' : 'Close Ticket',
+    html:
+      '<textarea id="swal-desc" class="swal2-textarea" placeholder="' + (isAr.value ? 'وصف أو سبب الإغلاق' : 'Resolution description') + '" style="margin-bottom: 10px;"></textarea>' +
+      '<select id="swal-cat" class="swal2-select" style="display: flex; width: 100%;">' +
+      '<option value="" disabled selected>' + (isAr.value ? 'تحديث التصنيف (اختياري)' : 'Update Category (Optional)') + '</option>' +
+      ticketCategories.value.map(c => '<option value="' + c.id + '" ' + (activeTicket.value.categoryId === c.id ? 'selected' : '') + '>' + c.name + '</option>').join('') +
+      '</select>',
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: isAr.value ? 'إغلاق التذكرة' : 'Close Ticket',
+    confirmButtonColor: '#FF6600',
+    cancelButtonText: isAr.value ? 'إلغاء' : 'Cancel',
+    preConfirm: () => {
+      return { 
+        description: document.getElementById('swal-desc').value,
+        categoryId: document.getElementById('swal-cat').value
+      }
+    }
+  });
+
+  if (!formValues) return;
+  
   try {
     creatingTicket.value = true;
-    await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/close');
+    await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/close', {
+      description: formValues.description || 'تم حل المشكلة',
+      categoryId: formValues.categoryId || undefined
+    });
     activeTicket.value = null;
-    alert('تم إغلاق التذكرة بنجاح!');
+    Swal.fire({ icon: 'success', title: isAr.value ? 'تم إغلاق التذكرة بنجاح!' : 'Ticket Closed!', timer: 1500, showConfirmButton: false });
   } catch (err) {
-    alert('حدث خطأ أثناء إغلاق التذكرة');
+    console.error(err);
+    Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', text: err.response?.data?.error || err.message });
   } finally {
     creatingTicket.value = false;
   }
@@ -521,7 +554,8 @@ const sendMessage = async () => {
     }
 
     const payload = {
-      content: newMessage.value.trim(),
+      content: newMessage.value,
+      isInternal: isInternal.value.trim(),
       type,
       hasMedia: !!mediaUrl,
       mediaUrl,

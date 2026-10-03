@@ -161,6 +161,7 @@ const fetchProfile = async () => {
     form.value.companyName = data.companyName || data.name || ''
     
     const details = data.customFeatures?.companyDetails || {}
+    const ticketSettings = data.customFeatures?.ticketSettings || {}
     Object.assign(form.value, {
       vatNumber: details.vatNumber || '',
       crn: details.crn || '',
@@ -169,7 +170,8 @@ const fetchProfile = async () => {
       city: details.city || '',
       country: details.country || '',
       buildingNo: details.buildingNo || '',
-      postalCode: details.postalCode || ''
+      postalCode: details.postalCode || '',
+      ratingMessageText: ticketSettings.ratingMessageText || ''
     })
     
   } catch (err) {
@@ -190,6 +192,7 @@ const saveCompanyDetails = async () => {
     tenant.companyName = form.value.companyName
     if (!tenant.customFeatures) tenant.customFeatures = {}
     tenant.customFeatures.companyDetails = { ...form.value }
+    tenant.customFeatures.ticketSettings = { ratingMessageText: form.value.ratingMessageText }
     localStorage.setItem('tenant', JSON.stringify(tenant))
     
     savedTax.value = true
