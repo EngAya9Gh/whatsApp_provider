@@ -41,7 +41,7 @@
               </div>
               <div class="thread-bottom">
                 <span class="thread-phone">{{ thread.contactPhone }}</span>
-                <button v-if="teamMembers.length > 0" @click.stop="quickAssign(thread)" class="btn-icon small text-slate-400 hover:text-[#FF6600]" title="إسناد المحادثة" style="background:transparent; border:none; padding:2px;">
+                <button @click.stop="quickAssign(thread)" class="btn-icon small text-slate-400 hover:text-[#FF6600]" title="إسناد المحادثة" style="background:transparent; border:none; padding:2px;">
                   <i class="fas fa-user-plus"></i>
                 </button>
                 <span class="channel-tag" v-if="thread.channel?.displayPhoneNumber || thread.channel?.phoneNumber">
@@ -429,6 +429,16 @@ const quickAssign = async (thread) => {
 }
 
 const promptAssign = async (ticket) => {
+  if (teamMembers.value.length === 0) {
+    Swal.fire({
+      icon: 'info',
+      title: isAr.value ? 'لا يوجد أعضاء' : 'No Team Members',
+      text: isAr.value ? 'الرجاء إضافة موظفين فرعيين أولاً من شاشة (المستخدمون) لتتمكن من الإسناد.' : 'Please add sub-users from the Sub Users screen first to assign tickets.',
+      confirmButtonColor: '#FF6600'
+    });
+    return;
+  }
+
   const { value: selectedUserId } = await Swal.fire({
     title: isAr.value ? 'إسناد التذكرة' : 'Assign Ticket',
     html: '<select id="swal-assign" class="swal2-select" style="display:flex; width:100%;">' +

@@ -176,6 +176,7 @@ const fetchProfile = async () => {
     
     const details = data.customFeatures?.companyDetails || {}
     const ticketSettings = data.customFeatures?.ticketSettings || {}
+    const aiSettings = data.customFeatures?.aiSettings || {}
     Object.assign(form.value, {
       vatNumber: details.vatNumber || '',
       crn: details.crn || '',
@@ -185,7 +186,8 @@ const fetchProfile = async () => {
       country: details.country || '',
       buildingNo: details.buildingNo || '',
       postalCode: details.postalCode || '',
-      ratingMessageText: ticketSettings.ratingMessageText || ''
+      ratingMessageText: ticketSettings.ratingMessageText || '',
+      geminiKey: aiSettings.geminiKey || ''
     })
     
   } catch (err) {
