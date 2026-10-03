@@ -78,10 +78,7 @@
             </div>
           </div>
           <div class="chat-header-actions flex gap-2 items-center">
-            <select v-if="activeTicket && activeTicket.status === 'OPEN'" v-model="activeTicket.assignedToId" @change="assignTicket(activeTicket.assignedToId)" class="form-control form-control-sm text-sm py-1 px-2 h-8 w-32 border-slate-300 rounded-lg">
-              <option :value="null">{{ isAr ? 'غير مسندة' : 'Unassigned' }}</option>
-              <option v-for="user in teamMembers" :key="user.id" :value="user.id">{{ user.name }}</option>
-            </select>
+
             <button v-if="activeTicket && activeTicket.status === 'OPEN'" @click="closeActiveTicket" class="btn btn-outline-danger btn-sm" :disabled="creatingTicket">
               <i class="fas fa-times-circle mr-2"></i> إغلاق التذكرة
             </button>
@@ -374,8 +371,6 @@ const onSearch = () => {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
     fetchThreads()
-  fetchTeamMembers()
-  fetchTicketCategories()
   }, 500)
 }
 
@@ -838,6 +833,8 @@ onMounted(() => {
   fetchChannels()
   fetchThreads()
   fetchQuickReplies()
+  fetchTeamMembers()
+  fetchTicketCategories()
 
   // Initialize Socket.io
   const baseURL = axios.defaults.baseURL || window.location.origin

@@ -276,7 +276,7 @@ class TicketsService {
               ]
             );
             // Save to DB so it shows in Dashboard
-            const { ChatMessage } = require('../../models/mongo/ChatMessage');
+            const ChatMessage = require('../../models/mongo/ChatMessage');
             await ChatMessage.create({
               threadId: ticket.threadId,
               tenantId: tenantId,
