@@ -43,11 +43,18 @@ class TicketsService {
     // Notify CRM
     try {
       const webhookService = require('../webhook/webhook.service');
-      // If we have a generic webhook for rating or update CRM ticket
-      if (updated.crmTicketId) {
-        // Send a custom payload or use a new method in webhookService
-        logger.info(`[TicketsService] Sending rating ${ratingValue} to CRM for ticket ${updated.crmTicketId}`);
-      }
+      const ChatThread = require('../../models/mongo/ChatThread');
+      const thread = await ChatThread.findById(updated.threadId);
+      await webhookService.syncCrmTicket(tenantId, {
+        ticket_id: updated.id,
+        ticket_number: updated.ticketNumber,
+        thread_id: updated.threadId,
+        phone: thread ? thread.contactPhone : '',
+        name: thread ? thread.contactName : '',
+        status: 'closed',
+        rating: ratingValue
+      });
+      logger.info(`[TicketsService] Sent rating ${ratingValue} to CRM for ticket ${updated.id}`);
     } catch (err) {
       logger.error(`[TicketsService] Failed to sync rating to CRM: ${err.message}`);
     }
@@ -110,8 +117,7 @@ class TicketsService {
       const count = await prisma.ticket.count({ where: { tenantId } });
       const ticketNumber = `#TK-${String(count + 1).padStart(4, '0')}`;
 
-      // 2. Sync ticket to CRM
-      let crmTicketId = null;
+      // 2. Fetch thread and category
       const ChatThread = require('../../models/mongo/ChatThread');
       const thread = await ChatThread.findById(threadId);
       
@@ -119,20 +125,6 @@ class TicketsService {
       if (categoryId) {
         const cat = await prisma.ticketCategory.findUnique({ where: { id: categoryId } });
         if (cat) categoryName = cat.name;
-      }
-      
-      const crmResponse = await webhookService.syncCrmTicket(tenantId, {
-        phone: thread ? thread.contactPhone : '',
-        name: thread ? thread.contactName : '',
-        thread_id: threadId,
-        category_name: categoryName,
-        status: 'open',
-        subject: subject || 'محادثة واتساب',
-        description: subject || 'محادثة دعم فني جديدة'
-      });
-
-      if (crmResponse && crmResponse.ticket_id) {
-        crmTicketId = String(crmResponse.ticket_id);
       }
 
       // 3. Create ticket in Provider DB
@@ -145,9 +137,30 @@ class TicketsService {
           status: 'OPEN',
           subject,
           crmClientId,
-          crmTicketId
+          categoryId: categoryId || undefined
         }
       });
+
+      // 4. Sync ticket to CRM
+      const crmResponse = await webhookService.syncCrmTicket(tenantId, {
+        ticket_id: ticket.id,
+        ticket_number: ticketNumber,
+        phone: thread ? thread.contactPhone : '',
+        name: thread ? thread.contactName : '',
+        thread_id: threadId,
+        category_name: categoryName,
+        status: 'open',
+        subject: subject || 'محادثة واتساب',
+        description: subject || 'محادثة دعم فني جديدة'
+      });
+
+      if (crmResponse && crmResponse.ticket_id) {
+        await prisma.ticket.update({
+          where: { id: ticket.id },
+          data: { crmTicketId: String(crmResponse.ticket_id) }
+        });
+        ticket.crmTicketId = String(crmResponse.ticket_id);
+      }
 
       return ticket;
     } catch (error) {
@@ -192,6 +205,8 @@ class TicketsService {
       }
       
       await webhookService.syncCrmTicket(tenantId, {
+        ticket_id: ticket.id,
+        ticket_number: ticket.ticketNumber,
         phone: thread ? thread.contactPhone : '',
         name: thread ? thread.contactName : '',
         thread_id: ticket.threadId,
@@ -245,6 +260,8 @@ class TicketsService {
       const thread = await ChatThread.findById(ticket.threadId);
       
       await webhookService.syncCrmTicket(tenantId, {
+        ticket_id: ticket.id,
+        ticket_number: ticket.ticketNumber,
         phone: thread ? thread.contactPhone : '',
         name: thread ? thread.contactName : '',
         thread_id: ticket.threadId,

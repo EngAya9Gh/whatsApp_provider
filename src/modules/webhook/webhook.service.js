@@ -167,11 +167,14 @@ class WebhookService {
           phone: data.phone,
           name: data.name || "عميل",
           thread_id: data.thread_id,
+          ticket_id: data.ticket_id,
+          ticket_number: data.ticket_number,
           category_name: data.category_name || "عام",
           status: data.status, // 'open', 'resolved', 'closed'
           subject: data.subject,
           description: data.description,
-          summary: data.summary
+          summary: data.summary,
+          rating: data.rating
         }
       };
 
