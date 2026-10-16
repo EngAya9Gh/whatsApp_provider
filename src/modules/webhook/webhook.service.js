@@ -176,7 +176,7 @@ class WebhookService {
       };
 
       const response = await axios.post(config.url, payload, { headers: config.headers, timeout: 10000 });
-      logger.info(`[WebhookService] ticket.sync (${data.status}) thread ${data.thread_id} → ${config.url} (HTTP ${response.status})`);
+      logger.info(`[WebhookService] ticket.sync (${data.status}) thread ${data.thread_id} → ${config.url} (HTTP ${response.status}) body: ${JSON.stringify(response.data)}`);
       return response.data; // Expecting CRM to return ticket data
 
     } catch (err) {

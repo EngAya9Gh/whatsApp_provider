@@ -126,7 +126,9 @@ class TicketsService {
         name: thread ? thread.contactName : '',
         thread_id: threadId,
         category_name: categoryName,
-        status: 'open'
+        status: 'open',
+        subject: subject || 'محادثة واتساب',
+        description: subject || 'محادثة دعم فني جديدة'
       });
 
       if (crmResponse && crmResponse.ticket_id) {
@@ -194,7 +196,9 @@ class TicketsService {
         name: thread ? thread.contactName : '',
         thread_id: ticket.threadId,
         category_name: categoryName,
-        status: 'open'
+        status: 'open',
+        subject: ticket.subject || 'إعادة فتح تذكرة',
+        description: 'تمت إعادة فتح التذكرة'
       });
 
       return updated;
