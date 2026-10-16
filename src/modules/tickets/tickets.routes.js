@@ -27,6 +27,7 @@ router.post('/:id/reopen', ticketsController.reopenTicket);
 
 // Assign a ticket
 router.post('/:id/assign', ticketsController.assignTicket);
+router.put('/:id/assign', ticketsController.assignTicket);
 
 // Toggle autoCreateTickets for a channel
 router.put('/channels/:channelId/auto-create', ticketsController.toggleAutoCreate);

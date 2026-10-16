@@ -398,7 +398,9 @@ const quickAssign = async (thread) => {
   try {
     // 1. Check if thread has an active ticket
     const res = await axios.get('/api/v1/tickets?threadId=' + thread.id + '&limit=1');
-    const ticket = (res.data.data.tickets && res.data.data.tickets.length > 0) ? res.data.data.tickets[0] : null;
+    const rawList = res.data?.data;
+    const tickets = Array.isArray(rawList) ? rawList : (rawList?.tickets || []);
+    const ticket = tickets[0] || null;
     
     if (!ticket || ticket.status !== 'OPEN') {
       const confirm = await Swal.fire({
