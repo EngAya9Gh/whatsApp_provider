@@ -5,40 +5,50 @@ const prisma = new PrismaClient();
 
 class WebhookService {
   /**
+   * Load tenant webhook config and build unified auth headers.
+   * Uses the custom header configured in Developer Tools (key1/value1).
+   * Falls back to X-Webhook-Key = crmApiToken if no custom header is set.
+   */
+  async _getWebhookConfig(tenantId) {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { webhookUrl: true, webhookEvents: true, crmApiToken: true }
+    });
+    if (!tenant || !tenant.webhookUrl) return null;
+
+    let events = tenant.webhookEvents;
+    if (typeof events === 'string') {
+      try { events = JSON.parse(events); } catch (e) { events = {}; }
+    }
+    events = events || {};
+
+    const headers = { 'Content-Type': 'application/json' };
+    const h = events.headers || {};
+    if (h.key1 && h.value1) {
+      headers[h.key1.trim()] = String(h.value1).trim();
+    } else if (tenant.crmApiToken) {
+      headers['X-Webhook-Key'] = tenant.crmApiToken;
+    }
+
+    return { url: tenant.webhookUrl, headers, events };
+  }
+
+  /**
    * Dispatch an incoming message event to the tenant's webhook
    */
   async dispatchIncomingMessage(tenantId, messagePayload, source = 'META') {
     try {
-      const tenant = await prisma.tenant.findUnique({
-        where: { id: tenantId },
-        select: { webhookUrl: true, webhookEvents: true }
-      });
+      const config = await this._getWebhookConfig(tenantId);
+      if (!config) return;
 
-      if (!tenant || !tenant.webhookUrl) return;
-
-      // Parse webhook events preference
-      let events = tenant.webhookEvents;
-      if (typeof events === 'string') {
-        try { events = JSON.parse(events); } catch (e) { events = {}; }
-      }
-      events = events || {};
-
-      const incomingPref = events.incoming || 'ALL'; // 'ALL', 'LIVE_CHAT', 'NONE'
+      const incomingPref = config.events.incoming || 'ALL'; // 'ALL', 'LIVE_CHAT', 'NONE'
       
       // If the tenant explicitly disabled incoming message webhooks
       if (incomingPref === 'NONE') return;
 
-      // Prepare headers
-      const headers = { 'Content-Type': 'application/json' };
-      if (events.headers) {
-        if (events.headers.key1 && events.headers.value1) {
-          headers[events.headers.key1] = events.headers.value1;
-        }
-      }
-
       // Fire and forget
-      axios.post(tenant.webhookUrl, messagePayload, { headers, timeout: 5000 }).catch(err => {
-        logger.warn(`[WebhookService] Failed to send incoming message webhook to ${tenant.webhookUrl}: ${err.message}`);
+      axios.post(config.url, messagePayload, { headers: config.headers, timeout: 5000 }).catch(err => {
+        logger.warn(`[WebhookService] Failed to send incoming message webhook to ${config.url}: ${err.message}`);
       });
 
     } catch (err) {
@@ -51,31 +61,14 @@ class WebhookService {
    */
   async dispatchDeliveryStatus(tenantId, statusPayload, source = 'META') {
     try {
-      const tenant = await prisma.tenant.findUnique({
-        where: { id: tenantId },
-        select: { webhookUrl: true, webhookEvents: true }
-      });
-
-      if (!tenant || !tenant.webhookUrl) return;
-
-      let events = tenant.webhookEvents;
-      if (typeof events === 'string') {
-        try { events = JSON.parse(events); } catch (e) { events = {}; }
-      }
-      events = events || {};
+      const config = await this._getWebhookConfig(tenantId);
+      if (!config) return;
 
       // If statuses are disabled
-      if (events.statuses === false) return;
+      if (config.events.statuses === false) return;
 
-      const headers = { 'Content-Type': 'application/json' };
-      if (events.headers) {
-        if (events.headers.key1 && events.headers.value1) {
-          headers[events.headers.key1] = events.headers.value1;
-        }
-      }
-
-      axios.post(tenant.webhookUrl, statusPayload, { headers, timeout: 5000 }).catch(err => {
-        logger.warn(`[WebhookService] Failed to send status webhook to ${tenant.webhookUrl}: ${err.message}`);
+      axios.post(config.url, statusPayload, { headers: config.headers, timeout: 5000 }).catch(err => {
+        logger.warn(`[WebhookService] Failed to send status webhook to ${config.url}: ${err.message}`);
       });
 
     } catch (err) {
@@ -88,12 +81,8 @@ class WebhookService {
    */
   async dispatchClientSync(tenantId, phone, name = 'WhatsApp Lead') {
     try {
-      const tenant = await prisma.tenant.findUnique({
-        where: { id: tenantId },
-        select: { webhookUrl: true, webhookEvents: true }
-      });
-
-      if (!tenant || !tenant.webhookUrl) return;
+      const config = await this._getWebhookConfig(tenantId);
+      if (!config) return;
 
       const payload = {
         event: 'client.sync',
@@ -102,24 +91,11 @@ class WebhookService {
           name: name
         }
       };
-      
-      let events = tenant.webhookEvents;
-      if (typeof events === 'string') {
-        try { events = JSON.parse(events); } catch (e) { events = {}; }
-      }
-      events = events || {};
 
-      const headers = { 'Content-Type': 'application/json' };
-      if (events.headers) {
-        if (events.headers.key1 && events.headers.value1) {
-          headers[events.headers.key1] = events.headers.value1;
-        }
-      }
+      logger.info(`[WebhookService] Sending client sync to ${config.url} (headers: ${Object.keys(config.headers).join(', ')})`);
 
-      logger.info(`[WebhookService] Sending client sync to ${tenant.webhookUrl} with headers: ${JSON.stringify(headers)}`);
-
-      axios.post(tenant.webhookUrl, payload, { headers, timeout: 5000 }).catch(err => {
-        logger.warn(`[WebhookService] Failed to send client sync webhook to ${tenant.webhookUrl}: ${err.message}`);
+      axios.post(config.url, payload, { headers: config.headers, timeout: 5000 }).catch(err => {
+        logger.warn(`[WebhookService] Failed to send client sync webhook to ${config.url}: ${err.message}`);
       });
     } catch (err) {
       logger.error(`[WebhookService] Error dispatching client sync: ${err.message}`);
@@ -129,27 +105,46 @@ class WebhookService {
    * Sync a contact with the CRM (Find or Create)
    */
   async syncCrmContact(tenantId, phone, name = 'WhatsApp Lead') {
+    // 1. Smart CRM endpoint (returns client_id) if configured
     try {
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
         select: { crmBaseUrl: true, crmApiToken: true }
       });
 
-      if (!tenant || !tenant.crmBaseUrl) return null;
+      if (tenant && tenant.crmBaseUrl && tenant.crmApiToken) {
+        const SYNC_PATH = '/api/v1/integrations/provider/sync-contact';
+        const base = tenant.crmBaseUrl.trim().replace(/\/+$/, '');
+        // Accept either the base domain or the full sync-contact URL
+        const url = base.includes('/integrations/provider/sync-contact') ? base : `${base}${SYNC_PATH}`;
 
-      const payload = { phone, name };
-      const headers = { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${tenant.crmApiToken || ''}`
-      };
+        const response = await axios.post(url, { phone, name }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${tenant.crmApiToken.trim()}`
+          },
+          timeout: 5000
+        });
+        logger.info(`[WebhookService] sync-contact ${phone} → ${url} (HTTP ${response.status})`);
+        return response.data || { success: true }; // { is_new, client_id }
+      }
+    } catch (err) {
+      logger.error(`[WebhookService] Error syncing contact with CRM (${err.response?.status || ''}) → ${err.config?.url || ''}: ${err.response?.data?.message || err.message}`);
+    }
 
-      const url = `${tenant.crmBaseUrl.replace(/\/$/, '')}/api/v1/integrations/provider/sync-contact`;
+    // 2. Fallback: client.sync via the generic webhook
+    try {
+      const config = await this._getWebhookConfig(tenantId);
+      if (!config) return null;
 
-      const response = await axios.post(url, payload, { headers, timeout: 5000 });
-      return response.data; // { is_new: boolean, client_id: number }
+      const payload = { event: 'client.sync', data: { phone, name } };
+      const response = await axios.post(config.url, payload, { headers: config.headers, timeout: 5000 });
+      logger.info(`[WebhookService] client.sync ${phone} → ${config.url} (HTTP ${response.status})`);
+      return response.data || { success: true };
 
     } catch (err) {
-      logger.error(`[WebhookService] Error syncing contact with CRM: ${err.message}`);
+      logger.error(`[WebhookService] Error sending client.sync (${err.response?.status || ''}): ${err.response?.data?.message || err.message}`);
       return null;
     }
   }
@@ -160,12 +155,11 @@ class WebhookService {
    */
   async syncCrmTicket(tenantId, data) {
     try {
-      const tenant = await prisma.tenant.findUnique({
-        where: { id: tenantId },
-        select: { crmBaseUrl: true, crmApiToken: true, webhookUrl: true }
-      });
-
-      if (!tenant || !tenant.webhookUrl) return null;
+      const config = await this._getWebhookConfig(tenantId);
+      if (!config) {
+        logger.warn(`[WebhookService] ticket.sync skipped: no Webhook URL configured for tenant ${tenantId}`);
+        return null;
+      }
 
       const payload = {
         event: "ticket.sync",
@@ -181,18 +175,12 @@ class WebhookService {
         }
       };
 
-      const headers = { 
-        'Content-Type': 'application/json',
-        'X-Webhook-Key': tenant.crmApiToken || ''
-      };
-
-      const url = tenant.webhookUrl;
-
-      const response = await axios.post(url, payload, { headers, timeout: 5000 });
+      const response = await axios.post(config.url, payload, { headers: config.headers, timeout: 10000 });
+      logger.info(`[WebhookService] ticket.sync (${data.status}) thread ${data.thread_id} → ${config.url} (HTTP ${response.status})`);
       return response.data; // Expecting CRM to return ticket data
 
     } catch (err) {
-      logger.error(`[WebhookService] Error syncing CRM ticket: ${err.response?.data?.message || err.message}`);
+      logger.error(`[WebhookService] Error syncing CRM ticket (${err.response?.status || ''}) → ${err.config?.url || ''}: ${err.response?.data?.message || err.message}`);
       return null;
     }
   }

@@ -288,14 +288,18 @@ class ChatService {
     const webhookService = require('../webhook/webhook.service');
     let crmClientId = thread.crmClientId;
     
-    // We only need to sync if we don't have the crmClientId yet (e.g. first message ever)
-    if (!crmClientId) {
+    // We only need to sync if we haven't synced this contact yet (e.g. first message ever)
+    if (!crmClientId && !thread.crmSyncedAt) {
       const crmData = await webhookService.syncCrmContact(tenantId, contactPhone, contactName || contactPhone);
-      if (crmData && crmData.client_id) {
-        crmClientId = String(crmData.client_id);
+      if (crmData) {
+        const update = { crmSyncedAt: new Date() };
+        if (crmData.client_id) {
+          crmClientId = String(crmData.client_id);
+          update.crmClientId = crmClientId;
+        }
         thread = await ChatThread.findOneAndUpdate(
           { _id: thread._id },
-          { $set: { crmClientId: crmClientId } },
+          { $set: update },
           { returnDocument: 'after' }
         );
       }
