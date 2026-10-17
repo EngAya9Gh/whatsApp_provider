@@ -106,12 +106,63 @@
             </div>
 
             <div class="form-divider full-width">
-              <span>{{ isAr ? 'إعدادات النظام والذكاء الاصطناعي' : 'System & AI Settings' }}</span>
+              <span>{{ isAr ? 'إعدادات تقييم التذاكر (WhatsApp Rating)' : 'Ticket Rating Settings' }}</span>
             </div>
 
             <div class="form-group full-width">
-              <label>{{ isAr ? 'رسالة التقييم بعد الإغلاق' : 'Rating Message after Close' }}</label>
-              <textarea v-model="form.ratingMessageText" :placeholder="isAr ? 'رسالة التقييم التي ستصل للعميل' : 'Rating message to send'" class="input-std" rows="2"></textarea>
+              <label>{{ isAr ? 'طريقة إرسال التقييم للعميل' : 'Rating Input Method' }}</label>
+              <div class="rating-options-grid">
+                <label class="rating-option-card" :class="{ selected: form.ratingType === 'LIST_5_STARS' }">
+                  <input type="radio" value="LIST_5_STARS" v-model="form.ratingType" class="hidden-radio" />
+                  <div class="option-header">
+                    <span class="option-badge recommended">{{ isAr ? 'موصى به' : 'Recommended' }}</span>
+                    <span class="option-title">{{ isAr ? 'قائمة تفاعلية (5 نجوم)' : 'Interactive List (5 Stars)' }}</span>
+                  </div>
+                  <div class="option-stars">⭐⭐⭐⭐⭐ (1 - 5)</div>
+                  <p class="option-desc">
+                    {{ isAr ? 'قائمة منسدلة بـ 5 خيارات (1 إلى 5 نجوم) مع وصف لكل تقييم. تمنح العميل تقييماً دقيقاً وشاملاً.' : 'A 5-row list from 1 to 5 stars with descriptions.' }}
+                  </p>
+                </label>
+
+                <label class="rating-option-card" :class="{ selected: form.ratingType === 'BUTTONS_3' }">
+                  <input type="radio" value="BUTTONS_3" v-model="form.ratingType" class="hidden-radio" />
+                  <div class="option-header">
+                    <span class="option-title">{{ isAr ? 'أزرار سريعة (3 خيارات)' : 'Quick Buttons (3 Options)' }}</span>
+                  </div>
+                  <div class="option-stars">1⭐ | 3⭐ | 5⭐</div>
+                  <p class="option-desc">
+                    {{ isAr ? '3 أزرار تفاعلية سريعة. (ملاحظة: تفرض شركة Meta حداً أقصى 3 أزرار لأي رسالة في واتساب).' : '3 quick reply buttons (Meta Cloud API limit: max 3 buttons).' }}
+                  </p>
+                </label>
+
+                <label class="rating-option-card" :class="{ selected: form.ratingType === 'TEXT' }">
+                  <input type="radio" value="TEXT" v-model="form.ratingType" class="hidden-radio" />
+                  <div class="option-header">
+                    <span class="option-title">{{ isAr ? 'رسالة نصية مع رد رقمي' : 'Plain Text with Number' }}</span>
+                  </div>
+                  <div class="option-stars">1 ... 5 💬</div>
+                  <p class="option-desc">
+                    {{ isAr ? 'يرسل نصاً عادياً ويطلب من العميل الرد برقم من 1 إلى 5.' : 'Sends a regular text asking client to reply with a number 1-5.' }}
+                  </p>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-group full-width">
+              <label>{{ isAr ? 'رسالة التقييم بعد إغلاق التذكرة' : 'Rating Message after Close' }}</label>
+              <textarea 
+                v-model="form.ratingMessageText" 
+                :placeholder="isAr ? 'تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).' : 'Your ticket has been closed. Please rate our service:'" 
+                class="input-std" 
+                rows="3"
+              ></textarea>
+              <span style="font-size: 0.78rem; color: #64748B; margin-top: 4px;">
+                {{ isAr ? 'يمكنك تعديل وتخصيص نص الرسالة التي تظهر للعميل قبل خيارات التقييم.' : 'Customize the greeting message shown to the client.' }}
+              </span>
+            </div>
+
+            <div class="form-divider full-width">
+              <span>{{ isAr ? 'إعدادات الذكاء الاصطناعي (AI)' : 'AI Settings' }}</span>
             </div>
 
             <div class="form-group full-width">
@@ -159,7 +210,10 @@ const form = ref({
   city: '',
   country: '',
   buildingNo: '',
-  postalCode: ''
+  postalCode: '',
+  ratingMessageText: '',
+  ratingType: 'LIST_5_STARS',
+  geminiKey: ''
 })
 
 const fetchProfile = async () => {
@@ -187,6 +241,7 @@ const fetchProfile = async () => {
       buildingNo: details.buildingNo || '',
       postalCode: details.postalCode || '',
       ratingMessageText: ticketSettings.ratingMessageText || '',
+      ratingType: ticketSettings.ratingType || 'LIST_5_STARS',
       geminiKey: aiSettings.geminiKey || ''
     })
     
@@ -208,14 +263,17 @@ const saveCompanyDetails = async () => {
     tenant.companyName = form.value.companyName
     if (!tenant.customFeatures) tenant.customFeatures = {}
     tenant.customFeatures.companyDetails = { ...form.value }
-    tenant.customFeatures.ticketSettings = { ratingMessageText: form.value.ratingMessageText }
+    tenant.customFeatures.ticketSettings = { 
+      ratingMessageText: form.value.ratingMessageText,
+      ratingType: form.value.ratingType
+    }
     localStorage.setItem('tenant', JSON.stringify(tenant))
     
     savedTax.value = true
     setTimeout(() => savedTax.value = false, 3500)
   } catch (err) {
     console.error('Error saving tax details:', err)
-    alert('حدث خطأ أثناء حفظ البيانات الضريبية.')
+    alert('حدث خطأ أثناء حفظ البيانات.')
   } finally {
     loadingTax.value = false
   }
@@ -350,4 +408,75 @@ onMounted(fetchProfile)
 
 .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* ═══ Rating Options ═══ */
+.rating-options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 0.35rem;
+}
+
+.rating-option-card {
+  border: 1.5px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  background: white;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  position: relative;
+}
+
+.rating-option-card:hover {
+  border-color: #CBD5E1;
+  background: #F8FAFC;
+}
+
+.rating-option-card.selected {
+  border-color: #FF6600;
+  background: #FFF9F5;
+  box-shadow: 0 0 0 2px rgba(255, 102, 0, 0.15);
+}
+
+.hidden-radio {
+  display: none;
+}
+
+.option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.option-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #0F172A;
+}
+
+.option-badge.recommended {
+  background: #FEF3C7;
+  color: #B45309;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.option-stars {
+  font-size: 0.9rem;
+  color: #FF6600;
+  font-weight: 700;
+}
+
+.option-desc {
+  font-size: 0.8rem;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.4;
+}
 </style>

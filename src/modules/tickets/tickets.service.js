@@ -327,20 +327,53 @@ class TicketsService {
           const tenantData = await prisma.tenant.findUnique({ where: { id: tenantId } });
           const customFeatures = typeof tenantData.customFeatures === 'object' ? tenantData.customFeatures : {};
           const ratingText = customFeatures?.ticketSettings?.ratingMessageText || "تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).";
+          const ratingType = customFeatures?.ticketSettings?.ratingType || 'LIST_5_STARS';
           
           if (ticket.channel.providerType === 'META_CLOUD') {
-            // Interactive message for Meta
             const metaService = require('../meta/meta.service');
-            const metaRes = await metaService.sendButtons(
-              ticket.channel,
-              thread.contactPhone,
-              ratingText,
-              [
-                { id: `RATE_${ticket.id}_1`, text: "1 ⭐" },
-                { id: `RATE_${ticket.id}_3`, text: "3 ⭐" },
-                { id: `RATE_${ticket.id}_5`, text: "5 ⭐" }
-              ]
-            );
+            let metaRes;
+
+            if (ratingType === 'BUTTONS_3') {
+              // 3 Quick-Reply Buttons (WhatsApp Meta limit: max 3 buttons)
+              metaRes = await metaService.sendButtons(
+                ticket.channel,
+                thread.contactPhone,
+                ratingText,
+                [
+                  { id: `RATE_${ticket.id}_1`, text: "1 ⭐" },
+                  { id: `RATE_${ticket.id}_3`, text: "3 ⭐" },
+                  { id: `RATE_${ticket.id}_5`, text: "5 ⭐" }
+                ]
+              );
+            } else if (ratingType === 'TEXT') {
+              // Text message
+              metaRes = await metaService.sendText(
+                ticket.channel,
+                thread.contactPhone,
+                ratingText + "\n\nللتقييم، يرجى الرد برقم من 1 إلى 5 (مثال: 5)."
+              );
+            } else {
+              // Default: Interactive 5-Star List (allows all 5 stars 1 to 5!)
+              metaRes = await metaService.sendList(
+                ticket.channel,
+                thread.contactPhone,
+                "تقييم الخدمة",
+                ratingText,
+                "تقييم الخدمة ⭐",
+                [
+                  {
+                    title: "اختر مستوى رضاك",
+                    rows: [
+                      { id: `RATE_${ticket.id}_5`, title: "⭐⭐⭐⭐⭐ ممتاز", description: "خدمة ممتازة وسريعة" },
+                      { id: `RATE_${ticket.id}_4`, title: "⭐⭐⭐⭐ جيد جداً", description: "خدمة جيدة جداً" },
+                      { id: `RATE_${ticket.id}_3`, title: "⭐⭐⭐ جيد", description: "خدمة مقبولة" },
+                      { id: `RATE_${ticket.id}_2`, title: "⭐⭐ غير راضٍ", description: "بحاجة لتحسين" },
+                      { id: `RATE_${ticket.id}_1`, title: "⭐ سيء جداً", description: "تجربة غير مرضية" }
+                    ]
+                  }
+                ]
+              );
+            }
             // Save to DB so it shows in Dashboard
             const ChatMessage = require('../../models/mongo/ChatMessage');
             await ChatMessage.create({

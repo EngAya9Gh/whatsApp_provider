@@ -78,16 +78,26 @@
             </div>
           </div>
           <div class="chat-header-actions flex gap-2 items-center">
-
-            <button v-if="activeTicket && activeTicket.status === 'OPEN'" @click="closeActiveTicket" class="btn btn-outline-danger btn-sm" :disabled="creatingTicket">
-              <i class="fas fa-times-circle mr-2"></i> إغلاق التذكرة
-            </button>
-            <template v-else>
-              <button v-if="isTicketRecentlyClosed" @click="reopenActiveTicket" class="btn btn-outline-success btn-sm me-2" :disabled="creatingTicket">
-                <i class="fas fa-redo mr-2"></i> إعادة الفتح
+            <template v-if="activeTicket && activeTicket.status === 'OPEN'">
+              <span class="ticket-status-badge open">
+                <i class="fas fa-ticket-alt mr-1"></i> #{{ activeTicket.ticketNumber || activeTicket.id.slice(0, 8) }}
+              </span>
+              <button @click="closeActiveTicket" class="btn btn-outline-danger btn-sm" :disabled="creatingTicket">
+                <i class="fas fa-times-circle mr-1"></i> إغلاق التذكرة
               </button>
-              <button @click="createManualTicket" class="btn btn-outline-primary btn-sm" :disabled="creatingTicket">
-                <i class="fas fa-ticket-alt mr-2"></i> {{ creatingTicket ? 'جاري الفتح...' : 'فتح تذكرة' + (isTicketRecentlyClosed ? ' جديدة' : '') }}
+            </template>
+            <template v-else>
+              <button 
+                v-if="hasReopenableTicket" 
+                @click="reopenActiveTicket" 
+                class="btn btn-outline-success btn-sm me-1" 
+                :disabled="creatingTicket"
+                :title="'إعادة فتح التذكرة السابقة #' + (activeTicket?.ticketNumber || '')"
+              >
+                <i class="fas fa-redo mr-1"></i> إعادة فتح التذكرة {{ activeTicket?.ticketNumber ? `(#${activeTicket.ticketNumber})` : '' }}
+              </button>
+              <button @click="createManualTicket" class="btn btn-primary btn-sm" :disabled="creatingTicket">
+                <i class="fas fa-plus mr-1"></i> {{ creatingTicket ? 'جاري الفتح...' : (hasReopenableTicket ? 'فتح تذكرة جديدة' : 'فتح تذكرة') }}
               </button>
             </template>
           </div>
@@ -101,9 +111,18 @@
           <div 
             v-for="msg in messages" 
             :key="msg.id" 
-            :class="['message-bubble', msg.direction === 'OUTBOUND' ? 'outbound' : 'inbound']"
+            :class="[
+              'message-bubble', 
+              (msg.isInternal || msg.type === 'INTERNAL_NOTE') ? 'internal-note' : (msg.direction === 'OUTBOUND' ? 'outbound' : 'inbound')
+            ]"
           >
             <div class="message-content">
+              <!-- Internal Note Header -->
+              <div v-if="msg.isInternal || msg.type === 'INTERNAL_NOTE'" class="internal-note-header">
+                <i class="fas fa-shield-alt"></i>
+                <span>ملاحظة داخلية (فريق العمل فقط)</span>
+              </div>
+
               <!-- Media Content -->
               <div v-if="msg.hasMedia && msg.mediaUrl" class="message-media">
                 <div v-if="msg.type === 'IMAGE'" class="image-container">
@@ -121,11 +140,15 @@
               </div>
               
               <!-- Text Content -->
-              <p v-if="msg.content">{{ msg.content }}</p>
+              <p v-if="msg.content" :class="{ 'internal-note-text': msg.isInternal || msg.type === 'INTERNAL_NOTE' }">{{ msg.content }}</p>
               
               <div class="message-meta">
                 <span class="message-time">{{ formatTime(msg.createdAt) }}</span>
-                <span class="message-status" v-if="msg.direction === 'OUTBOUND'">
+                <span v-if="msg.isInternal || msg.type === 'INTERNAL_NOTE'" class="internal-meta-badge" title="مرئية لفريق العمل فقط ولم ترسل للعميل">
+                  <i class="fas fa-lock"></i>
+                  <span>خاصة بالفريق</span>
+                </span>
+                <span class="message-status" v-else-if="msg.direction === 'OUTBOUND'">
                   <i :class="getStatusIcon(msg.status)"></i>
                 </span>
               </div>
@@ -138,7 +161,22 @@
         </div>
 
         <!-- Chat Input -->
-        <div class="chat-input-area">
+        <div class="chat-input-area" :class="{ 'internal-mode': isInternal }">
+          <!-- Internal Note Active Banner -->
+          <div v-if="isInternal" class="internal-mode-banner">
+            <div class="banner-content">
+              <span class="lock-indicator"><i class="fas fa-lock"></i></span>
+              <div class="banner-text">
+                <strong>وضع الملاحظة الداخلية نشط</strong>
+                <span>هذه الملاحظة ستسجل لفريق العمل فقط ولن تصل إلى العميل على واتساب.</span>
+              </div>
+            </div>
+            <button type="button" class="btn-cancel-internal" @click="isInternal = false" title="إلغاء وضع الملاحظة">
+              <i class="fas fa-times"></i>
+              <span>إلغاء</span>
+            </button>
+          </div>
+
           <div class="attachment-preview" v-if="attachment">
             <span>{{ attachment.name }}</span>
             <button @click="attachment = null" class="btn-clear"><i class="fas fa-times"></i></button>
@@ -173,7 +211,13 @@
             <button type="button" class="btn-attach" @click="$refs.fileInput.click()" title="إرفاق ملف">
               <i class="fas fa-paperclip"></i>
             </button>
-            <button type="button" class="btn-attach" @click="isInternal = !isInternal" :class="{'text-[#FF6600]': isInternal}" :title="isInternal ? 'إلغاء الملاحظة الداخلية' : 'ملاحظة داخلية'">
+            <button 
+              type="button" 
+              class="btn-attach btn-lock-toggle" 
+              @click="isInternal = !isInternal" 
+              :class="{'active-lock': isInternal}" 
+              :title="isInternal ? 'إلغاء وضع الملاحظة الداخلية' : 'تفعيل وضع الملاحظة الداخلية (لفريق العمل فقط)'"
+            >
               <i class="fas fa-lock"></i>
             </button>
             <button type="button" class="btn-attach" @click="toggleRecording" :class="{'recording': isRecording}" title="تسجيل صوتي">
@@ -192,13 +236,23 @@
               type="text" 
               v-model="newMessage" 
               @input="handleInput"
-              :placeholder="isRecording ? 'جاري التسجيل...' : 'Type a message...'" 
+              :placeholder="isRecording ? 'جاري التسجيل...' : (isInternal ? 'اكتب ملاحظة داخلية لفريق العمل (لن يراها العميل)...' : 'Type a message...')" 
               class="form-control msg-input"
+              :class="{ 'input-internal': isInternal }"
               :disabled="sending || isRecording"
             />
             
-            <button type="submit" class="btn-send" :disabled="sending || isRecording || (!newMessage.trim() && !attachment)">
-              <i class="fas fa-paper-plane" v-if="!sending"></i>
+            <button 
+              type="submit" 
+              class="btn-send" 
+              :class="{ 'btn-send-internal': isInternal }"
+              :disabled="sending || isRecording || (!newMessage.trim() && !attachment)"
+              :title="isInternal ? 'حفظ ملاحظة داخلية' : 'إرسال'"
+            >
+              <template v-if="!sending">
+                <i class="fas fa-lock" v-if="isInternal"></i>
+                <i class="fas fa-paper-plane" v-else></i>
+              </template>
               <i class="fas fa-spinner fa-spin" v-else></i>
             </button>
           </form>
@@ -285,13 +339,8 @@ const fetchTeamMembers = async () => {
 }
 
 
-const isTicketRecentlyClosed = computed(() => {
-  if (!activeTicket.value || activeTicket.value.status !== 'CLOSED') return false;
-  if (!activeTicket.value.resolvedAt) return true; // Fallback
-  const resolvedTime = new Date(activeTicket.value.resolvedAt).getTime();
-  const now = new Date().getTime();
-  const diffHours = (now - resolvedTime) / (1000 * 60 * 60);
-  return diffHours < 24; // Less than 24 hours
+const hasReopenableTicket = computed(() => {
+  return !!(activeTicket.value && (activeTicket.value.status === 'CLOSED' || activeTicket.value.status === 'RESOLVED'));
 });
 
 const ticketCategories = ref([])
@@ -376,13 +425,19 @@ const onSearch = () => {
 
 const fetchActiveTicket = async (threadId) => {
   try {
-    // Search tickets by threadId string (using our existing getTickets endpoint with search or fetch by ID if we had an endpoint)
-    // Actually we can just do a GET /api/v1/tickets and search in the UI, or we need a new endpoint.
-    // Wait, let's just make a new endpoint to get active ticket by threadId
+    // 1. Prioritize finding an open ticket first
+    const openRes = await axios.get('/api/v1/tickets?threadId=' + threadId + '&status=OPEN&limit=1');
+    const openTickets = Array.isArray(openRes.data?.data) ? openRes.data.data : [];
+    if (openTickets.length > 0) {
+      activeTicket.value = openTickets[0];
+      return;
+    }
+    // 2. Otherwise get the latest ticket (e.g. CLOSED or RESOLVED)
     const res = await axios.get('/api/v1/tickets?threadId=' + threadId + '&limit=1');
-    activeTicket.value = res.data.data[0] || null;
+    const tickets = Array.isArray(res.data?.data) ? res.data.data : [];
+    activeTicket.value = tickets[0] || null;
   } catch(e) {
-    console.error(e);
+    console.error('Error fetching active ticket:', e);
   }
 }
 
@@ -500,7 +555,10 @@ const closeActiveTicket = async () => {
       description: formValues.description || 'تم حل المشكلة',
       categoryId: formValues.categoryId || undefined
     });
-    activeTicket.value = null;
+    // Refresh active ticket to keep the closed ticket reference for reopening
+    if (selectedThread.value) {
+      await fetchActiveTicket(selectedThread.value.id);
+    }
     Swal.fire({ icon: 'success', title: isAr.value ? 'تم إغلاق التذكرة بنجاح!' : 'Ticket Closed!', timer: 1500, showConfirmButton: false });
   } catch (err) {
     console.error(err);
@@ -793,6 +851,7 @@ const sendMessage = async () => {
     newMessage.value = ''
     attachment.value = null
     showEmojiPicker.value = false
+    isInternal.value = false
     if (fileInput.value) fileInput.value.value = ''
     scrollToBottom()
   } catch (error) {
@@ -1125,6 +1184,51 @@ onUnmounted(() => {
   border-top-right-radius: 0;
 }
 
+.message-bubble.internal-note {
+  background: #fffbeb !important;
+  align-self: flex-end;
+  border-radius: 12px;
+  border-top-right-radius: 0;
+  border: 1.5px solid #fcd34d !important;
+  border-right: 5px solid #d97706 !important;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.12) !important;
+  max-width: 75%;
+}
+
+.internal-note-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #b45309;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed #fde68a;
+}
+
+.internal-note-header i {
+  color: #d97706;
+}
+
+.internal-note-text {
+  color: #78350f !important;
+  font-weight: 500;
+}
+
+.internal-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #fde68a;
+}
+
 .message-content p {
   margin: 0 0 5px 0;
   line-height: 1.4;
@@ -1449,5 +1553,129 @@ onUnmounted(() => {
 .message-media video, .message-media img {
   max-width: 100%;
   border-radius: 8px;
+}
+
+/* ═══ INTERNAL NOTE MODE & INPUT STYLES ═══ */
+.chat-input-area.internal-mode {
+  background: #fffbeb !important;
+  border-top: 2px solid #f59e0b !important;
+}
+
+.internal-mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  padding: 8px 14px;
+  margin-bottom: 10px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.internal-mode-banner .banner-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.internal-mode-banner .lock-indicator {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #f59e0b;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.internal-mode-banner .banner-text {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.internal-mode-banner .banner-text strong {
+  color: #92400e;
+  font-weight: 800;
+}
+
+.internal-mode-banner .banner-text span {
+  color: #b45309;
+}
+
+.btn-cancel-internal {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: white;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.btn-cancel-internal:hover {
+  background: #fde68a;
+  color: #78350f;
+}
+
+.btn-attach.btn-lock-toggle.active-lock {
+  background: #fef3c7;
+  color: #d97706 !important;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+
+.msg-input.input-internal {
+  background: white !important;
+  border: 1.5px solid #f59e0b !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15) !important;
+  color: #78350f !important;
+}
+
+.msg-input.input-internal::placeholder {
+  color: #b45309 !important;
+  opacity: 0.75;
+}
+
+.btn-send.btn-send-internal {
+  background: #d97706 !important;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.35) !important;
+}
+
+.btn-send.btn-send-internal:hover:not(:disabled) {
+  background: #b45309 !important;
+  transform: scale(1.05);
+}
+
+.ticket-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.ticket-status-badge.open {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
 }
 </style>
