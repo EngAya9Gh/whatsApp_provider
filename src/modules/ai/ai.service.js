@@ -2,7 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const logger = require('../../utils/logger');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { ChatMessage } = require('../../models/mongo/ChatMessage');
+const ChatMessage = require('../../models/mongo/ChatMessage');
 
 class AIService {
   async summarizeTicket(tenantId, threadId) {

@@ -77,27 +77,50 @@
               <span class="contact-phone">{{ selectedThread.contactPhone }}</span>
             </div>
           </div>
-          <div class="chat-header-actions flex gap-2 items-center">
+          <div class="chat-header-actions">
+            <!-- Case 1: Active Ticket is OPEN -->
             <template v-if="activeTicket && activeTicket.status === 'OPEN'">
-              <span class="ticket-status-badge open">
-                <i class="fas fa-ticket-alt mr-1"></i> #{{ activeTicket.ticketNumber || activeTicket.id.slice(0, 8) }}
+              <span class="ticket-badge-open">
+                <i class="fas fa-ticket-alt"></i>
+                <span>{{ activeTicket.ticketNumber || ('#' + activeTicket.id.slice(0, 8)) }}</span>
               </span>
-              <button @click="closeActiveTicket" class="btn btn-outline-danger btn-sm" :disabled="creatingTicket">
-                <i class="fas fa-times-circle mr-1"></i> إغلاق التذكرة
+              <button 
+                type="button" 
+                @click="closeActiveTicket" 
+                class="ticket-btn ticket-btn-close" 
+                :disabled="creatingTicket"
+                title="إغلاق التذكرة الحالية"
+              >
+                <i class="fas fa-times-circle"></i>
+                <span>{{ isAr ? 'إغلاق التذكرة' : 'Close Ticket' }}</span>
               </button>
             </template>
+
+            <!-- Case 2: No ticket is currently open -->
             <template v-else>
+              <!-- Option to reopen previous closed ticket -->
               <button 
                 v-if="hasReopenableTicket" 
+                type="button" 
                 @click="reopenActiveTicket" 
-                class="btn btn-outline-success btn-sm me-1" 
+                class="ticket-btn ticket-btn-reopen" 
                 :disabled="creatingTicket"
-                :title="'إعادة فتح التذكرة السابقة #' + (activeTicket?.ticketNumber || '')"
+                :title="isAr ? 'إعادة فتح التذكرة السابقة' : 'Reopen Previous Ticket'"
               >
-                <i class="fas fa-redo mr-1"></i> إعادة فتح التذكرة {{ activeTicket?.ticketNumber ? `(#${activeTicket.ticketNumber})` : '' }}
+                <i class="fas fa-redo"></i>
+                <span>{{ isAr ? ('إعادة الفتح ' + (activeTicket?.ticketNumber ? `(${activeTicket.ticketNumber})` : '')) : 'Reopen Ticket' }}</span>
               </button>
-              <button @click="createManualTicket" class="btn btn-primary btn-sm" :disabled="creatingTicket">
-                <i class="fas fa-plus mr-1"></i> {{ creatingTicket ? 'جاري الفتح...' : (hasReopenableTicket ? 'فتح تذكرة جديدة' : 'فتح تذكرة') }}
+
+              <!-- Option to open a new ticket -->
+              <button 
+                type="button" 
+                @click="createManualTicket" 
+                class="ticket-btn ticket-btn-new" 
+                :disabled="creatingTicket"
+                :title="isAr ? 'فتح تذكرة جديدة' : 'Open Ticket'"
+              >
+                <i class="fas fa-plus"></i>
+                <span>{{ creatingTicket ? (isAr ? 'جاري الفتح...' : 'Opening...') : (hasReopenableTicket ? (isAr ? 'فتح تذكرة جديدة' : 'New Ticket') : (isAr ? 'فتح تذكرة' : 'Open Ticket')) }}</span>
               </button>
             </template>
           </div>
@@ -443,9 +466,12 @@ const fetchActiveTicket = async (threadId) => {
 
 const selectThread = async (thread) => {
   selectedThread.value = thread
+  activeTicket.value = null // Reset so old thread's ticket isn't shown while loading
   thread.unreadCount = 0 // Optimistic update
-  await fetchMessages(thread.id)
-  await fetchActiveTicket(thread.id)
+  await Promise.all([
+    fetchMessages(thread.id),
+    fetchActiveTicket(thread.id)
+  ])
 }
 
 
@@ -551,12 +577,14 @@ const closeActiveTicket = async () => {
   
   try {
     creatingTicket.value = true;
-    await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/close', {
+    const res = await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/close', {
       description: formValues.description || 'تم حل المشكلة',
       categoryId: formValues.categoryId || undefined
     });
-    // Refresh active ticket to keep the closed ticket reference for reopening
-    if (selectedThread.value) {
+    // Immediately set activeTicket to the closed ticket so reopen is ready instantly
+    if (res.data?.data) {
+      activeTicket.value = res.data.data;
+    } else if (selectedThread.value) {
       await fetchActiveTicket(selectedThread.value.id);
     }
     Swal.fire({ icon: 'success', title: isAr.value ? 'تم إغلاق التذكرة بنجاح!' : 'Ticket Closed!', timer: 1500, showConfirmButton: false });
@@ -646,9 +674,13 @@ const reopenActiveTicket = async () => {
   if (!activeTicket.value) return;
   try {
     creatingTicket.value = true;
-    await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/reopen');
+    const res = await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/reopen');
+    if (res.data?.data) {
+      activeTicket.value = res.data.data;
+    } else if (selectedThread.value) {
+      await fetchActiveTicket(selectedThread.value.id);
+    }
     Swal.fire({ icon: 'success', title: isAr.value ? 'تم إعادة فتح التذكرة!' : 'Ticket Reopened!', timer: 1500, showConfirmButton: false });
-    await fetchActiveTicket(selectedThread.value.id);
   } catch (err) {
     console.error(err);
     Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', text: err.response?.data?.error || err.message });
@@ -657,20 +689,23 @@ const reopenActiveTicket = async () => {
   }
 }
 
-
 const createManualTicket = async () => {
   if (!selectedThread.value) return;
   
   try {
     creatingTicket.value = true;
-    await axios.post('/api/v1/tickets', {
+    const res = await axios.post('/api/v1/tickets', {
       channelId: selectedThread.value.channelId,
       threadId: selectedThread.value.id,
       crmClientId: selectedThread.value.crmClientId,
       subject: 'محادثة واتساب'
     });
+    if (res.data?.data) {
+      activeTicket.value = res.data.data;
+    } else if (selectedThread.value) {
+      await fetchActiveTicket(selectedThread.value.id);
+    }
     Swal.fire({ icon: 'success', title: isAr.value ? 'تم فتح التذكرة بنجاح!' : 'Ticket Opened!', timer: 1500, showConfirmButton: false });
-    await fetchActiveTicket(selectedThread.value.id);
   } catch (err) {
     console.error(err);
     Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', text: err.response?.data?.error || err.message });
@@ -1118,11 +1153,20 @@ onUnmounted(() => {
 }
 
 .chat-header {
-  padding: 15px 25px;
+  padding: 12px 25px;
   background: white;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #f1f5f9;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
 }
 
 .chat-header-info {
@@ -1664,18 +1708,72 @@ onUnmounted(() => {
   transform: scale(1.05);
 }
 
-.ticket-status-badge {
+/* ═══ TICKET ACTION BUTTONS ═══ */
+.ticket-btn {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border-radius: 8px;
-  font-size: 0.8rem;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 0.82rem;
   font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1.5px solid transparent;
+  white-space: nowrap;
+  font-family: inherit;
 }
 
-.ticket-status-badge.open {
+.ticket-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ticket-btn-close {
+  background: #fff1f2;
+  color: #e11d48;
+  border-color: #fecdd3;
+}
+.ticket-btn-close:hover:not(:disabled) {
+  background: #ffe4e6;
+  color: #be123c;
+  border-color: #fda4af;
+}
+
+.ticket-btn-reopen {
+  background: #f0fdf4;
+  color: #16a34a;
+  border-color: #bbf7d0;
+}
+.ticket-btn-reopen:hover:not(:disabled) {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+.ticket-btn-new {
+  background: linear-gradient(135deg, #FF6600, #E55A00);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 2px 6px rgba(255, 102, 0, 0.25);
+}
+.ticket-btn-new:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f95f00, #d94e00);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(255, 102, 0, 0.35);
+}
+
+.ticket-badge-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: #ecfdf5;
-  color: #065f46;
+  color: #047857;
   border: 1px solid #a7f3d0;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 </style>
