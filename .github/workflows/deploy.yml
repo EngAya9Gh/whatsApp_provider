@@ -52,4 +52,5 @@ jobs:
             cd ..
 
             echo "7. Restarting Node.js Server..."
-            pm2 restart whatsapp-api
+            pm2 restart whatsapp-api || pm2 start src/server.js --name whatsapp-api
+            pm2 save
