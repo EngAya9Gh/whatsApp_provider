@@ -92,12 +92,13 @@ class TicketsService {
       }
 
       // Check if there is a recently closed ticket (less than 24h)
+      // Note: If the closed ticket is already rated, do NOT reopen it! It was completed and rated.
       const lastClosedTicket = await prisma.ticket.findFirst({
         where: { tenantId, threadId, status: 'CLOSED' },
         orderBy: { resolvedAt: 'desc' }
       });
 
-      if (lastClosedTicket && lastClosedTicket.resolvedAt) {
+      if (lastClosedTicket && lastClosedTicket.resolvedAt && !lastClosedTicket.rating) {
         const diffHours = (new Date() - new Date(lastClosedTicket.resolvedAt)) / (1000 * 60 * 60);
         if (diffHours < 24) {
           logger.info(`[TicketsService] Auto-reopening ticket ${lastClosedTicket.id} for thread ${threadId}`);
@@ -150,16 +151,29 @@ class TicketsService {
         }
       });
 
-      // 3.1 Backfill ticketId on all previous unassigned messages in this thread
+      // 3.1 Backfill ticketId on messages that belong to this new ticket
       if (thread) {
         const ChatMessage = require('../../models/mongo/ChatMessage');
-        await ChatMessage.updateMany(
-          {
-            threadId: thread._id,
-            $or: [{ ticketId: null }, { ticketId: { $exists: false } }]
-          },
-          { $set: { ticketId: ticket.id } }
-        );
+        
+        // Find previous closed ticket for this thread
+        const lastClosedTicket = await prisma.ticket.findFirst({
+          where: { tenantId, threadId, status: 'CLOSED' },
+          orderBy: { resolvedAt: 'desc' }
+        });
+
+        const query = {
+          threadId: thread._id,
+          content: { $not: /تقييم|شكراً لتقييمك/ }
+        };
+
+        if (lastClosedTicket && lastClosedTicket.resolvedAt) {
+          // Assign all messages sent after the previous ticket resolved
+          query.createdAt = { $gt: lastClosedTicket.resolvedAt };
+        } else {
+          query.$or = [{ ticketId: null }, { ticketId: { $exists: false } }];
+        }
+
+        await ChatMessage.updateMany(query, { $set: { ticketId: ticket.id } });
       }
 
       // 4. Sync ticket to CRM

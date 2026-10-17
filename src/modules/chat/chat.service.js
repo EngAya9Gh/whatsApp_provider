@@ -213,7 +213,7 @@ class ChatService {
         mediaMime: payload.mediaMime || null,
         status: payload.isInternal ? 'READ' : 'SENT', // Internal notes are instantly "READ"
         metaMessageId: metaResponse?.messages?.[0]?.id || null,
-        ticketId: activeTicket ? activeTicket.id : null,
+        ticketId: payload.ticketId || (activeTicket ? activeTicket.id : null),
         isInternal: payload.isInternal || false
       });
 
@@ -239,7 +239,7 @@ class ChatService {
         hasMedia: payload.hasMedia || false,
         mediaUrl: payload.mediaUrl || null,
         status: 'FAILED',
-        ticketId: activeTicket ? activeTicket.id : null
+        ticketId: payload.ticketId || (activeTicket ? activeTicket.id : null)
       });
       
       const failedMsgData = failedMessage.toObject();
@@ -355,11 +355,13 @@ class ChatService {
     if (ratingValue && targetTicketId) {
       await ticketsService.saveTicketRating(tenantId, targetTicketId, ratingValue);
       content = `[العميل قام بتقييم التذكرة: ${ratingValue} نجوم]`;
+      ticketId = targetTicketId;
       
-      // Optional: send thank you message
+      // Send thank you message tied to the evaluated ticket
       this.sendMessage(tenantId, threadIdStr, {
         content: "شكراً لتقييمك! نحن سعداء بخدمتك.",
-        type: 'text'
+        type: 'text',
+        ticketId: targetTicketId
       }).catch(e => console.log('Error sending thank you:', e.message));
     } else {
       // 2. Check/Auto-create Ticket if not a rating
