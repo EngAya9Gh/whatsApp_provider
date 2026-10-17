@@ -43,6 +43,15 @@ class TicketsService {
     // Notify CRM
     try {
       const webhookService = require('../webhook/webhook.service');
+
+      // 1. Send dedicated ticket.rated event
+      await webhookService.sendTicketRated(tenantId, {
+        ticket_id: updated.id,
+        thread_id: updated.threadId,
+        rating: ratingValue
+      });
+
+      // 2. Also sync ticket.sync for backward compatibility
       const ChatThread = require('../../models/mongo/ChatThread');
       const thread = await ChatThread.findById(updated.threadId);
       await webhookService.syncCrmTicket(tenantId, {
@@ -141,6 +150,18 @@ class TicketsService {
         }
       });
 
+      // 3.1 Backfill ticketId on all previous unassigned messages in this thread
+      if (thread) {
+        const ChatMessage = require('../../models/mongo/ChatMessage');
+        await ChatMessage.updateMany(
+          {
+            threadId: thread._id,
+            $or: [{ ticketId: null }, { ticketId: { $exists: false } }]
+          },
+          { $set: { ticketId: ticket.id } }
+        );
+      }
+
       // 4. Sync ticket to CRM
       const crmResponse = await webhookService.syncCrmTicket(tenantId, {
         ticket_id: ticket.id,
@@ -193,6 +214,16 @@ class TicketsService {
           resolvedAt: null
         }
       });
+
+      // Backfill any unassigned messages in this thread on ticket reopen
+      const ChatMessage = require('../../models/mongo/ChatMessage');
+      await ChatMessage.updateMany(
+        {
+          threadId: ticket.threadId,
+          $or: [{ ticketId: null }, { ticketId: { $exists: false } }]
+        },
+        { $set: { ticketId: ticket.id } }
+      );
 
       // Sync to CRM
       const ChatThread = require('../../models/mongo/ChatThread');

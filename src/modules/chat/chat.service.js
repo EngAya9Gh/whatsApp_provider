@@ -139,6 +139,25 @@ class ChatService {
     const msgType = payload.type || 'text'; // text, image, document, audio, video
     
 
+    // Sync Contact with CRM if not yet synced
+    const webhookService = require('../webhook/webhook.service');
+    let crmClientId = thread.crmClientId;
+    if (!crmClientId && !thread.crmSyncedAt) {
+      try {
+        const crmData = await webhookService.syncCrmContact(tenantId, thread.contactPhone, thread.contactName || thread.contactPhone);
+        if (crmData) {
+          const update = { crmSyncedAt: new Date() };
+          if (crmData.client_id) {
+            crmClientId = String(crmData.client_id);
+            update.crmClientId = crmClientId;
+          }
+          await ChatThread.updateOne({ _id: thread._id }, { $set: update });
+        }
+      } catch (e) {
+        logger.warn(`[ChatService] Failed to sync contact on outbound message: ${e.message}`);
+      }
+    }
+
     const ticketsService = require('../tickets/tickets.service');
     
     // Auto-assign ticket if unassigned and sender is a sub-user

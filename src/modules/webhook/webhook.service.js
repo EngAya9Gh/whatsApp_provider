@@ -187,6 +187,37 @@ class WebhookService {
       return null;
     }
   }
+
+  /**
+   * Dispatch a direct ticket.rated event to the CRM
+   * data: { ticket_id, thread_id, rating }
+   */
+  async sendTicketRated(tenantId, data) {
+    try {
+      const config = await this._getWebhookConfig(tenantId);
+      if (!config) {
+        logger.warn(`[WebhookService] ticket.rated skipped: no Webhook URL configured for tenant ${tenantId}`);
+        return null;
+      }
+
+      const payload = {
+        event: 'ticket.rated',
+        data: {
+          ticket_id: data.ticket_id,
+          thread_id: data.thread_id,
+          rating: data.rating
+        }
+      };
+
+      const response = await axios.post(config.url, payload, { headers: config.headers, timeout: 5000 });
+      logger.info(`[WebhookService] ticket.rated ${data.rating} stars for ticket ${data.ticket_id} → ${config.url} (HTTP ${response.status}) body: ${JSON.stringify(response.data)}`);
+      return response.data;
+
+    } catch (err) {
+      logger.error(`[WebhookService] Error sending ticket.rated (${err.response?.status || ''}) → ${err.config?.url || ''}: ${err.response?.data?.message || err.message}`);
+      return null;
+    }
+  }
 }
 
 module.exports = new WebhookService();
