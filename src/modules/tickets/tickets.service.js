@@ -220,6 +220,8 @@ class TicketsService {
         throw new Error('Only closed tickets can be reopened');
       }
 
+      const previousResolvedAt = ticket.resolvedAt;
+
       // Update in local DB
       const updated = await prisma.ticket.update({
         where: { id: ticketId },
@@ -229,20 +231,37 @@ class TicketsService {
         }
       });
 
-      // Backfill any unassigned messages in this thread on ticket reopen
+      // Fetch thread
+      const ChatThread = require('../../models/mongo/ChatThread');
       const ChatMessage = require('../../models/mongo/ChatMessage');
-      await ChatMessage.updateMany(
-        {
-          threadId: ticket.threadId,
-          $or: [{ ticketId: null }, { ticketId: { $exists: false } }]
-        },
-        { $set: { ticketId: ticket.id } }
-      );
+      const mongoose = require('mongoose');
+      const thread = await ChatThread.findById(ticket.threadId);
+      const threadObjId = thread ? thread._id : (mongoose.Types.ObjectId.isValid(ticket.threadId) ? new mongoose.Types.ObjectId(ticket.threadId) : ticket.threadId);
+
+      // Backfill any unassigned or follow-up messages in this thread on ticket reopen
+      const updateQuery = {
+        threadId: threadObjId,
+        content: { $not: /تقييم|شكراً لتقييمك/ }
+      };
+
+      if (previousResolvedAt) {
+        updateQuery.$or = [
+          { createdAt: { $gte: previousResolvedAt } },
+          { ticketId: null },
+          { ticketId: { $exists: false } },
+          { ticketId: "" }
+        ];
+      } else {
+        updateQuery.$or = [
+          { ticketId: null },
+          { ticketId: { $exists: false } },
+          { ticketId: "" }
+        ];
+      }
+
+      await ChatMessage.updateMany(updateQuery, { $set: { ticketId: ticket.id } });
 
       // Sync to CRM
-      const ChatThread = require('../../models/mongo/ChatThread');
-      const thread = await ChatThread.findById(ticket.threadId);
-      
       let categoryName = "عام";
       if (ticket.categoryId) {
         const cat = await prisma.ticketCategory.findUnique({ where: { id: ticket.categoryId } });
