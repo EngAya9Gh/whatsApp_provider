@@ -382,7 +382,7 @@ const launchEmbeddedSignup = () => {
     response_type: 'code',
     override_default_response_type: true,
     display: 'popup',
-    extras: { setup: {} }
+    extras: { setup: {}, sessionInfoVersion: '3' }
   })
 
   // Update UI after calling FB.login

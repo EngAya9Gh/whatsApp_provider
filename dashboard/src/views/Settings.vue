@@ -22,51 +22,49 @@
 
     <!-- ══ Main Content ══ -->
     <div class="page-content">
-      <div class="settings-layout">
+      <div class="settings-container">
         
-        <!-- Sidebar Navigation -->
-        <div class="settings-sidebar">
-          <div class="nav-group">
-            <div class="nav-group-title">{{ isAr ? 'أقسام الإعدادات' : 'Navigation' }}</div>
-            
+        <!-- ══ Navigation Tabs Bar ══ -->
+        <div class="settings-tabs-wrapper">
+          <div class="settings-tabs-bar">
             <button 
               type="button"
-              class="nav-item" 
+              class="tab-btn" 
               :class="{ active: currentTab === 'business' }"
               @click="currentTab = 'business'"
             >
-              <span class="nav-icon">🏢</span>
-              <span>{{ isAr ? 'بيانات المنشأة والضريبة' : 'Business & Tax' }}</span>
+              <span class="tab-icon">🏢</span>
+              <span class="tab-title">{{ isAr ? 'بيانات المنشأة والضريبة' : 'Business & Tax' }}</span>
             </button>
 
             <button 
               type="button"
-              class="nav-item" 
+              class="tab-btn" 
               :class="{ active: currentTab === 'tickets' }"
               @click="currentTab = 'tickets'"
             >
-              <span class="nav-icon">🎫</span>
-              <span>{{ isAr ? 'إعدادات التذاكر والدعم' : 'Tickets & Support' }}</span>
+              <span class="tab-icon">🎫</span>
+              <span class="tab-title">{{ isAr ? 'إعدادات التذاكر والدعم' : 'Tickets & Support' }}</span>
             </button>
 
             <button 
               type="button"
-              class="nav-item" 
+              class="tab-btn" 
               :class="{ active: currentTab === 'ai' }"
               @click="currentTab = 'ai'"
             >
-              <span class="nav-icon">🤖</span>
-              <span>{{ isAr ? 'الذكاء الاصطناعي (AI)' : 'AI Settings' }}</span>
+              <span class="tab-icon">🤖</span>
+              <span class="tab-title">{{ isAr ? 'الذكاء الاصطناعي (AI)' : 'AI Settings' }}</span>
             </button>
 
             <button 
               type="button"
-              class="nav-item" 
+              class="tab-btn" 
               :class="{ active: currentTab === 'security' }"
               @click="currentTab = 'security'"
             >
-              <span class="nav-icon">🔒</span>
-              <span>{{ isAr ? 'الأمان وكلمة المرور' : 'Security' }}</span>
+              <span class="tab-icon">🔒</span>
+              <span class="tab-title">{{ isAr ? 'الأمان وكلمة المرور' : 'Security' }}</span>
             </button>
           </div>
         </div>
@@ -390,7 +388,13 @@ import axios from 'axios'
 import Swal from 'sweetalert2'
 
 const { locale } = useI18n()
-const isAr = computed(() => locale.value === 'ar')
+const isAr = computed(() => {
+  return locale.value === 'ar' || 
+         localStorage.getItem('app_lang') === 'ar' || 
+         localStorage.getItem('lang') === 'ar' || 
+         document.documentElement.lang === 'ar' || 
+         document.documentElement.dir === 'rtl'
+})
 
 const currentTab = ref('business')
 const saving = ref(false)
@@ -603,39 +607,92 @@ onMounted(fetchProfile)
 .hero-title { font-size: 2rem; font-weight: 900; color: #fff; margin: 0 0 0.3rem; letter-spacing: -0.03em; }
 .hero-sub { font-size: 0.95rem; color: #94A3B8; margin: 0; font-weight: 500; }
 
-/* ═══ MAIN ═══ */
+/* ═══ MAIN CONTAINER ═══ */
 .page-content { padding: 2.5rem; margin-top: -2.5rem; position: relative; z-index: 10; }
-.settings-layout {
-  display: flex; gap: 2rem; align-items: flex-start;
-  max-width: 1100px; margin: 0 auto;
-}
-@media (max-width: 800px) {
-  .settings-layout { flex-direction: column; }
-  .settings-sidebar { width: 100%; }
+.settings-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-/* Sidebar */
-.settings-sidebar {
-  width: 260px; flex-shrink: 0;
+/* ═══ TABS BAR ═══ */
+.settings-tabs-wrapper {
+  width: 100%;
 }
-.nav-group { display: flex; flex-direction: column; gap: 0.4rem; }
-.nav-group-title { font-size: 0.75rem; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; padding: 0 0.5rem; }
-.nav-item {
-  display: flex; align-items: center; gap: 0.85rem;
-  padding: 0.85rem 1.1rem; border: none; background: transparent;
-  border-radius: 14px; cursor: pointer; transition: all 0.2s;
-  color: #64748B; font-weight: 700; font-size: 0.92rem; font-family: inherit;
-  text-align: left;
+.settings-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  padding: 0.5rem;
+  border-radius: 16px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
-.rtl .nav-item { text-align: right; }
-.nav-icon { font-size: 1.15rem; }
-.nav-item:hover { background: rgba(255,255,255,0.7); color: #0F172A; }
-.nav-item.active { background: white; color: #FF6600; box-shadow: 0 4px 14px rgba(0,0,0,0.04); }
+.settings-tabs-bar::-webkit-scrollbar {
+  height: 4px;
+}
+.settings-tabs-bar::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
 
-/* Card */
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  font-weight: 700;
+  font-size: 0.92rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tab-icon {
+  font-size: 1.15rem;
+}
+.tab-btn:hover {
+  background: #F8FAFC;
+  color: #0F172A;
+}
+.tab-btn.active {
+  background: linear-gradient(135deg, #FF6600, #E55A00);
+  color: white;
+  box-shadow: 0 4px 12px rgba(255, 102, 0, 0.25);
+}
+
+@media (max-width: 640px) {
+  .page-content { padding: 1.5rem 1rem; margin-top: -1.5rem; }
+  .settings-tabs-bar {
+    gap: 0.35rem;
+    padding: 0.4rem;
+  }
+  .tab-btn {
+    padding: 0.6rem 0.85rem;
+    font-size: 0.82rem;
+    gap: 0.4rem;
+  }
+  .settings-card {
+    padding: 1.5rem !important;
+  }
+}
+
+/* ═══ CARD ═══ */
 .settings-card {
-  flex: 1; background: white; border-radius: 20px;
-  border: 1px solid #E2E8F0; box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+  background: white;
+  border-radius: 20px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.03);
   padding: 2.5rem;
 }
 .card-header {
@@ -646,7 +703,7 @@ onMounted(fetchProfile)
 .card-desc { font-size: 0.88rem; color: #64748B; margin: 0; font-weight: 500; line-height: 1.5; }
 .header-icon-bg { font-size: 2.5rem; opacity: 0.15; user-select: none; }
 
-/* Form */
+/* ═══ FORM ═══ */
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 .full-width { grid-column: 1 / -1; }
 
@@ -708,12 +765,10 @@ onMounted(fetchProfile)
   gap: 0.4rem;
   position: relative;
 }
-
 .rating-option-card:hover {
   border-color: #CBD5E1;
   background: #F8FAFC;
 }
-
 .rating-option-card.selected {
   border-color: #FF6600;
   background: #FFF9F5;
@@ -730,13 +785,11 @@ onMounted(fetchProfile)
   justify-content: space-between;
   gap: 0.5rem;
 }
-
 .option-title {
   font-weight: 800;
   font-size: 0.95rem;
   color: #0F172A;
 }
-
 .option-badge.recommended {
   background: #FEF3C7;
   color: #B45309;
@@ -745,13 +798,11 @@ onMounted(fetchProfile)
   padding: 2px 8px;
   border-radius: 20px;
 }
-
 .option-stars {
   font-size: 0.9rem;
   color: #FF6600;
   font-weight: 700;
 }
-
 .option-desc {
   font-size: 0.8rem;
   color: #64748B;
