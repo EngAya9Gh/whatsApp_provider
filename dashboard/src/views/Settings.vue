@@ -162,6 +162,36 @@
             </div>
 
             <div class="form-divider full-width">
+              <span>{{ isAr ? 'الإغلاق التلقائي للتذاكر (Ticket Auto-Close)' : 'Ticket Auto-Close Settings' }}</span>
+            </div>
+
+            <div class="form-group full-width">
+              <label class="toggle-card" :class="{ active: form.autoCloseEnabled }">
+                <input type="checkbox" v-model="form.autoCloseEnabled" class="hidden-checkbox" />
+                <div class="toggle-switch">
+                  <div class="toggle-slider"></div>
+                </div>
+                <div class="toggle-info">
+                  <span class="toggle-title">{{ isAr ? 'تفعيل الإغلاق التلقائي للتذاكر غير النشطة' : 'Enable Auto-Close for Inactive Tickets' }}</span>
+                  <span class="toggle-desc">{{ isAr ? 'إغلاق التذكرة وإرسال رسالة التقييم تلقائياً بعد فترة من عدم استجابة العميل.' : 'Automatically closes ticket and sends rating message if client remains inactive.' }}</span>
+                </div>
+              </label>
+            </div>
+
+            <div class="form-group" v-if="form.autoCloseEnabled">
+              <label>{{ isAr ? 'مهلة إغلاق التذكرة عند عدم رد العميل' : 'Inactivity Timeout' }}</label>
+              <select v-model="form.autoCloseHours" class="input-std">
+                <option :value="12">{{ isAr ? '12 ساعة (نصف يوم)' : '12 Hours (Half day)' }}</option>
+                <option :value="24">{{ isAr ? '24 ساعة (يوم واحد - موصى به لواتساب)' : '24 Hours (1 Day - Recommended)' }}</option>
+                <option :value="48">{{ isAr ? '48 ساعة (يومان)' : '48 Hours (2 Days)' }}</option>
+                <option :value="72">{{ isAr ? '72 ساعة (3 أيام)' : '72 Hours (3 Days)' }}</option>
+              </select>
+              <span style="font-size: 0.78rem; color: #64748B; margin-top: 4px;">
+                {{ isAr ? 'ملاحظة هامة: يتم الإغلاق فقط إذا كان آخر رد صادراً من موظف الدعم. إذا كان العميل هو من أرسل آخر رسالة فلن تُغلق التذكرة.' : 'Note: Only closes if last reply was from support team. Will never close if client spoke last.' }}
+              </span>
+            </div>
+
+            <div class="form-divider full-width">
               <span>{{ isAr ? 'إعدادات الذكاء الاصطناعي (AI)' : 'AI Settings' }}</span>
             </div>
 
@@ -213,6 +243,8 @@ const form = ref({
   postalCode: '',
   ratingMessageText: '',
   ratingType: 'LIST_5_STARS',
+  autoCloseEnabled: true,
+  autoCloseHours: 24,
   geminiKey: ''
 })
 
@@ -242,6 +274,8 @@ const fetchProfile = async () => {
       postalCode: details.postalCode || '',
       ratingMessageText: ticketSettings.ratingMessageText || '',
       ratingType: ticketSettings.ratingType || 'LIST_5_STARS',
+      autoCloseEnabled: ticketSettings.autoCloseEnabled !== false,
+      autoCloseHours: Number(ticketSettings.autoCloseHours) || 24,
       geminiKey: aiSettings.geminiKey || ''
     })
     
@@ -265,7 +299,9 @@ const saveCompanyDetails = async () => {
     tenant.customFeatures.companyDetails = { ...form.value }
     tenant.customFeatures.ticketSettings = { 
       ratingMessageText: form.value.ratingMessageText,
-      ratingType: form.value.ratingType
+      ratingType: form.value.ratingType,
+      autoCloseEnabled: form.value.autoCloseEnabled,
+      autoCloseHours: form.value.autoCloseHours
     }
     localStorage.setItem('tenant', JSON.stringify(tenant))
     
@@ -478,5 +514,72 @@ onMounted(fetchProfile)
   color: #64748B;
   margin: 0;
   line-height: 1.4;
+}
+
+/* ═══ Auto-Close Toggle Card ═══ */
+.toggle-card {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 1.1rem 1.25rem;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 14px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.toggle-card:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+.toggle-card.active {
+  border-color: #FF6600;
+  background: #FFF9F5;
+  box-shadow: 0 0 0 2px rgba(255, 102, 0, 0.12);
+}
+.hidden-checkbox {
+  display: none;
+}
+.toggle-switch {
+  width: 46px;
+  height: 26px;
+  background: #CBD5E1;
+  border-radius: 20px;
+  position: relative;
+  transition: background 0.25s ease;
+  flex-shrink: 0;
+}
+.toggle-card.active .toggle-switch {
+  background: #FF6600;
+}
+.toggle-slider {
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.25s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+.toggle-card.active .toggle-slider {
+  transform: translateX(20px);
+}
+.toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.toggle-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0F172A;
+}
+.toggle-desc {
+  font-size: 0.8rem;
+  color: #64748B;
+  line-height: 1.35;
 }
 </style>

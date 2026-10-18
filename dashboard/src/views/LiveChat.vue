@@ -995,6 +995,12 @@ onMounted(() => {
       threads.value.unshift(updatedThread)
     }
   })
+
+  socket.value.on('ticket_updated', (data) => {
+    if (selectedThread.value && (data.threadId === selectedThread.value.id || data.threadId === selectedThread.value._id)) {
+      fetchActiveTicket(selectedThread.value.id)
+    }
+  })
 })
 
 onUnmounted(() => {

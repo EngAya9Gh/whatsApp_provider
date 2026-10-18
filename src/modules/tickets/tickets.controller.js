@@ -242,6 +242,15 @@ class TicketsController {
       next(error);
     }
   }
+
+  async triggerAutoClose(req, res, next) {
+    try {
+      const result = await ticketsService.autoCloseInactiveTickets();
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new TicketsController();

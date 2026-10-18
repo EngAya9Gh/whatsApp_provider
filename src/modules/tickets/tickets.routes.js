@@ -32,4 +32,7 @@ router.put('/:id/assign', ticketsController.assignTicket);
 // Toggle autoCreateTickets for a channel
 router.put('/channels/:channelId/auto-create', ticketsController.toggleAutoCreate);
 
+// Manual trigger for auto-close check
+router.post('/auto-close/trigger', ticketsController.triggerAutoClose);
+
 module.exports = router;

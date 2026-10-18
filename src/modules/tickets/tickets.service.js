@@ -197,6 +197,16 @@ class TicketsService {
         ticket.crmTicketId = String(crmResponse.ticket_id);
       }
 
+      // Real-time broadcast
+      try {
+        const socketService = require('../../services/socket.service');
+        socketService.emitToTenant(tenantId, 'ticket_updated', {
+          ticketId: ticket.id,
+          threadId: threadId,
+          status: 'OPEN'
+        });
+      } catch (sockErr) {}
+
       return ticket;
     } catch (error) {
       logger.error(`[TicketsService] Error creating ticket: ${error.message}`);
@@ -279,6 +289,16 @@ class TicketsService {
         subject: ticket.subject || 'إعادة فتح تذكرة',
         description: 'تمت إعادة فتح التذكرة'
       });
+
+      // Real-time broadcast
+      try {
+        const socketService = require('../../services/socket.service');
+        socketService.emitToTenant(tenantId, 'ticket_updated', {
+          ticketId: ticket.id,
+          threadId: ticket.threadId,
+          status: 'OPEN'
+        });
+      } catch (sockErr) {}
 
       return updated;
     } catch (error) {
@@ -417,10 +437,108 @@ class TicketsService {
         logger.error(`[TicketsService] Error sending rating message: ${err.message}`);
       }
 
+      // Real-time broadcast
+      try {
+        const socketService = require('../../services/socket.service');
+        socketService.emitToTenant(tenantId, 'ticket_updated', {
+          ticketId: ticket.id,
+          threadId: ticket.threadId,
+          status: 'CLOSED'
+        });
+      } catch (sockErr) {}
+
       return updated;
     } catch (error) {
       logger.error(`[TicketsService] Error closing ticket: ${error.message}`);
       throw error;
+    }
+  }
+
+  /**
+   * Process and auto-close inactive tickets across all tenants
+   */
+  async autoCloseInactiveTickets() {
+    try {
+      const openTickets = await prisma.ticket.findMany({
+        where: {
+          status: { in: ['OPEN', 'PENDING'] }
+        },
+        include: {
+          channel: true,
+          tenant: {
+            select: { id: true, customFeatures: true }
+          }
+        }
+      });
+
+      if (!openTickets.length) return { processed: 0, closed: 0 };
+
+      logger.info(`[AutoClose] Checking ${openTickets.length} active tickets for inactivity...`);
+
+      const ChatMessage = require('../../models/mongo/ChatMessage');
+      const ChatThread = require('../../models/mongo/ChatThread');
+      const mongoose = require('mongoose');
+
+      let closedCount = 0;
+
+      for (const ticket of openTickets) {
+        try {
+          const customFeatures = typeof ticket.tenant?.customFeatures === 'object' ? ticket.tenant.customFeatures : {};
+          const ticketSettings = customFeatures?.ticketSettings || {};
+
+          // Default: auto-close is enabled unless explicitly false
+          const isEnabled = ticketSettings.autoCloseEnabled !== false;
+          if (!isEnabled) continue;
+
+          // Inactivity timeout in hours (default 24h)
+          const timeoutHours = Number(ticketSettings.autoCloseHours) || 24;
+
+          const thread = await ChatThread.findById(ticket.threadId).catch(() => null);
+          const threadObjId = thread ? thread._id : (mongoose.Types.ObjectId.isValid(ticket.threadId) ? new mongoose.Types.ObjectId(ticket.threadId) : ticket.threadId);
+
+          // Find the last non-evaluation message in this thread
+          const lastMsg = await ChatMessage.findOne({
+            threadId: threadObjId,
+            content: { $not: /تقييم|شكراً لتقييمك/ }
+          }).sort({ createdAt: -1 });
+
+          let shouldClose = false;
+          let reason = '';
+
+          if (lastMsg) {
+            // ONLY auto-close if the last message was OUTBOUND (sent by agent or system to client).
+            // If the client spoke last (INBOUND), the client is waiting for support - DO NOT close!
+            if (lastMsg.direction === 'OUTBOUND') {
+              const diffHours = (Date.now() - new Date(lastMsg.createdAt).getTime()) / (1000 * 60 * 60);
+              if (diffHours >= timeoutHours) {
+                shouldClose = true;
+                reason = `تم الإغلاق تلقائياً لعدم استجابة العميل بعد ${diffHours.toFixed(0)} ساعة`;
+              }
+            }
+          } else {
+            // If ticket has no messages at all, check ticket creation time
+            const diffHours = (Date.now() - new Date(ticket.createdAt).getTime()) / (1000 * 60 * 60);
+            if (diffHours >= timeoutHours) {
+              shouldClose = true;
+              reason = `تم الإغلاق تلقائياً لعدم وجود نشاط بعد ${diffHours.toFixed(0)} ساعة`;
+            }
+          }
+
+          if (shouldClose) {
+            logger.info(`[AutoClose] Auto-closing ticket ${ticket.ticketNumber} (${ticket.id}) for tenant ${ticket.tenantId}. Reason: ${reason}`);
+            await this.closeTicket(ticket.tenantId, ticket.id, reason);
+            closedCount++;
+          }
+        } catch (ticketErr) {
+          logger.error(`[AutoClose] Error evaluating ticket ${ticket.id}: ${ticketErr.message}`);
+        }
+      }
+
+      logger.info(`[AutoClose] Check completed. Evaluated: ${openTickets.length}, Closed: ${closedCount}`);
+      return { processed: openTickets.length, closed: closedCount };
+    } catch (err) {
+      logger.error(`[AutoClose] Error in autoCloseInactiveTickets: ${err.message}`);
+      return { error: err.message };
     }
   }
 }

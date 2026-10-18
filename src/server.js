@@ -48,6 +48,10 @@ const startServer = async () => {
     // Initialize MongoDB
     await connectMongo();
 
+    // Start ticket inactivity auto-close scheduler
+    const ticketScheduler = require('./services/ticketScheduler');
+    ticketScheduler.start();
+
     server.listen(config.port, () => {
       logger.info(`Server is running on port ${config.port} in ${config.env} mode`);
     });
@@ -62,6 +66,11 @@ startServer();
 // Handle graceful shutdown
 const shutdown = () => {
   logger.info('Shutting down server gracefully...');
+  try {
+    const ticketScheduler = require('./services/ticketScheduler');
+    ticketScheduler.stop();
+  } catch (e) {}
+
   server.close(() => {
     logger.info('HTTP server closed.');
     redisClient.quit();
