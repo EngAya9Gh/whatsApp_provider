@@ -270,6 +270,23 @@ class SubUserService {
   }
 
   /**
+   * قائمة أعضاء الفريق للإسناد في التذاكر
+   */
+  async getTeam(tenantId) {
+    return prisma.subUser.findMany({
+      where: { tenantId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+      },
+      orderBy: { name: 'asc' }
+    });
+  }
+
+  /**
    * الحقول المشتركة للـ select
    */
   _selectFields() {

@@ -86,6 +86,15 @@
               </span>
               <button 
                 type="button" 
+                @click="promptAssign(activeTicket)" 
+                class="ticket-btn ticket-btn-assign"
+                :title="isAr ? 'إسناد التذكرة لموظف' : 'Assign to Team Member'"
+              >
+                <i class="fas fa-user-tag"></i>
+                <span>{{ getAssignedUserName(activeTicket.assignedToId) || (isAr ? 'إسناد' : 'Assign') }}</span>
+              </button>
+              <button 
+                type="button" 
                 @click="closeActiveTicket" 
                 class="ticket-btn ticket-btn-close" 
                 :disabled="creatingTicket"
@@ -354,12 +363,29 @@ const fetchTicketCategories = async () => {
 
 const fetchTeamMembers = async () => {
   try {
-    const res = await axios.get('/api/v1/subusers/team');
-    teamMembers.value = res.data.data || [];
+    let res = await axios.get('/api/sub-users/team');
+    if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
+      teamMembers.value = res.data.data;
+      return;
+    }
+    // Fallback to main sub-users endpoint
+    res = await axios.get('/api/sub-users');
+    teamMembers.value = res.data?.data || [];
   } catch(e) {
-    console.error('Error fetching team members:', e);
+    try {
+      const fallback = await axios.get('/api/sub-users');
+      teamMembers.value = fallback.data?.data || [];
+    } catch(err) {
+      console.error('Error fetching team members:', err);
+    }
   }
 }
+
+const getAssignedUserName = (assignedToId) => {
+  if (!assignedToId) return null;
+  const member = teamMembers.value.find(u => u.id === assignedToId);
+  return member ? member.name : null;
+};
 
 
 const hasReopenableTicket = computed(() => {
@@ -472,6 +498,34 @@ const selectThread = async (thread) => {
     fetchMessages(thread.id),
     fetchActiveTicket(thread.id)
   ])
+
+  // Automatically open ticket if no active ticket is open and there are messages from the client
+  if (!activeTicket.value || (activeTicket.value.status !== 'OPEN' && activeTicket.value.status !== 'PENDING')) {
+    const clientMessages = (messages.value || []).filter(m => m.direction === 'INBOUND' && !m.content?.startsWith('RATE_'));
+    if (clientMessages.length > 0) {
+      try {
+        creatingTicket.value = true;
+        // If there is a recently closed unrated ticket, reopen it; otherwise create a new ticket
+        if (activeTicket.value && (activeTicket.value.status === 'CLOSED' || activeTicket.value.status === 'RESOLVED') && !activeTicket.value.rating) {
+          const res = await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/reopen');
+          if (res.data?.data) activeTicket.value = res.data.data;
+        } else {
+          const lastMsg = clientMessages[clientMessages.length - 1];
+          const res = await axios.post('/api/v1/tickets', {
+            channelId: thread.channelId,
+            threadId: thread.id,
+            crmClientId: thread.crmClientId,
+            subject: lastMsg?.content ? lastMsg.content.substring(0, 100) : 'محادثة واتساب'
+          });
+          if (res.data?.data) activeTicket.value = res.data.data;
+        }
+      } catch (err) {
+        console.error('Error auto-opening ticket on selectThread:', err);
+      } finally {
+        creatingTicket.value = false;
+      }
+    }
+  }
 }
 
 
@@ -512,6 +566,9 @@ const quickAssign = async (thread) => {
 }
 
 const promptAssign = async (ticket) => {
+  if (teamMembers.value.length === 0) {
+    await fetchTeamMembers();
+  }
   if (teamMembers.value.length === 0) {
     Swal.fire({
       icon: 'info',
@@ -1767,6 +1824,17 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #f95f00, #d94e00);
   transform: translateY(-1px);
   box-shadow: 0 4px 10px rgba(255, 102, 0, 0.35);
+}
+
+.ticket-btn-assign {
+  background: #f8fafc;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+.ticket-btn-assign:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
 }
 
 .ticket-badge-open {

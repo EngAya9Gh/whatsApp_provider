@@ -112,6 +112,7 @@ class AuthService {
       ticketSettings: {
         ratingMessageText: data.ratingMessageText !== undefined ? data.ratingMessageText : (data.ticketSettings?.ratingMessageText !== undefined ? data.ticketSettings.ratingMessageText : (currentFeatures.ticketSettings?.ratingMessageText || 'تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).')),
         ratingType: data.ratingType !== undefined ? data.ratingType : (data.ticketSettings?.ratingType !== undefined ? data.ticketSettings.ratingType : (currentFeatures.ticketSettings?.ratingType || 'LIST_5_STARS')),
+        autoCreateTickets: data.autoCreateTickets !== undefined ? Boolean(data.autoCreateTickets) : (data.ticketSettings?.autoCreateTickets !== undefined ? Boolean(data.ticketSettings.autoCreateTickets) : (currentFeatures.ticketSettings?.autoCreateTickets !== false)),
         autoCloseEnabled: data.autoCloseEnabled !== undefined ? Boolean(data.autoCloseEnabled) : (data.ticketSettings?.autoCloseEnabled !== undefined ? Boolean(data.ticketSettings.autoCloseEnabled) : (currentFeatures.ticketSettings?.autoCloseEnabled !== false)),
         autoCloseHours: data.autoCloseHours !== undefined ? Number(data.autoCloseHours) : (data.ticketSettings?.autoCloseHours !== undefined ? Number(data.ticketSettings.autoCloseHours) : (Number(currentFeatures.ticketSettings?.autoCloseHours) || 24))
       },
@@ -142,6 +143,11 @@ class AuthService {
       } catch (e) {
         updateData.webhookEvents = data.webhookEvents;
       }
+    }
+
+    if (data.password) {
+      const bcrypt = require('bcryptjs');
+      updateData.passwordHash = await bcrypt.hash(data.password, 10);
     }
 
     const updatedTenant = await prisma.tenant.update({

@@ -80,8 +80,13 @@ class TicketsService {
         select: { autoCreateTickets: true }
       });
 
-      if (!channel || !channel.autoCreateTickets) {
-        return null; // Not enabled for this channel
+      const tenantData = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } });
+      const customFeatures = typeof tenantData?.customFeatures === 'object' ? tenantData.customFeatures : {};
+      const tenantAutoCreate = customFeatures?.ticketSettings?.autoCreateTickets !== false;
+
+      const isEnabled = channel?.autoCreateTickets || tenantAutoCreate;
+      if (!isEnabled) {
+        return null; // Not enabled
       }
 
 

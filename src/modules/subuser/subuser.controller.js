@@ -104,14 +104,7 @@ class SubUserController {
 
   async getTeam(req, res, next) {
     try {
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-      const team = await prisma.subUser.findMany({
-        where: { tenantId: req.tenant.id },
-        select: { id: true, name: true, email: true }
-      });
-      // Add owner as a team member option too
-      // REMOVED: Cannot assign to owner because assignedToId is a foreign key to SubUser.
+      const team = await subUserService.getTeam(req.tenant.id);
       res.json({ success: true, data: team });
     } catch (err) {
       next(err);

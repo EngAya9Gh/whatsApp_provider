@@ -13,8 +13,8 @@
             </svg>
           </div>
           <div>
-            <h1 class="hero-title">{{ isAr ? 'الإعدادات وبيانات المنشأة' : 'Settings & Business Info' }}</h1>
-            <p class="hero-sub">{{ isAr ? 'قم بإدارة بيانات منشأتك الضريبية والتي ستظهر في الفواتير الصادرة' : 'Manage your business details and official tax information' }}</p>
+            <h1 class="hero-title">{{ isAr ? 'إعدادات المنصة' : 'Platform Settings' }}</h1>
+            <p class="hero-sub">{{ isAr ? 'إدارة بيانات المنشأة الضريبية، إعدادات التذاكر والدعم، والذكاء الاصطناعي' : 'Manage your business details, ticket & support settings, and AI configuration' }}</p>
           </div>
         </div>
       </div>
@@ -27,29 +27,61 @@
         <!-- Sidebar Navigation -->
         <div class="settings-sidebar">
           <div class="nav-group">
-            <div class="nav-group-title">{{ isAr ? 'عام' : 'General' }}</div>
-            <button class="nav-item active">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-              <span>{{ isAr ? 'بيانات المنشأة' : 'Business Details' }}</span>
+            <div class="nav-group-title">{{ isAr ? 'أقسام الإعدادات' : 'Navigation' }}</div>
+            
+            <button 
+              type="button"
+              class="nav-item" 
+              :class="{ active: currentTab === 'business' }"
+              @click="currentTab = 'business'"
+            >
+              <span class="nav-icon">🏢</span>
+              <span>{{ isAr ? 'بيانات المنشأة والضريبة' : 'Business & Tax' }}</span>
             </button>
-            <button class="nav-item">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              <span>{{ isAr ? 'الأمان' : 'Security' }}</span>
+
+            <button 
+              type="button"
+              class="nav-item" 
+              :class="{ active: currentTab === 'tickets' }"
+              @click="currentTab = 'tickets'"
+            >
+              <span class="nav-icon">🎫</span>
+              <span>{{ isAr ? 'إعدادات التذاكر والدعم' : 'Tickets & Support' }}</span>
+            </button>
+
+            <button 
+              type="button"
+              class="nav-item" 
+              :class="{ active: currentTab === 'ai' }"
+              @click="currentTab = 'ai'"
+            >
+              <span class="nav-icon">🤖</span>
+              <span>{{ isAr ? 'الذكاء الاصطناعي (AI)' : 'AI Settings' }}</span>
+            </button>
+
+            <button 
+              type="button"
+              class="nav-item" 
+              :class="{ active: currentTab === 'security' }"
+              @click="currentTab = 'security'"
+            >
+              <span class="nav-icon">🔒</span>
+              <span>{{ isAr ? 'الأمان وكلمة المرور' : 'Security' }}</span>
             </button>
           </div>
         </div>
 
-        <!-- Form Area -->
-        <div class="settings-card">
+        <!-- ══ TAB 1: Business Details ══ -->
+        <div class="settings-card" v-if="currentTab === 'business'">
           <div class="card-header">
             <div>
-              <h3 class="card-title">{{ isAr ? 'المعلومات الضريبية' : 'Tax Information' }}</h3>
+              <h3 class="card-title">{{ isAr ? 'المعلومات التجارية والضريبية' : 'Tax & Business Information' }}</h3>
               <p class="card-desc">{{ isAr ? 'تستخدم هذه البيانات لإصدار الفواتير الضريبية الرسمية لخدماتك على المنصة' : 'These details will appear on your official tax invoices' }}</p>
             </div>
             <div class="header-icon-bg">🏢</div>
           </div>
 
-          <form @submit.prevent="saveCompanyDetails" class="form-grid">
+          <form @submit.prevent="saveGeneralSettings('business')" class="form-grid">
             <div class="form-group full-width">
               <label>{{ isAr ? 'اسم المنشأة / الشركة' : 'Company Name' }}</label>
               <div class="input-wrap">
@@ -105,8 +137,85 @@
               <input type="text" v-model="form.postalCode" :placeholder="isAr ? 'مثال: 12381' : 'e.g. 12381'" class="input-std" />
             </div>
 
+            <div class="form-actions full-width">
+              <button type="submit" class="btn-save" :disabled="saving">
+                <span v-if="saving" class="spinner-sm"></span>
+                {{ saving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'حفظ بيانات المنشأة' : 'Save Business Details') }}
+              </button>
+              <transition name="fade">
+                <span v-if="savedSuccess === 'business'" class="success-msg">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  {{ isAr ? 'تم حفظ بيانات المنشأة بنجاح!' : 'Business details saved successfully!' }}
+                </span>
+              </transition>
+            </div>
+          </form>
+        </div>
+
+        <!-- ══ TAB 2: Tickets & Support Settings ══ -->
+        <div class="settings-card" v-if="currentTab === 'tickets'">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">{{ isAr ? 'إعدادات تذاكر الدعم الفني وخدمة العملاء' : 'Ticket & Customer Support Settings' }}</h3>
+              <p class="card-desc">{{ isAr ? 'تخصيص الفتح التلقائي للتذاكر، مهلة الإغلاق عند عدم النشاط، وخيارات تقييم الخدمة عبر واتساب' : 'Configure ticket auto-creation, inactivity auto-close, and WhatsApp CSAT ratings' }}</p>
+            </div>
+            <div class="header-icon-bg">🎫</div>
+          </div>
+
+          <form @submit.prevent="saveGeneralSettings('tickets')" class="form-grid">
+            
+            <!-- Section 1: Auto-Create Tickets -->
             <div class="form-divider full-width">
-              <span>{{ isAr ? 'إعدادات تقييم التذاكر (WhatsApp Rating)' : 'Ticket Rating Settings' }}</span>
+              <span>{{ isAr ? 'فتح التذاكر التلقائي (Auto-Create Tickets)' : 'Automatic Ticket Creation' }}</span>
+            </div>
+
+            <div class="form-group full-width">
+              <label class="toggle-card" :class="{ active: form.autoCreateTickets }">
+                <input type="checkbox" v-model="form.autoCreateTickets" class="hidden-checkbox" />
+                <div class="toggle-switch">
+                  <div class="toggle-slider"></div>
+                </div>
+                <div class="toggle-info">
+                  <span class="toggle-title">{{ isAr ? 'تفعيل فتح التذاكر تلقائياً عند استلام رسالة عميل' : 'Auto-Create Tickets on Inbound Customer Messages' }}</span>
+                  <span class="toggle-desc">{{ isAr ? 'عند تفعيل هذا الخيار، يتم فتح تذكرة دعم فني جديدة تلقائياً بمجرد مراسلة العميل إذا لم تكن هناك تذكرة نشطة حالياً.' : 'Automatically creates a new ticket whenever a client sends a message if no open ticket exists.' }}</span>
+                </div>
+              </label>
+            </div>
+
+            <!-- Section 2: Auto-Close Inactivity -->
+            <div class="form-divider full-width">
+              <span>{{ isAr ? 'الإغلاق التلقائي للتذاكر غير النشطة (Ticket Auto-Close)' : 'Ticket Inactivity Auto-Close' }}</span>
+            </div>
+
+            <div class="form-group full-width">
+              <label class="toggle-card" :class="{ active: form.autoCloseEnabled }">
+                <input type="checkbox" v-model="form.autoCloseEnabled" class="hidden-checkbox" />
+                <div class="toggle-switch">
+                  <div class="toggle-slider"></div>
+                </div>
+                <div class="toggle-info">
+                  <span class="toggle-title">{{ isAr ? 'تفعيل الإغلاق التلقائي للتذاكر غير النشطة' : 'Enable Auto-Close for Inactive Tickets' }}</span>
+                  <span class="toggle-desc">{{ isAr ? 'إغلاق التذكرة وإرسال رسالة التقييم تلقائياً بعد فترة من عدم استجابة العميل (شريطة أن يكون آخر رد صادراً من فريق الدعم).' : 'Automatically closes ticket and sends rating message if client remains inactive after support response.' }}</span>
+                </div>
+              </label>
+            </div>
+
+            <div class="form-group full-width" v-if="form.autoCloseEnabled">
+              <label>{{ isAr ? 'مهلة إغلاق التذكرة عند عدم رد العميل' : 'Inactivity Timeout' }}</label>
+              <select v-model="form.autoCloseHours" class="input-std">
+                <option :value="12">{{ isAr ? '12 ساعة (نصف يوم)' : '12 Hours (Half day)' }}</option>
+                <option :value="24">{{ isAr ? '24 ساعة (يوم واحد - موصى به لواتساب)' : '24 Hours (1 Day - Recommended)' }}</option>
+                <option :value="48">{{ isAr ? '48 ساعة (يومان)' : '48 Hours (2 Days)' }}</option>
+                <option :value="72">{{ isAr ? '72 ساعة (3 أيام)' : '72 Hours (3 Days)' }}</option>
+              </select>
+              <span style="font-size: 0.8rem; color: #64748B; margin-top: 4px;">
+                {{ isAr ? 'ملاحظة هامة: يتم الإغلاق فقط إذا كان آخر رد صادراً من موظف الدعم. إذا كان العميل هو من أرسل آخر رسالة فلن تُغلق التذكرة.' : 'Note: Only closes if last reply was from support team. Will never close if client spoke last.' }}
+              </span>
+            </div>
+
+            <!-- Section 3: WhatsApp Rating CSAT -->
+            <div class="form-divider full-width">
+              <span>{{ isAr ? 'إعدادات تقييم الخدمة (WhatsApp CSAT Rating)' : 'Customer Satisfaction Rating Settings' }}</span>
             </div>
 
             <div class="form-group full-width">
@@ -156,59 +265,113 @@
                 class="input-std" 
                 rows="3"
               ></textarea>
-              <span style="font-size: 0.78rem; color: #64748B; margin-top: 4px;">
-                {{ isAr ? 'يمكنك تعديل وتخصيص نص الرسالة التي تظهر للعميل قبل خيارات التقييم.' : 'Customize the greeting message shown to the client.' }}
+              <span style="font-size: 0.8rem; color: #64748B; margin-top: 4px;">
+                {{ isAr ? 'يمكنك تخصيص نص الرسالة الترحيبية التي تظهر للعميل قبل خيارات التقييم.' : 'Customize the greeting message shown to the client before rating options.' }}
               </span>
-            </div>
-
-            <div class="form-divider full-width">
-              <span>{{ isAr ? 'الإغلاق التلقائي للتذاكر (Ticket Auto-Close)' : 'Ticket Auto-Close Settings' }}</span>
-            </div>
-
-            <div class="form-group full-width">
-              <label class="toggle-card" :class="{ active: form.autoCloseEnabled }">
-                <input type="checkbox" v-model="form.autoCloseEnabled" class="hidden-checkbox" />
-                <div class="toggle-switch">
-                  <div class="toggle-slider"></div>
-                </div>
-                <div class="toggle-info">
-                  <span class="toggle-title">{{ isAr ? 'تفعيل الإغلاق التلقائي للتذاكر غير النشطة' : 'Enable Auto-Close for Inactive Tickets' }}</span>
-                  <span class="toggle-desc">{{ isAr ? 'إغلاق التذكرة وإرسال رسالة التقييم تلقائياً بعد فترة من عدم استجابة العميل.' : 'Automatically closes ticket and sends rating message if client remains inactive.' }}</span>
-                </div>
-              </label>
-            </div>
-
-            <div class="form-group" v-if="form.autoCloseEnabled">
-              <label>{{ isAr ? 'مهلة إغلاق التذكرة عند عدم رد العميل' : 'Inactivity Timeout' }}</label>
-              <select v-model="form.autoCloseHours" class="input-std">
-                <option :value="12">{{ isAr ? '12 ساعة (نصف يوم)' : '12 Hours (Half day)' }}</option>
-                <option :value="24">{{ isAr ? '24 ساعة (يوم واحد - موصى به لواتساب)' : '24 Hours (1 Day - Recommended)' }}</option>
-                <option :value="48">{{ isAr ? '48 ساعة (يومان)' : '48 Hours (2 Days)' }}</option>
-                <option :value="72">{{ isAr ? '72 ساعة (3 أيام)' : '72 Hours (3 Days)' }}</option>
-              </select>
-              <span style="font-size: 0.78rem; color: #64748B; margin-top: 4px;">
-                {{ isAr ? 'ملاحظة هامة: يتم الإغلاق فقط إذا كان آخر رد صادراً من موظف الدعم. إذا كان العميل هو من أرسل آخر رسالة فلن تُغلق التذكرة.' : 'Note: Only closes if last reply was from support team. Will never close if client spoke last.' }}
-              </span>
-            </div>
-
-            <div class="form-divider full-width">
-              <span>{{ isAr ? 'إعدادات الذكاء الاصطناعي (AI)' : 'AI Settings' }}</span>
-            </div>
-
-            <div class="form-group full-width">
-              <label>{{ isAr ? 'مفتاح Gemini (للذكاء الاصطناعي)' : 'Gemini AI Key' }}</label>
-              <input type="text" v-model="form.geminiKey" placeholder="AIzaSyB..." class="input-std" />
             </div>
 
             <div class="form-actions full-width">
-              <button type="submit" class="btn-save" :disabled="loadingTax">
-                <span v-if="loadingTax" class="spinner-sm"></span>
-                {{ loadingTax ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'حفظ التغييرات' : 'Save Changes') }}
+              <button type="submit" class="btn-save" :disabled="saving">
+                <span v-if="saving" class="spinner-sm"></span>
+                {{ saving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'حفظ إعدادات التذاكر' : 'Save Ticket Settings') }}
               </button>
               <transition name="fade">
-                <span v-if="savedTax" class="success-msg">
+                <span v-if="savedSuccess === 'tickets'" class="success-msg">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  {{ isAr ? 'تم حفظ البيانات بنجاح!' : 'Saved successfully!' }}
+                  {{ isAr ? 'تم حفظ إعدادات التذاكر بنجاح!' : 'Ticket settings saved successfully!' }}
+                </span>
+              </transition>
+            </div>
+          </form>
+        </div>
+
+        <!-- ══ TAB 3: AI Configuration ══ -->
+        <div class="settings-card" v-if="currentTab === 'ai'">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">{{ isAr ? 'إعدادات الذكاء الاصطناعي (Gemini AI)' : 'AI Configuration' }}</h3>
+              <p class="card-desc">{{ isAr ? 'ربط مفتاح API لمساعد الذكاء الاصطناعي لتوليد الردود التلقائية الذكية وتحليل المحادثات' : 'Connect Gemini API Key for smart auto-replies and message analysis' }}</p>
+            </div>
+            <div class="header-icon-bg">🤖</div>
+          </div>
+
+          <form @submit.prevent="saveGeneralSettings('ai')" class="form-grid">
+            <div class="form-group full-width">
+              <label>{{ isAr ? 'مفتاح Gemini API Key' : 'Gemini API Key' }}</label>
+              <div class="input-wrap">
+                <input 
+                  type="password" 
+                  v-model="form.geminiKey" 
+                  placeholder="AIzaSyB..." 
+                  class="input-std" 
+                />
+              </div>
+              <span style="font-size: 0.8rem; color: #64748B; margin-top: 4px;">
+                {{ isAr ? 'يمكنك الحصول على مفتاح API مجاناً من Google AI Studio لتفعيل الردود الذكية في المحادثة المباشرة والمساعد الآلي.' : 'Get a free API key from Google AI Studio to power smart replies in Live Chat and bot.' }}
+              </span>
+            </div>
+
+            <div class="form-actions full-width">
+              <button type="submit" class="btn-save" :disabled="saving">
+                <span v-if="saving" class="spinner-sm"></span>
+                {{ saving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'حفظ إعدادات AI' : 'Save AI Settings') }}
+              </button>
+              <transition name="fade">
+                <span v-if="savedSuccess === 'ai'" class="success-msg">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  {{ isAr ? 'تم حفظ إعدادات الذكاء الاصطناعي بنجاح!' : 'AI settings saved successfully!' }}
+                </span>
+              </transition>
+            </div>
+          </form>
+        </div>
+
+        <!-- ══ TAB 4: Security & Password ══ -->
+        <div class="settings-card" v-if="currentTab === 'security'">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">{{ isAr ? 'أمان الحساب وكلمة المرور' : 'Account Security & Password' }}</h3>
+              <p class="card-desc">{{ isAr ? 'قم بتحديث كلمة المرور الخاصة بحساب الإدارة لحماية بياناتك والتحكم بصلاحيات الدخول' : 'Update your administrator password to keep your account secure' }}</p>
+            </div>
+            <div class="header-icon-bg">🔒</div>
+          </div>
+
+          <form @submit.prevent="savePassword" class="form-grid">
+            <div class="form-group full-width">
+              <label>{{ isAr ? 'كلمة المرور الجديدة' : 'New Password' }}</label>
+              <input 
+                type="password" 
+                v-model="passwordForm.newPassword" 
+                :placeholder="isAr ? 'أدخل كلمة مرور جديدة (6 أحرف على الأقل)' : 'Min 6 characters'" 
+                required 
+                class="input-std" 
+              />
+            </div>
+
+            <div class="form-group full-width">
+              <label>{{ isAr ? 'تأكيد كلمة المرور الجديدة' : 'Confirm New Password' }}</label>
+              <input 
+                type="password" 
+                v-model="passwordForm.confirmPassword" 
+                :placeholder="isAr ? 'أعد إدخال كلمة المرور' : 'Re-enter password'" 
+                required 
+                class="input-std" 
+              />
+            </div>
+
+            <div v-if="passwordError" class="error-msg full-width">
+              {{ passwordError }}
+            </div>
+
+            <div class="form-actions full-width">
+              <button type="submit" class="btn-save" :disabled="savingPassword">
+                <span v-if="savingPassword" class="spinner-sm"></span>
+                {{ savingPassword ? (isAr ? 'جاري التحديث...' : 'Updating...') : (isAr ? 'تحديث كلمة المرور' : 'Update Password') }}
+              </button>
+              <transition name="fade">
+                <span v-if="savedSuccess === 'security'" class="success-msg">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  {{ isAr ? 'تم تحديث كلمة المرور بنجاح!' : 'Password updated successfully!' }}
                 </span>
               </transition>
             </div>
@@ -224,12 +387,16 @@
 import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
+import Swal from 'sweetalert2'
 
 const { locale } = useI18n()
 const isAr = computed(() => locale.value === 'ar')
 
-const loadingTax = ref(false)
-const savedTax = ref(false)
+const currentTab = ref('business')
+const saving = ref(false)
+const savingPassword = ref(false)
+const savedSuccess = ref(null)
+const passwordError = ref('')
 
 const form = ref({
   companyName: '',
@@ -241,11 +408,17 @@ const form = ref({
   country: '',
   buildingNo: '',
   postalCode: '',
+  autoCreateTickets: true,
   ratingMessageText: '',
   ratingType: 'LIST_5_STARS',
   autoCloseEnabled: true,
   autoCloseHours: 24,
   geminiKey: ''
+})
+
+const passwordForm = ref({
+  newPassword: '',
+  confirmPassword: ''
 })
 
 const fetchProfile = async () => {
@@ -272,6 +445,7 @@ const fetchProfile = async () => {
       country: details.country || '',
       buildingNo: details.buildingNo || '',
       postalCode: details.postalCode || '',
+      autoCreateTickets: ticketSettings.autoCreateTickets !== false,
       ratingMessageText: ticketSettings.ratingMessageText || '',
       ratingType: ticketSettings.ratingType || 'LIST_5_STARS',
       autoCloseEnabled: ticketSettings.autoCloseEnabled !== false,
@@ -284,11 +458,27 @@ const fetchProfile = async () => {
   }
 }
 
-const saveCompanyDetails = async () => {
-  loadingTax.value = true
+const saveGeneralSettings = async (section) => {
+  saving.value = true
   try {
     const token = localStorage.getItem('token')
-    await axios.put('/api/auth/profile', form.value, {
+    await axios.put('/api/auth/profile', {
+      companyName: form.value.companyName,
+      vatNumber: form.value.vatNumber,
+      crn: form.value.crn,
+      street: form.value.street,
+      district: form.value.district,
+      city: form.value.city,
+      country: form.value.country,
+      buildingNo: form.value.buildingNo,
+      postalCode: form.value.postalCode,
+      autoCreateTickets: form.value.autoCreateTickets,
+      ratingMessageText: form.value.ratingMessageText,
+      ratingType: form.value.ratingType,
+      autoCloseEnabled: form.value.autoCloseEnabled,
+      autoCloseHours: form.value.autoCloseHours,
+      geminiKey: form.value.geminiKey
+    }, {
       headers: { Authorization: `Bearer ${token}` }
     })
     
@@ -296,22 +486,76 @@ const saveCompanyDetails = async () => {
     const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
     tenant.companyName = form.value.companyName
     if (!tenant.customFeatures) tenant.customFeatures = {}
-    tenant.customFeatures.companyDetails = { ...form.value }
+    tenant.customFeatures.companyDetails = { 
+      vatNumber: form.value.vatNumber,
+      crn: form.value.crn,
+      street: form.value.street,
+      district: form.value.district,
+      city: form.value.city,
+      country: form.value.country,
+      buildingNo: form.value.buildingNo,
+      postalCode: form.value.postalCode
+    }
     tenant.customFeatures.ticketSettings = { 
+      autoCreateTickets: form.value.autoCreateTickets,
       ratingMessageText: form.value.ratingMessageText,
       ratingType: form.value.ratingType,
       autoCloseEnabled: form.value.autoCloseEnabled,
       autoCloseHours: form.value.autoCloseHours
     }
+    tenant.customFeatures.aiSettings = {
+      geminiKey: form.value.geminiKey
+    }
     localStorage.setItem('tenant', JSON.stringify(tenant))
     
-    savedTax.value = true
-    setTimeout(() => savedTax.value = false, 3500)
+    savedSuccess.value = section
+    setTimeout(() => {
+      if (savedSuccess.value === section) savedSuccess.value = null
+    }, 3500)
   } catch (err) {
-    console.error('Error saving tax details:', err)
-    alert('حدث خطأ أثناء حفظ البيانات.')
+    console.error('Error saving settings:', err)
+    Swal.fire({
+      icon: 'error',
+      title: isAr.value ? 'خطأ' : 'Error',
+      text: isAr.value ? 'حدث خطأ أثناء حفظ الإعدادات.' : 'Error saving settings.',
+      confirmButtonColor: '#FF6600'
+    })
   } finally {
-    loadingTax.value = false
+    saving.value = false
+  }
+}
+
+const savePassword = async () => {
+  passwordError.value = ''
+  if (!passwordForm.value.newPassword || passwordForm.value.newPassword.length < 6) {
+    passwordError.value = isAr.value ? 'كلمة المرور يجب أن لا تقل عن 6 أحرف.' : 'Password must be at least 6 characters.'
+    return
+  }
+  if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
+    passwordError.value = isAr.value ? 'كلمتا المرور غير متطابقتين.' : 'Passwords do not match.'
+    return
+  }
+
+  savingPassword.value = true
+  try {
+    const token = localStorage.getItem('token')
+    await axios.put('/api/auth/profile', {
+      password: passwordForm.value.newPassword
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    passwordForm.value.newPassword = ''
+    passwordForm.value.confirmPassword = ''
+    savedSuccess.value = 'security'
+    setTimeout(() => {
+      if (savedSuccess.value === 'security') savedSuccess.value = null
+    }, 3500)
+  } catch (err) {
+    console.error('Error updating password:', err)
+    passwordError.value = isAr.value ? 'حدث خطأ أثناء تحديث كلمة المرور.' : 'Failed to update password.'
+  } finally {
+    savingPassword.value = false
   }
 }
 
@@ -359,7 +603,6 @@ onMounted(fetchProfile)
 .hero-title { font-size: 2rem; font-weight: 900; color: #fff; margin: 0 0 0.3rem; letter-spacing: -0.03em; }
 .hero-sub { font-size: 0.95rem; color: #94A3B8; margin: 0; font-weight: 500; }
 
-
 /* ═══ MAIN ═══ */
 .page-content { padding: 2.5rem; margin-top: -2.5rem; position: relative; z-index: 10; }
 .settings-layout {
@@ -373,21 +616,21 @@ onMounted(fetchProfile)
 
 /* Sidebar */
 .settings-sidebar {
-  width: 240px; flex-shrink: 0;
+  width: 260px; flex-shrink: 0;
 }
-.nav-group { display: flex; flex-direction: column; gap: 0.25rem; }
+.nav-group { display: flex; flex-direction: column; gap: 0.4rem; }
 .nav-group-title { font-size: 0.75rem; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; padding: 0 0.5rem; }
 .nav-item {
-  display: flex; align-items: center; gap: 0.75rem;
-  padding: 0.85rem 1rem; border: none; background: transparent;
-  border-radius: 12px; cursor: pointer; transition: all 0.2s;
-  color: #64748B; font-weight: 700; font-size: 0.9rem; font-family: inherit;
+  display: flex; align-items: center; gap: 0.85rem;
+  padding: 0.85rem 1.1rem; border: none; background: transparent;
+  border-radius: 14px; cursor: pointer; transition: all 0.2s;
+  color: #64748B; font-weight: 700; font-size: 0.92rem; font-family: inherit;
   text-align: left;
 }
 .rtl .nav-item { text-align: right; }
-.nav-item:hover { background: rgba(255,255,255,0.6); color: #0F172A; }
-.nav-item.active { background: white; color: #FF6600; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
-
+.nav-icon { font-size: 1.15rem; }
+.nav-item:hover { background: rgba(255,255,255,0.7); color: #0F172A; }
+.nav-item.active { background: white; color: #FF6600; box-shadow: 0 4px 14px rgba(0,0,0,0.04); }
 
 /* Card */
 .settings-card {
@@ -397,12 +640,11 @@ onMounted(fetchProfile)
 }
 .card-header {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid #F1F5F9;
+  margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid #F1F5F9;
 }
 .card-title { font-size: 1.25rem; font-weight: 800; color: #0F172A; margin: 0 0 0.5rem; }
-.card-desc { font-size: 0.9rem; color: #64748B; margin: 0; font-weight: 500; }
-.header-icon-bg { font-size: 2.5rem; opacity: 0.1; user-select: none; }
-
+.card-desc { font-size: 0.88rem; color: #64748B; margin: 0; font-weight: 500; line-height: 1.5; }
+.header-icon-bg { font-size: 2.5rem; opacity: 0.15; user-select: none; }
 
 /* Form */
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
@@ -420,7 +662,7 @@ onMounted(fetchProfile)
 .form-divider {
   margin: 1.5rem 0 0.5rem; padding-bottom: 0.5rem;
   border-bottom: 1px solid #F1F5F9;
-  font-size: 0.9rem; font-weight: 800; color: #0F172A;
+  font-size: 0.92rem; font-weight: 800; color: #0F172A;
 }
 
 .form-actions {
@@ -439,6 +681,7 @@ onMounted(fetchProfile)
 .btn-save:disabled { opacity: 0.7; cursor: not-allowed; }
 
 .success-msg { display: flex; align-items: center; gap: 6px; color: #10B981; font-weight: 700; font-size: 0.9rem; }
+.error-msg { color: #EF4444; font-weight: 700; font-size: 0.88rem; }
 .spinner-sm { display: inline-block; width: 14px; height: 14px; border: 2px solid white; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -456,7 +699,7 @@ onMounted(fetchProfile)
 .rating-option-card {
   border: 1.5px solid #E2E8F0;
   border-radius: 14px;
-  padding: 1rem 1.25rem;
+  padding: 1.1rem 1.25rem;
   cursor: pointer;
   background: white;
   transition: all 0.2s ease;
@@ -516,7 +759,7 @@ onMounted(fetchProfile)
   line-height: 1.4;
 }
 
-/* ═══ Auto-Close Toggle Card ═══ */
+/* ═══ Auto-Close & Auto-Create Toggle Card ═══ */
 .toggle-card {
   display: flex;
   align-items: center;

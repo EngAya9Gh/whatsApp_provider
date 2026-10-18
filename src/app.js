@@ -60,6 +60,8 @@ app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/tickets', ticketsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/sub-users', subUserRoutes);
+app.use('/api/v1/subusers', subUserRoutes);
+app.use('/api/v1/sub-users', subUserRoutes);
 app.use('/api/contacts', contactRoutes);
 
 // Health check endpoint
