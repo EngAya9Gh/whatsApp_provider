@@ -179,6 +179,19 @@
               </div>
             </div>
 
+            <!-- Conversation visibility -->
+            <div class="section-title mt">
+              {{ isAr ? 'رؤية المحادثات' : 'Conversation visibility' }}
+              <span class="section-hint">{{ isAr ? 'أي محادثات يراها في المحادثات والتذاكر' : 'Which conversations they see in Live Chat and Tickets' }}</span>
+            </div>
+            <div class="scope-options">
+              <label v-for="opt in scopeOptions" :key="opt.key" class="scope-option" :class="{ active: form.chatScope === opt.key }">
+                <input type="radio" :value="opt.key" v-model="form.chatScope" />
+                <span class="scope-title">{{ opt.label }}</span>
+                <span class="scope-desc">{{ opt.desc }}</span>
+              </label>
+            </div>
+
             <!-- Permissions Matrix -->
             <div class="section-title mt">
               {{ isAr ? 'الصلاحيات' : 'Permissions' }}
@@ -337,9 +350,15 @@ const ROLE_PERMS = {
 }
 
 const form = reactive({
-  name: '', email: '', password: '', role: 'AGENT', channelId: '',
+  name: '', email: '', password: '', role: 'AGENT', channelId: '', chatScope: 'ALL',
   permissions: { ...DEFAULT_PERMS }
 })
+
+const scopeOptions = computed(() => [
+  { key: 'ALL', label: isAr.value ? 'كل المحادثات' : 'All conversations', desc: isAr.value ? 'يرى جميع المحادثات' : 'Sees everything' },
+  { key: 'TEAM', label: isAr.value ? 'محادثات فريقه' : 'Team conversations', desc: isAr.value ? 'أرقام فرقه + المسندة له' : "Their teams' numbers + assigned to them" },
+  { key: 'ASSIGNED', label: isAr.value ? 'المسندة له فقط' : 'Assigned only', desc: isAr.value ? 'المحادثات المسندة له فقط' : 'Only what is assigned to them' }
+])
 
 const activeCount = computed(() => users.value.filter(u => u.isActive).length)
 
@@ -365,19 +384,22 @@ async function fetchChannels() {
 
 function openCreate() {
   editingUser.value = null
-  Object.assign(form, { name: '', email: '', password: '', role: 'AGENT', channelId: '', permissions: { ...ROLE_PERMS.AGENT } })
+  Object.assign(form, { name: '', email: '', password: '', role: 'AGENT', channelId: '', chatScope: 'ALL', permissions: { ...ROLE_PERMS.AGENT } })
   showModal.value = true
 }
 
 function openEdit(user) {
   editingUser.value = user
+  // chat_scope is edited separately, not in the on/off permissions grid
+  const { chat_scope, ...customPerms } = user.permissions || {}
   Object.assign(form, {
     name: user.name,
     email: user.email,
     password: '',
     role: user.role,
     channelId: user.channelId || '',
-    permissions: { ...ROLE_PERMS[user.role], ...(user.permissions || {}) }
+    chatScope: chat_scope || 'ALL',
+    permissions: { ...ROLE_PERMS[user.role], ...customPerms }
   })
   showModal.value = true
 }
@@ -401,7 +423,7 @@ async function saveUser() {
     const payload = {
       name: form.name, email: form.email, role: form.role,
       channelId: form.channelId || null,
-      permissions: form.permissions
+      permissions: { ...form.permissions, chat_scope: form.chatScope }
     }
     if (!editingUser.value) payload.password = form.password
 
@@ -681,6 +703,15 @@ select.input-std { cursor: pointer; }
 .toggle-btn.on { background: #FF6600; }
 .toggle-knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: white; transition: left 0.2s; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
 .toggle-btn.on .toggle-knob { left: 23px; }
+
+.scope-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+.scope-option { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.8rem 1rem; border: 1.5px solid #E2E8F0; border-radius: 14px; cursor: pointer; transition: all 0.15s; }
+.scope-option:hover { border-color: #CBD5E1; }
+.scope-option.active { border-color: #FF6600; background: #FFF7F2; }
+.scope-option input { display: none; }
+.scope-title { font-size: 0.85rem; font-weight: 700; color: #0F172A; }
+.scope-desc { font-size: 0.72rem; color: #94A3B8; }
+@media (max-width: 640px) { .scope-options { grid-template-columns: 1fr; } }
 
 /* ═══ DELETE WARNING ═══ */
 .delete-warning { display: flex; align-items: flex-start; gap: 1rem; background: #FFF5F5; border: 1px solid #FCA5A5; border-radius: 12px; padding: 1.25rem; }

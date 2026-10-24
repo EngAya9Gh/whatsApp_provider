@@ -41,6 +41,7 @@ const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
 const subUserRoutes = require('./modules/subuser/subuser.routes');
 const contactRoutes = require('./modules/contacts/contact.routes');
 const ticketsRoutes = require('./modules/tickets/tickets.routes');
+const workforceRoutes = require('./modules/workforce/workforce.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/keys', apiKeyRoutes);
@@ -63,6 +64,7 @@ app.use('/api/sub-users', subUserRoutes);
 app.use('/api/v1/subusers', subUserRoutes);
 app.use('/api/v1/sub-users', subUserRoutes);
 app.use('/api/contacts', contactRoutes);
+app.use('/api/v1/workforce', workforceRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

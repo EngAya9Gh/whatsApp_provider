@@ -21,6 +21,8 @@ const DEFAULT_PERMISSIONS = {
     can_view_billing:        false,
     can_manage_sub_users:    false,
     can_manage_contacts:     true,
+    // Conversation visibility: ALL | TEAM | ASSIGNED
+    chat_scope:              'ALL',
   },
   MANAGER: {
     can_send_message:        true,
@@ -38,6 +40,7 @@ const DEFAULT_PERMISSIONS = {
     can_view_billing:        false,
     can_manage_sub_users:    false,
     can_manage_contacts:     true,
+    chat_scope:              'ALL',
   },
   AGENT: {
     can_send_message:        true,
@@ -55,6 +58,7 @@ const DEFAULT_PERMISSIONS = {
     can_view_billing:        false,
     can_manage_sub_users:    false,
     can_manage_contacts:     false,
+    chat_scope:              'ALL',
   },
 };
 

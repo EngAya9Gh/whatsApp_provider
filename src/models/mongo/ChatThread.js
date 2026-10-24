@@ -8,7 +8,19 @@ const ChatThreadSchema = new mongoose.Schema({
   crmClientId: { type: String },
   crmSyncedAt: { type: Date },
   lastMessageAt: { type: Date, default: Date.now },
-  unreadCount: { type: Number, default: 0 }
+  unreadCount: { type: Number, default: 0 },
+  // Last customer message — opens Meta's 24h customer-service window
+  lastInboundAt: { type: Date },
+  // Last automatic "outside working hours" reply (to avoid repeating it)
+  awayMessageSentAt: { type: Date },
+  tagIds: { type: [String], default: [] },
+  stageId: { type: String, default: null },
+  stageHistory: [{
+    _id: false,
+    stageId: { type: String, default: null },
+    changedBy: { type: String }, // sub-user id, 'OWNER' or 'SYSTEM'
+    changedAt: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true,
   collection: 'chat_threads'

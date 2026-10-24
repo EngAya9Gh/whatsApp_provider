@@ -1,4 +1,5 @@
 const ticketsService = require('./tickets.service');
+const accessService = require('../workforce/access.service');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
@@ -31,14 +32,9 @@ class TicketsController {
         ];
       }
 
-      // If user is a sub-user and not admin, we might want to restrict to their assigned tickets
-      // But usually, agents can see all or just theirs depending on role.
-      // For now, if role is Agent, maybe restrict to their channel or assignments.
-      if (req.isSubUser && req.user && req.user.role === 'AGENT') {
-        // Example: Only show tickets assigned to them or unassigned in their channel
-        // where.assignedToId = req.subUserId; 
-        // This is a business rule, we leave it open unless specified.
-      }
+      // Sub-users only see tickets inside their visibility scope (chat_scope)
+      const scopeWhere = await accessService.getTicketWhere(req);
+      if (scopeWhere) where.AND = [scopeWhere];
 
       const [tickets, total] = await Promise.all([
         prisma.ticket.findMany({

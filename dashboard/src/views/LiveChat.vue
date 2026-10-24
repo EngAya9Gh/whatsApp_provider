@@ -22,6 +22,29 @@
               </option>
             </select>
           </div>
+          <div class="label-filters" v-if="stageFilterVisible || tags.length > 0">
+            <select v-if="stageFilterVisible" v-model="stageFilter" @change="fetchThreads" class="channel-select">
+              <option value="">{{ isAr ? 'كل المراحل' : 'All stages' }}</option>
+              <option value="none">{{ isAr ? 'بدون مرحلة' : 'No stage' }}</option>
+              <option v-for="stage in stageConfig.stages" :key="stage.id" :value="stage.id">{{ stage.name }}</option>
+            </select>
+            <select v-if="tags.length > 0" v-model="tagFilter" @change="fetchThreads" class="channel-select">
+              <option value="">{{ isAr ? 'كل الوسوم' : 'All tags' }}</option>
+              <option v-for="tag in tags" :key="tag.id" :value="tag.id">{{ tag.name }}</option>
+            </select>
+          </div>
+          <div class="pinned-tags" v-if="pinnedTags.length > 0">
+            <button
+              v-for="tag in pinnedTags"
+              :key="tag.id"
+              type="button"
+              @click="togglePinnedFilter(tag.id)"
+              :class="['pinned-tag-chip', { active: tagFilter === tag.id }]"
+              :style="tagFilter === tag.id ? { background: tag.color, borderColor: tag.color, color: 'white' } : chipStyle(tag.color)"
+            >
+              <i class="fas fa-thumbtack"></i>{{ tag.name }}
+            </button>
+          </div>
         </div>
         
         <div class="threads-list" v-if="threads.length > 0">
@@ -48,6 +71,13 @@
                   {{ thread.channel.displayPhoneNumber || thread.channel.phoneNumber }}
                 </span>
                 <span class="unread-badge" v-if="thread.unreadCount > 0">{{ thread.unreadCount }}</span>
+              </div>
+              <div class="thread-labels" v-if="threadStage(thread) || threadTags(thread).length > 0">
+                <span v-if="threadStage(thread)" class="label-chip" :style="chipStyle(threadStage(thread).color)">
+                  <span class="label-dot" :style="{ background: threadStage(thread).color }"></span>{{ threadStage(thread).name }}
+                </span>
+                <span v-for="tag in threadTags(thread).slice(0, 2)" :key="tag.id" class="label-chip" :style="chipStyle(tag.color)">{{ tag.name }}</span>
+                <span v-if="threadTags(thread).length > 2" class="label-chip label-more">+{{ threadTags(thread).length - 2 }}</span>
               </div>
             </div>
           </div>
@@ -135,6 +165,29 @@
           </div>
         </div>
 
+        <div class="chat-labels-bar">
+          <StagePicker
+            v-if="isStageActive(selectedThread)"
+            :stages="stageConfig.stages"
+            :model-value="selectedThread.stageId || null"
+            :is-ar="isAr"
+            @change="updateThreadStage"
+          />
+          <span v-for="tag in threadTags(selectedThread)" :key="tag.id" class="label-chip label-chip-lg" :style="chipStyle(tag.color)">
+            {{ tag.name }}
+            <button type="button" class="label-remove" @click="removeThreadTag(tag.id)" :title="isAr ? 'إزالة الوسم' : 'Remove tag'">
+              <i class="fas fa-xmark"></i>
+            </button>
+          </span>
+          <TagPicker
+            :tags="tags"
+            :model-value="selectedThread.tagIds || []"
+            :is-ar="isAr"
+            :can-manage="canManageLabels"
+            @change="updateThreadTags"
+          />
+        </div>
+
         <div class="chat-messages" ref="messagesContainer">
           <div class="loading-state" v-if="loadingMessages">
             <AppLoader />
@@ -176,6 +229,9 @@
               
               <div class="message-meta">
                 <span class="message-time">{{ formatTime(msg.createdAt) }}</span>
+                <span v-if="msg.type === 'TEMPLATE'" class="template-badge">
+                  <i class="fas fa-file-lines"></i> {{ isAr ? 'قالب' : 'Template' }}
+                </span>
                 <span v-if="msg.isInternal || msg.type === 'INTERNAL_NOTE'" class="internal-meta-badge" title="مرئية لفريق العمل فقط ولم ترسل للعميل">
                   <i class="fas fa-lock"></i>
                   <span>خاصة بالفريق</span>
@@ -207,6 +263,21 @@
               <i class="fas fa-times"></i>
               <span>إلغاء</span>
             </button>
+          </div>
+
+          <!-- Meta 24h customer-service window -->
+          <div v-if="windowExpired && !isInternal" class="window-banner">
+            <i class="fas fa-triangle-exclamation"></i>
+            <div class="window-banner-text">
+              <strong>{{ isAr ? 'يلزم إرسال قالب رسالة' : 'A template message is required' }}</strong>
+              <span>{{ isAr ? 'مرّت 24 ساعة على آخر رسالة من العميل (سياسة Meta). أرسل قالباً معتمداً، وبعد رده تكتب بحرية لمدة 24 ساعة.' : 'It has been 24h since the customer last wrote (Meta policy). Send an approved template; once they reply you can write freely for 24h.' }}</span>
+            </div>
+            <button type="button" class="window-banner-btn" @click="showTemplateModal = true">
+              <i class="fas fa-file-lines"></i> {{ isAr ? 'إرسال قالب' : 'Send template' }}
+            </button>
+          </div>
+          <div v-else-if="windowRemainingLabel && !isInternal" class="window-hint">
+            <i class="far fa-clock"></i> {{ windowRemainingLabel }}
           </div>
 
           <div class="attachment-preview" v-if="attachment">
@@ -252,6 +323,9 @@
             >
               <i class="fas fa-lock"></i>
             </button>
+            <button type="button" class="btn-attach" @click="showTemplateModal = true" :title="isAr ? 'إرسال قالب' : 'Send template'">
+              <i class="fas fa-file-lines"></i>
+            </button>
             <button type="button" class="btn-attach" @click="toggleRecording" :class="{'recording': isRecording}" title="تسجيل صوتي">
               <i class="fas fa-microphone" v-if="!isRecording"></i>
               <i class="fas fa-stop-circle text-danger" v-else></i>
@@ -268,17 +342,17 @@
               type="text" 
               v-model="newMessage" 
               @input="handleInput"
-              :placeholder="isRecording ? 'جاري التسجيل...' : (isInternal ? 'اكتب ملاحظة داخلية لفريق العمل (لن يراها العميل)...' : 'Type a message...')" 
+              :placeholder="isRecording ? 'جاري التسجيل...' : (isInternal ? 'اكتب ملاحظة داخلية لفريق العمل (لن يراها العميل)...' : (windowExpired ? (isAr ? 'أرسل قالباً، أو فعّل الملاحظة الداخلية 🔒' : 'Send a template, or switch to an internal note 🔒') : 'Type a message...'))"
               class="form-control msg-input"
               :class="{ 'input-internal': isInternal }"
-              :disabled="sending || isRecording"
+              :disabled="sending || isRecording || (windowExpired && !isInternal)"
             />
             
             <button 
               type="submit" 
               class="btn-send" 
               :class="{ 'btn-send-internal': isInternal }"
-              :disabled="sending || isRecording || (!newMessage.trim() && !attachment)"
+              :disabled="sending || isRecording || (!newMessage.trim() && !attachment) || (windowExpired && !isInternal)"
               :title="isInternal ? 'حفظ ملاحظة داخلية' : 'إرسال'"
             >
               <template v-if="!sending">
@@ -296,6 +370,15 @@
         <h3>Welcome to Live Chat</h3>
         <p>Select a conversation from the sidebar to start messaging.</p>
       </div>
+
+      <TemplateSendModal
+        v-if="showTemplateModal && selectedThread"
+        :channel-id="selectedThread.channelId"
+        :thread-id="selectedThread.id"
+        :is-ar="isAr"
+        @close="showTemplateModal = false"
+        @sent="onTemplateSent"
+      />
 
       <!-- Rename Modal -->
       <div v-if="showRenameModal" class="modal-overlay" @click.self="showRenameModal = false">
@@ -329,6 +412,9 @@ import Swal from 'sweetalert2'
 import { io } from 'socket.io-client'
 import { useI18n } from 'vue-i18n'
 import FeatureLock from '../components/FeatureLock.vue'
+import StagePicker from '../components/chat/StagePicker.vue'
+import TagPicker from '../components/chat/TagPicker.vue'
+import TemplateSendModal from '../components/chat/TemplateSendModal.vue'
 import EmojiPicker from 'vue3-emoji-picker'
 import 'vue3-emoji-picker/css'
 
@@ -350,6 +436,135 @@ const activeTicket = ref(null)
 const isInternal = ref(false)
 const { locale } = useI18n()
 const isAr = computed(() => locale.value === 'ar')
+
+// ─── Tags & Customer Stages ───────────────────────────────────
+const tags = ref([])
+const stageConfig = ref({ enabled: false, channelIds: [], stages: [] })
+const tagFilter = ref('')
+const stageFilter = ref('')
+
+const storedTenant = (() => {
+  try {
+    return JSON.parse(localStorage.getItem('tenant') || '{}')
+  } catch {
+    return {}
+  }
+})()
+const canManageLabels = !storedTenant.isSubUser || !!storedTenant.subUser?.permissions?.can_manage_settings
+// Agents limited to their team / assigned conversations (chat_scope)
+const isScopedViewer = !!storedTenant.isSubUser && ['TEAM', 'ASSIGNED'].includes(storedTenant.subUser?.permissions?.chat_scope)
+
+const pinnedTags = computed(() => tags.value.filter(t => t.isPinned))
+const tagMap = computed(() => Object.fromEntries(tags.value.map(t => [t.id, t])))
+const stageMap = computed(() => Object.fromEntries(stageConfig.value.stages.map(s => [s.id, s])))
+const stageFilterVisible = computed(() => stageConfig.value.enabled && stageConfig.value.stages.length > 0)
+
+const isStageActive = (thread) => {
+  const cfg = stageConfig.value
+  if (!thread || !cfg.enabled || cfg.stages.length === 0) return false
+  return cfg.channelIds.length === 0 || cfg.channelIds.includes(thread.channelId)
+}
+const threadStage = (thread) => (isStageActive(thread) ? stageMap.value[thread.stageId] || null : null)
+const threadTags = (thread) => (thread?.tagIds || []).map(id => tagMap.value[id]).filter(Boolean)
+
+// Light tinted chip with readable text for any tag/stage color
+const chipStyle = (color) => ({
+  background: `${color}1a`,
+  borderColor: `${color}40`,
+  color: `color-mix(in srgb, ${color} 70%, #0f172a)`
+})
+
+const fetchLabels = async () => {
+  try {
+    const [tagsRes, stagesRes] = await Promise.all([
+      axios.get('/api/v1/chat/tags'),
+      axios.get('/api/v1/chat/stages')
+    ])
+    tags.value = tagsRes.data.data || []
+    stageConfig.value = stagesRes.data.data || { enabled: false, channelIds: [], stages: [] }
+  } catch (e) {
+    console.error('Error fetching tags/stages:', e)
+  }
+}
+
+const togglePinnedFilter = (tagId) => {
+  tagFilter.value = tagFilter.value === tagId ? '' : tagId
+  fetchThreads()
+}
+
+const labelErrorToast = (err) => {
+  Swal.fire({
+    icon: 'error',
+    title: err.response?.data?.error?.message || (isAr.value ? 'تعذّر الحفظ' : 'Could not save'),
+    toast: true, position: 'top-end', showConfirmButton: false, timer: 3000
+  })
+}
+
+const updateThreadStage = async (stageId) => {
+  const thread = selectedThread.value
+  if (!thread) return
+  const previous = thread.stageId || null
+  thread.stageId = stageId
+  try {
+    await axios.put(`/api/v1/chat/threads/${thread.id}/stage`, { stageId })
+  } catch (err) {
+    thread.stageId = previous
+    labelErrorToast(err)
+  }
+}
+
+const updateThreadTags = async (tagIds) => {
+  const thread = selectedThread.value
+  if (!thread) return
+  const previous = thread.tagIds || []
+  thread.tagIds = tagIds
+  try {
+    const res = await axios.put(`/api/v1/chat/threads/${thread.id}/tags`, { tagIds })
+    thread.tagIds = res.data.data.tagIds
+  } catch (err) {
+    thread.tagIds = previous
+    labelErrorToast(err)
+  }
+}
+
+const removeThreadTag = (tagId) => {
+  updateThreadTags((selectedThread.value?.tagIds || []).filter(id => id !== tagId))
+}
+
+// ─── Meta 24h customer-service window ─────────────────────────
+const WINDOW_MS = 24 * 60 * 60 * 1000
+const showTemplateModal = ref(false)
+const nowTick = ref(Date.now())
+let nowTimer = null
+
+// Last customer message: stored on the thread, or found in the loaded messages (older threads)
+const lastInboundTime = computed(() => {
+  const fromThread = selectedThread.value?.lastInboundAt ? new Date(selectedThread.value.lastInboundAt).getTime() : 0
+  const fromMessages = messages.value
+    .filter(m => m.direction === 'INBOUND')
+    .reduce((max, m) => Math.max(max, new Date(m.createdAt).getTime()), 0)
+  return Math.max(fromThread, fromMessages)
+})
+
+const windowExpired = computed(() => {
+  if (!selectedThread.value || loadingMessages.value) return false
+  return !lastInboundTime.value || nowTick.value - lastInboundTime.value >= WINDOW_MS
+})
+
+// Shown during the last 3 hours of the window
+const windowRemainingLabel = computed(() => {
+  if (!lastInboundTime.value || windowExpired.value) return ''
+  const left = WINDOW_MS - (nowTick.value - lastInboundTime.value)
+  if (left > 3 * 60 * 60 * 1000) return ''
+  const h = Math.floor(left / 3600000)
+  const m = Math.floor((left % 3600000) / 60000)
+  return isAr.value ? `تنتهي نافذة المحادثة خلال ${h}س ${m}د` : `Conversation window closes in ${h}h ${m}m`
+})
+
+const onTemplateSent = (msg) => {
+  if (msg && !messages.value.find(m => m.id === msg.id)) messages.value.push(msg)
+  scrollToBottom()
+}
 
 
 const fetchTicketCategories = async () => {
@@ -454,6 +669,8 @@ const fetchThreads = async () => {
     if (selectedChannel.value) {
       params.channelId = selectedChannel.value
     }
+    if (tagFilter.value) params.tagId = tagFilter.value
+    if (stageFilter.value) params.stageId = stageFilter.value
     const res = await axios.get('/api/v1/chat/threads', { params })
     threads.value = res.data.data.threads
   } catch (error) {
@@ -579,11 +796,20 @@ const promptAssign = async (ticket) => {
     return;
   }
 
+  let onShift = new Set()
+  try {
+    const res = await axios.get('/api/v1/workforce/shifts/on-shift')
+    onShift = new Set(res.data?.data?.userIds || [])
+  } catch (e) {
+    console.error('Error fetching on-shift members:', e)
+  }
+  const shiftNote = (id) => (onShift.has(id) ? (isAr.value ? ' 🟢 في الدوام' : ' 🟢 on shift') : '')
+
   const { value: selectedUserId } = await Swal.fire({
     title: isAr.value ? 'إسناد التذكرة' : 'Assign Ticket',
     html: '<select id="swal-assign" class="swal2-select" style="display:flex; width:100%;">' +
           '<option value="">' + (isAr.value ? 'غير مسندة' : 'Unassigned') + '</option>' +
-          teamMembers.value.map(u => '<option value="' + u.id + '" ' + (ticket.assignedToId === u.id ? 'selected' : '') + '>' + u.name + '</option>').join('') +
+          teamMembers.value.map(u => '<option value="' + u.id + '" ' + (ticket.assignedToId === u.id ? 'selected' : '') + '>' + u.name + shiftNote(u.id) + '</option>').join('') +
           '</select>',
     focusConfirm: false,
     showCancelButton: true,
@@ -998,6 +1224,8 @@ onMounted(() => {
   fetchQuickReplies()
   fetchTeamMembers()
   fetchTicketCategories()
+  fetchLabels()
+  nowTimer = setInterval(() => { nowTick.value = Date.now() }, 60000)
 
   // Initialize Socket.io
   const baseURL = axios.defaults.baseURL || window.location.origin
@@ -1044,13 +1272,21 @@ onMounted(() => {
          }
       }
       if (updatedThread.lastMessageAt) threads.value[idx].lastMessageAt = updatedThread.lastMessageAt
-      
+      if (updatedThread.lastInboundAt) threads.value[idx].lastInboundAt = updatedThread.lastInboundAt
+      if (updatedThread.tagIds !== undefined) threads.value[idx].tagIds = updatedThread.tagIds
+      if (updatedThread.stageId !== undefined) threads.value[idx].stageId = updatedThread.stageId
+
       // Re-sort
       threads.value.sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt))
     } else if (updatedThread.id && updatedThread.lastMessageAt) {
-      // New thread
-      threads.value.unshift(updatedThread)
+      // New thread — restricted agents reload so the server applies their visibility scope
+      if (isScopedViewer) fetchThreads()
+      else threads.value.unshift(updatedThread)
     }
+  })
+
+  socket.value.on('stages_updated', () => {
+    fetchLabels()
   })
 
   socket.value.on('ticket_updated', (data) => {
@@ -1068,6 +1304,7 @@ onUnmounted(() => {
   if (searchTimeout) {
     clearTimeout(searchTimeout)
   }
+  if (nowTimer) clearInterval(nowTimer)
 })
 </script>
 
@@ -1434,6 +1671,163 @@ onUnmounted(() => {
   color: #64748b;
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+/* ═══ TAGS & STAGES ═══ */
+.label-filters {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pinned-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.pinned-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pinned-tag-chip i {
+  font-size: 0.6rem;
+  opacity: 0.7;
+}
+
+.thread-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.label-chip-lg {
+  font-size: 0.75rem;
+  padding: 4px 6px 4px 10px;
+}
+
+.label-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.label-more {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+.label-remove {
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.label-remove:hover {
+  opacity: 1;
+}
+
+.window-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  color: #92400e;
+  font-size: 0.8rem;
+}
+
+.window-banner > i {
+  color: #d97706;
+  font-size: 1rem;
+}
+
+.window-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.window-banner-text span {
+  color: #a16207;
+  font-size: 0.75rem;
+}
+
+.window-banner-btn {
+  background: #FF6600;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.window-banner-btn:hover {
+  background: #E65C00;
+}
+
+.window-hint {
+  font-size: 0.72rem;
+  color: #b45309;
+  margin-bottom: 6px;
+}
+
+.template-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.chat-labels-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 25px;
+  background: #fcfcfd;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 /* ═══ MODAL ═══ */

@@ -156,6 +156,11 @@ class TicketsService {
         }
       });
 
+      // 3.0 Route to an agent of the team that owns this channel (on shift, by the team's rule)
+      const routingService = require('../workforce/routing.service');
+      const assignedToId = await routingService.autoAssignTicket(tenantId, ticket);
+      if (assignedToId) ticket.assignedToId = assignedToId;
+
       // 3.1 Backfill ticketId on messages that belong to this new ticket
       if (thread) {
         const ChatMessage = require('../../models/mongo/ChatMessage');

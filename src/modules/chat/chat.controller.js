@@ -1,4 +1,5 @@
 const chatService = require('./chat.service');
+const accessService = require('../workforce/access.service');
 const logger = require('../../utils/logger');
 
 class ChatController {
@@ -32,13 +33,15 @@ class ChatController {
   }
   async getThreads(req, res, next) {
     try {
-      const { page, limit, search, channelId } = req.query;
+      const { page, limit, search, channelId, tagId, stageId } = req.query;
+      const access = await accessService.getThreadFilter(req);
       const result = await chatService.getThreads(
         req.tenant.id,
         parseInt(page) || 1,
         parseInt(limit) || 50,
         search,
-        channelId
+        channelId,
+        { tagId, stageId, access }
       );
       res.json({ success: true, data: result });
     } catch (error) {
@@ -117,6 +120,15 @@ class ChatController {
         req.params.threadId,
         { ...req.body, senderId: req.subUser ? req.subUser.id : null }
       );
+      res.json({ success: true, data: message });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async sendTemplate(req, res, next) {
+    try {
+      const message = await chatService.sendTemplateMessage(req.tenant.id, req.params.threadId, req.body);
       res.json({ success: true, data: message });
     } catch (error) {
       next(error);

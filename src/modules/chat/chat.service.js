@@ -33,18 +33,29 @@ class ChatService {
     });
   }
 
-  async getThreads(tenantId, page = 1, limit = 50, search = '', channelId = null) {
+  async getThreads(tenantId, page = 1, limit = 50, search = '', channelId = null, filters = {}) {
     const skip = (page - 1) * limit;
-    
+
     let where = { tenantId };
     if (channelId) {
       where.channelId = channelId;
+    }
+    if (filters.tagId) {
+      where.tagIds = String(filters.tagId);
+    }
+    if (filters.stageId === 'none') {
+      where.stageId = null;
+    } else if (filters.stageId) {
+      where.stageId = String(filters.stageId);
     }
     if (search) {
       where.$or = [
         { contactPhone: { $regex: search, $options: 'i' } },
         { contactName: { $regex: search, $options: 'i' } }
       ];
+    }
+    if (filters.access) {
+      where = { $and: [where, filters.access] };
     }
 
     // Fetch from MongoDB
@@ -286,8 +297,8 @@ class ChatService {
     if (thread) {
       thread = await ChatThread.findOneAndUpdate(
         { _id: thread._id },
-        { 
-          $set: { lastMessageAt: new Date(), contactName: contactName || thread.contactName },
+        {
+          $set: { lastMessageAt: new Date(), lastInboundAt: new Date(), contactName: contactName || thread.contactName },
           $inc: { unreadCount: 1 }
         },
         { returnDocument: 'after' }
@@ -299,9 +310,14 @@ class ChatService {
         contactPhone,
         contactName: contactName || contactPhone,
         lastMessageAt: new Date(),
+        lastInboundAt: new Date(),
         unreadCount: 1
       });
     }
+
+    // Put conversations that never had a customer stage into the entry stage (if enabled)
+    const chatStageService = require('./chat.stage.service');
+    thread = await chatStageService.applyEntryStage(tenantId, thread);
 
     // 1. Sync Contact with CRM (Background Fire & Forget, but we await to get clientId if fast)
     const webhookService = require('../webhook/webhook.service');
@@ -395,7 +411,67 @@ class ChatService {
       // Broadcast to frontend
       socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
       socketService.emitToTenant(tenantId, 'thread_updated', threadData);
+
+      // Outside the channel's working hours → automatic away reply (not for rating replies)
+      if (!ratingValue) {
+        const hoursService = require('../workforce/hours.service');
+        hoursService.sendAwayMessageIfClosed(tenantId, channelId, thread)
+          .catch(e => logger.error('[ChatService] Away message failed: ' + e.message));
+      }
     }
+  }
+
+  /**
+   * Send an approved Meta template inside a conversation (works outside the 24h window).
+   * payload: { templateName, language, bodyParams: [..], previewText, senderId }
+   */
+  async sendTemplateMessage(tenantId, threadId, payload) {
+    const { templateName, language, bodyParams = [], previewText } = payload;
+    if (!templateName || !language) throw { status: 400, message: 'templateName and language are required' };
+
+    const thread = await ChatThread.findOne({ _id: threadId, tenantId });
+    if (!thread) throw { status: 404, message: 'Thread not found' };
+
+    const channel = await prisma.whatsAppChannel.findUnique({ where: { id: thread.channelId } });
+    if (!channel) throw { status: 404, message: 'Channel not found' };
+
+    const canSend = await billingService.checkLimit(tenantId);
+    if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
+
+    const components = bodyParams.length > 0
+      ? [{ type: 'body', parameters: bodyParams.map(text => ({ type: 'text', text: String(text) })) }]
+      : [];
+
+    const ticketsService = require('../tickets/tickets.service');
+    const activeTicket = await ticketsService.getActiveTicket(tenantId, thread._id.toString());
+
+    let metaResponse = null;
+    let status = 'SENT';
+    try {
+      metaResponse = await metaService.sendTemplate(channel, thread.contactPhone, templateName, language, components);
+      await billingService.incrementUsage(tenantId, 'sent');
+    } catch (error) {
+      logger.error('Error sending chat template:', error.response?.data || error.message);
+      status = 'FAILED';
+    }
+
+    const message = await ChatMessage.create({
+      threadId: thread._id,
+      direction: 'OUTBOUND',
+      type: 'TEMPLATE',
+      content: previewText || templateName,
+      status,
+      metaMessageId: metaResponse?.messages?.[0]?.id || null,
+      ticketId: activeTicket ? activeTicket.id : null
+    });
+    await ChatThread.updateOne({ _id: thread._id }, { $set: { lastMessageAt: new Date() } });
+
+    const msgData = message.toObject();
+    msgData.id = msgData._id.toString();
+    socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
+
+    if (status === 'FAILED') throw { status: 400, message: 'Meta rejected the template message. Check the template and its variables.' };
+    return msgData;
   }
 }
 
