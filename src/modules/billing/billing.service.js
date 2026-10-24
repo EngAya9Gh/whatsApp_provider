@@ -47,22 +47,24 @@ class BillingService {
       select: { monthlyLimit: true, plan: true }
     });
 
-    // Use the tenant's specific monthly limit from DB (customizable in admin panel). 
-    // Fallback to plans.js if not set.
-    const plansConfig = require('../../config/plans');
-    const defaultPlanLimit = plansConfig[tenant.plan]?.limit;
-    
-    // Prioritize tenant.monthlyLimit if it exists, otherwise use plan default
-    const dynamicLimit = tenant.monthlyLimit !== undefined && tenant.monthlyLimit !== null 
-                         ? tenant.monthlyLimit 
-                         : defaultPlanLimit;
+    // Use the tenant's specific monthly limit from DB (customizable in admin panel).
+    // Fallback to the plan's limit in plan_settings if not set.
+    let dynamicLimit = tenant.monthlyLimit;
+    if (dynamicLimit === undefined || dynamicLimit === null) {
+      const planSetting = await prisma.planSetting.findUnique({ where: { planCode: tenant.plan } });
+      dynamicLimit = planSetting ? planSetting.limit : 0;
+    }
+
+    // A limit of 0 (or the ENTERPRISE plan) means no monthly cap
+    const unlimited = tenant.plan === 'ENTERPRISE' || dynamicLimit <= 0;
 
     return {
       plan: tenant.plan,
       monthlyLimit: dynamicLimit,
+      unlimited,
       messagesSent: usage.messagesSent,
       messagesFailed: usage.messagesFailed,
-      remaining: Math.max(0, dynamicLimit - usage.messagesSent),
+      remaining: unlimited ? null : Math.max(0, dynamicLimit - usage.messagesSent),
       month: currentMonth
     };
   }
@@ -114,9 +116,9 @@ class BillingService {
   async checkLimit(tenantId) {
     const usage = await this.getUsage(tenantId);
     
-    // Check if the plan is unlimited (e.g. ENTERPRISE) or if they haven't reached the limit
-    if (usage.plan === 'ENTERPRISE') return true;
-    
+    // Check if the plan is unlimited (ENTERPRISE or a 0 limit) or if they haven't reached the limit
+    if (usage.unlimited) return true;
+
     if (usage.messagesSent >= usage.monthlyLimit) {
       return false;
     }

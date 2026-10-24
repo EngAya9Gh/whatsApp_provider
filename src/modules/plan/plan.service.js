@@ -1,50 +1,13 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const DEFAULT_PLANS = require('../../config/defaultPlans');
 
 class PlanService {
   async initPlans() {
     const plansCount = await prisma.planSetting.count();
     if (plansCount > 0) return;
 
-    const defaultPlans = [
-      {
-        planCode: 'FREE',
-        name: 'Free Trial',
-        price: 0,
-        limit: 10,
-        features: JSON.stringify(['API Access', 'Basic Support'])
-      },
-      {
-        planCode: 'STARTER',
-        name: 'Starter',
-        price: 20,
-        limit: 1000,
-        features: JSON.stringify(['API Access', 'Standard Support', 'Bulk Campaigns'])
-      },
-      {
-        planCode: 'ADVANCED',
-        name: 'Advanced',
-        price: 30,
-        limit: 5000,
-        features: JSON.stringify(['API Access', 'Priority Support', 'Bulk Campaigns'])
-      },
-      {
-        planCode: 'PRO',
-        name: 'Professional',
-        price: 49,
-        limit: 10000,
-        features: JSON.stringify(['API Access', '24/7 Support', 'Bulk Campaigns', 'Custom Templates'])
-      },
-      {
-        planCode: 'ENTERPRISE',
-        name: 'Enterprise',
-        price: 99,
-        limit: 50000,
-        features: JSON.stringify(['API Access', 'Dedicated Account Manager', 'Bulk Campaigns', 'Custom Templates', 'Unlimited Devices'])
-      }
-    ];
-
-    for (const p of defaultPlans) {
+    for (const p of DEFAULT_PLANS) {
       await prisma.planSetting.create({ data: p });
     }
   }

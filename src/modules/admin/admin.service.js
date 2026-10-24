@@ -111,13 +111,13 @@ class AdminService {
   }
 
   async updateTenantPlan(id, plan) {
-    const plansConfig = require('../../config/plans');
-    const validPlans = Object.keys(plansConfig);
-    if (!validPlans.includes(plan)) throw new Error('Invalid plan');
+    // Limits come from the plans edited in the admin console (plan_settings)
+    const planSetting = await prisma.planSetting.findUnique({ where: { planCode: plan } }).catch(() => null);
+    if (!planSetting) throw new Error('Invalid plan');
 
     return prisma.tenant.update({
       where: { id },
-      data: { plan, monthlyLimit: plansConfig[plan].limit }
+      data: { plan, monthlyLimit: planSetting.limit }
     });
   }
 

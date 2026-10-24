@@ -8,7 +8,7 @@
       <div class="progress-section">
         <div class="progress-labels">
           <span>Messages Sent</span>
-          <span>{{ usage.messagesSent }} / {{ usage.monthlyLimit }}</span>
+          <span>{{ usage.messagesSent }} / {{ usage.unlimited ? '∞' : usage.monthlyLimit }}</span>
         </div>
         <div class="progress-bar-bg">
           <div class="progress-bar-fill" :style="{ width: progressPercentage + '%' }" :class="{ 'warning': progressPercentage > 80, 'danger': progressPercentage >= 100 }"></div>
@@ -22,7 +22,7 @@
         </div>
         <div class="stat">
           <label>Remaining</label>
-          <div class="value">{{ usage.remaining }}</div>
+          <div class="value">{{ usage.unlimited ? '∞' : usage.remaining }}</div>
         </div>
       </div>
     </div>
@@ -92,7 +92,7 @@ onMounted(async () => {
 
 const progressPercentage = computed(() => {
   if (!usage.value) return 0
-  if (usage.value.monthlyLimit === 0) return 0
+  if (usage.value.unlimited || !usage.value.monthlyLimit) return 0
   return Math.min(100, (usage.value.messagesSent / usage.value.monthlyLimit) * 100)
 })
 </script>
