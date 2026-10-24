@@ -3,6 +3,7 @@ const prisma = new PrismaClient();
 const ChatThread = require('../../models/mongo/ChatThread');
 const ChatMessage = require('../../models/mongo/ChatMessage');
 const ChatTag = require('../../models/mongo/ChatTag');
+const CampaignDelivery = require('../../models/mongo/CampaignDelivery');
 const shiftService = require('../workforce/shift.service');
 const { localClock } = require('../workforce/shift.service');
 const chatStageService = require('../chat/chat.stage.service');
@@ -137,10 +138,18 @@ class AnalyticsService {
       if (daily[key]) daily[key].outbound++;
     }
 
-    // Delivery funnel of what the team / system sent
-    const delivered = curOut.filter(m => m.status === 'DELIVERED' || m.status === 'READ').length;
-    const read = curOut.filter(m => m.status === 'READ').length;
-    const failed = curOut.filter(m => m.status === 'FAILED').length;
+    // ─── Messages sent through the API / "Send Meta message" page (MessageLog) ───
+    const apiLogs = await prisma.messageLog.findMany({
+      where: { tenantId, channelId: { in: channelIds }, createdAt: { gte: prevStart, lt: end } },
+      select: { status: true, deliveryStatus: true, createdAt: true },
+      take: MAX_ROWS
+    });
+    const curApi = apiLogs.filter(l => between(l.createdAt, start, end) && l.status !== 'QUEUED');
+    const prevApi = apiLogs.filter(l => between(l.createdAt, prevStart, start) && l.status !== 'QUEUED');
+    for (const l of curApi) {
+      const key = localClock(timezone, l.createdAt).date;
+      if (daily[key]) daily[key].outbound++;
+    }
 
     // ─── Tickets ───
     const ticketScope = { tenantId, ...(channelId ? { channelId } : { channelId: { in: channelIds } }) };
@@ -229,6 +238,62 @@ class AnalyticsService {
       prisma.campaignTarget.groupBy({ by: ['status'], where: { campaign: campaignWhere }, _count: { _all: true } })
     ]);
     const targetCount = (status) => targetStatuses.filter(t => t.status === status).reduce((s, t) => s + t._count._all, 0);
+    const campaignSent = targetCount('SENT') + targetCount('DELIVERED') + targetCount('READ');
+
+    const prevCampaignTargets = await prisma.campaignTarget.groupBy({
+      by: ['status'],
+      where: { campaign: { ...campaignWhere, createdAt: { gte: prevStart, lt: start } } },
+      _count: { _all: true }
+    });
+    const prevCampaignSent = prevCampaignTargets.filter(t => ['SENT', 'DELIVERED', 'READ'].includes(t.status)).reduce((s, t) => s + t._count._all, 0);
+
+    // Delivered / read are only known for campaign messages sent since delivery tracking exists
+    const deliveryRows = campaigns.length
+      ? await CampaignDelivery.aggregate([
+        { $match: { tenantId, campaignId: { $in: campaigns.map(c => c.id) } } },
+        { $group: { _id: { campaignId: '$campaignId', status: '$status' }, n: { $sum: 1 } } }
+      ])
+      : [];
+    const deliveryCount = (statuses, campaignId = null) => deliveryRows
+      .filter(r => statuses.includes(r._id.status) && (!campaignId || r._id.campaignId === campaignId))
+      .reduce((sum, r) => sum + r.n, 0);
+    const campaignTracked = deliveryCount(['sent', 'delivered', 'read', 'failed']);
+
+    // ─── Everything we sent, by source ───
+    const isApiDelivered = (l) => l.deliveryStatus === 'delivered' || l.deliveryStatus === 'read';
+    const isApiFailed = (l) => l.status === 'FAILED' || l.deliveryStatus === 'failed';
+    const sources = [
+      {
+        key: 'chat',
+        sent: curOut.length,
+        delivered: curOut.filter(m => m.status === 'DELIVERED' || m.status === 'READ').length,
+        read: curOut.filter(m => m.status === 'READ').length,
+        failed: curOut.filter(m => m.status === 'FAILED').length,
+        tracked: curOut.length
+      },
+      {
+        key: 'api',
+        sent: curApi.length,
+        delivered: curApi.filter(isApiDelivered).length,
+        read: curApi.filter(l => l.deliveryStatus === 'read').length,
+        failed: curApi.filter(isApiFailed).length,
+        tracked: curApi.length
+      },
+      {
+        key: 'campaigns',
+        sent: campaignSent + targetCount('FAILED'),
+        delivered: campaignTracked ? deliveryCount(['delivered', 'read']) : null,
+        read: campaignTracked ? deliveryCount(['read']) : null,
+        failed: targetCount('FAILED'),
+        tracked: campaignTracked
+      }
+    ];
+    const tracked = sources.reduce((s, x) => s + x.tracked, 0);
+    const delivered = sources.reduce((s, x) => s + (x.delivered || 0), 0);
+    const read = sources.reduce((s, x) => s + (x.read || 0), 0);
+    const failed = sources.reduce((s, x) => s + x.failed, 0);
+    const totalSent = sources.reduce((s, x) => s + x.sent, 0);
+    const prevTotalSent = prevOut.length + prevApi.length + prevCampaignSent + prevCampaignTargets.filter(t => t.status === 'FAILED').reduce((s, t) => s + t._count._all, 0);
 
     return {
       range: { days: range.days, start, end, timezone },
@@ -249,14 +314,20 @@ class AnalyticsService {
         medianResponseMinutes: minutes(median(curPairs.map(p => p.ms))),
         avgResponseChange: delta(avg(curPairs.map(p => p.ms)), avg(prevPairs.map(p => p.ms)))
       },
+      // Rates use only messages whose Meta status we can follow
       delivery: {
-        sent: curOut.length,
+        sent: tracked,
         delivered,
         read,
         failed,
-        deliveredRate: pct(delivered, curOut.length),
-        readRate: pct(read, curOut.length),
-        failedRate: pct(failed, curOut.length)
+        deliveredRate: pct(delivered, tracked),
+        readRate: pct(read, tracked),
+        failedRate: pct(failed, tracked)
+      },
+      sent: {
+        total: totalSent,
+        change: delta(totalSent, prevTotalSent),
+        bySource: sources
       },
       daily: keys.map(k => daily[k]),
       heatmap,
@@ -274,13 +345,19 @@ class AnalyticsService {
       campaigns: {
         count: campaigns.length,
         targets: targetStatuses.reduce((s, t) => s + t._count._all, 0),
-        sent: targetCount('SENT') + targetCount('DELIVERED') + targetCount('READ'),
+        sent: campaignSent,
         failed: targetCount('FAILED'),
+        read: campaignTracked ? deliveryCount(['read']) : null,
         interactions: campaigns.reduce((s, c) => s + c._count.interactions, 0),
-        list: campaigns.slice(0, 10).map(c => ({
-          id: c.id, name: c.name, status: c.status, createdAt: c.createdAt, category: c.metaCategory,
-          targets: c._count.targets, interactions: c._count.interactions
-        }))
+        list: campaigns.slice(0, 10).map(c => {
+          const trackedHere = deliveryCount(['sent', 'delivered', 'read', 'failed'], c.id);
+          return {
+            id: c.id, name: c.name, status: c.status, createdAt: c.createdAt, category: c.metaCategory,
+            targets: c._count.targets, interactions: c._count.interactions,
+            delivered: trackedHere ? deliveryCount(['delivered', 'read'], c.id) : null,
+            read: trackedHere ? deliveryCount(['read'], c.id) : null
+          };
+        })
       }
     };
   }

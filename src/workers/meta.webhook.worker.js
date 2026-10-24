@@ -154,6 +154,14 @@ async function processStatusUpdate(channelId, tenantId, payload) {
     logger.error(`[MetaWebhookWorker] Failed to update Mongoose ChatMessage status:`, e.message);
   }
 
+  // Campaign messages: delivered / read tracking
+  try {
+    const CampaignDelivery = require('../models/mongo/CampaignDelivery');
+    await CampaignDelivery.applyStatus(wamid, status);
+  } catch (e) {
+    logger.error(`[MetaWebhookWorker] Failed to update campaign delivery status:`, e.message);
+  }
+
   logger.info(`[MetaWebhookWorker] ✅ Updated status for wamid ${wamid} → ${status}`);
 }
 

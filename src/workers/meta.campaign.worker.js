@@ -96,6 +96,13 @@ const worker = new Worker('meta-campaign-queue', async (job) => {
       data: { status: 'SENT' }
     });
 
+    // Track delivered / read for campaign analytics (Meta status webhooks update it by wamid)
+    if (wamid) {
+      const CampaignDelivery = require('../models/mongo/CampaignDelivery');
+      await CampaignDelivery.create({ wamid, tenantId, campaignId, targetId, status: 'sent' })
+        .catch(e => logger.warn(`[MetaCampaign] Could not record delivery tracking: ${e.message}`));
+    }
+
     logger.info(`[MetaCampaign] Message sent to ${phone} for campaign ${campaignId}. WAMID: ${wamid}`);
     return { success: true, wamid };
 

@@ -30,6 +30,12 @@
     </div>
 
     <div v-else-if="data" class="space-y-5 transition-opacity" :class="{ 'opacity-50': loading }">
+      <div v-if="isEmpty" class="text-sm text-slate-600 bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center gap-3">
+        <i class="fas fa-circle-info text-slate-400"></i>
+        <span class="flex-1">{{ isAr ? `لا توجد رسائل أو تذاكر أو حملات على أرقام Meta خلال آخر ${days} يوماً.` : `No messages, tickets or campaigns on Meta numbers in the last ${days} days.` }}</span>
+        <button v-if="days < 365" type="button" class="text-[#FF6600] font-semibold bg-transparent border-none cursor-pointer" @click="setDays(365)">{{ isAr ? 'عرض آخر سنة' : 'Show last year' }}</button>
+      </div>
+
       <p v-if="data.truncated" class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
         {{ isAr ? 'الفترة كبيرة جداً، فحُسبت الأرقام على أحدث الرسائل فقط. اختر فترة أقصر لأرقام دقيقة.' : 'Large period: figures use the most recent messages only. Pick a shorter period for exact numbers.' }}
       </p>
@@ -38,7 +44,7 @@
       <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         <StatTile :label="isAr ? 'محادثات جديدة' : 'New conversations'" icon="fas fa-comment-medical" :value="fmt.num(c.new)" :delta="c.newChange" />
         <StatTile :label="isAr ? 'رسائل العملاء' : 'Customer messages'" icon="fas fa-arrow-down" :value="fmt.num(c.inbound)" :delta="c.inboundChange" />
-        <StatTile :label="isAr ? 'رسائل الفريق' : 'Team messages'" icon="fas fa-arrow-up" :value="fmt.num(c.outbound)" :delta="c.outboundChange" :hint="c.templatesSent ? (isAr ? `${c.templatesSent} قالب` : `${c.templatesSent} templates`) : ''" />
+        <StatTile :label="isAr ? 'الرسائل المرسلة' : 'Messages sent'" icon="fas fa-arrow-up" :value="fmt.num(data.sent.total)" :delta="data.sent.change" :hint="isAr ? 'محادثات + API + حملات' : 'chats + API + campaigns'" />
         <StatTile :label="isAr ? 'متوسط زمن الرد' : 'Avg. response time'" icon="far fa-clock" :value="fmt.duration(c.avgResponseMinutes)" :delta="c.avgResponseChange" :up-is-good="false" :hint="c.medianResponseMinutes !== null ? (isAr ? `الوسيط ${fmt.duration(c.medianResponseMinutes)}` : `median ${fmt.duration(c.medianResponseMinutes)}`) : ''" />
         <StatTile :label="isAr ? 'بانتظار الرد' : 'Awaiting reply'" icon="fas fa-hourglass-half" :value="fmt.num(c.awaitingReply)" :hint="isAr ? 'آخر رسالة من العميل' : 'customer wrote last'" />
         <StatTile :label="isAr ? 'نسبة الوصول' : 'Delivery rate'" icon="fas fa-check-double" :value="fmt.percent(data.delivery.deliveredRate)" :hint="isAr ? `القراءة ${fmt.percent(data.delivery.readRate)}` : `read ${fmt.percent(data.delivery.readRate)}`" />
@@ -51,7 +57,7 @@
           :rows="data.daily"
           :series="trendSeries"
           :is-ar="isAr"
-          :aria-label="isAr ? 'رسائل العملاء ورسائل الفريق يومياً' : 'Customer and team messages per day'"
+          :aria-label="isAr ? 'رسائل العملاء والرسائل المرسلة يومياً' : 'Customer messages and messages sent per day'"
         />
       </section>
 
@@ -62,8 +68,8 @@
           <HeatmapChart :matrix="data.heatmap" :is-ar="isAr" :unit="isAr ? 'رسالة' : 'messages'" />
         </section>
         <section class="card">
-          <h2 class="card-title">{{ isAr ? 'تسليم رسائل الفريق' : 'Delivery of team messages' }}</h2>
-          <p class="card-sub">{{ isAr ? 'حسب آخر حالة وصلت من Meta' : 'By the latest status reported by Meta' }}</p>
+          <h2 class="card-title">{{ isAr ? 'تسليم الرسائل' : 'Message delivery' }}</h2>
+          <p class="card-sub">{{ isAr ? 'المحادثات والـ API والحملات، حسب آخر حالة أبلغت بها Meta' : 'Chats, API and campaigns, by the latest status Meta reported' }}</p>
           <BarList :items="deliveryItems" />
           <p v-if="data.delivery.failed" class="mt-3 text-xs font-semibold text-[#d03b3b] flex items-center gap-1.5">
             <i class="fas fa-circle-exclamation"></i>
@@ -71,6 +77,34 @@
           </p>
         </section>
       </div>
+
+      <!-- Sent by source -->
+      <section class="card">
+        <h2 class="card-title">{{ isAr ? 'الرسائل المرسلة حسب المصدر' : 'Messages sent by source' }}</h2>
+        <p class="card-sub">{{ isAr ? '«—» يعني أن Meta لم تُبلغ بحالة هذه الرسائل (حملات أُرسلت قبل تفعيل تتبّع الوصول).' : '"—" means Meta did not report a status for these messages (campaigns sent before delivery tracking).' }}</p>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>{{ isAr ? 'المصدر' : 'Source' }}</th>
+                <th>{{ isAr ? 'أُرسلت' : 'Sent' }}</th>
+                <th>{{ isAr ? 'وصلت' : 'Delivered' }}</th>
+                <th>{{ isAr ? 'قُرئت' : 'Read' }}</th>
+                <th>{{ isAr ? 'فشلت' : 'Failed' }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="src in data.sent.bySource" :key="src.key">
+                <td class="font-semibold text-slate-800">{{ sourceLabel(src.key) }}</td>
+                <td>{{ fmt.num(src.sent) }}</td>
+                <td>{{ fmt.num(src.delivered) }}</td>
+                <td>{{ fmt.num(src.read) }}</td>
+                <td>{{ fmt.num(src.failed) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <!-- Tickets -->
       <section class="card">
@@ -160,6 +194,8 @@
                 <th>{{ isAr ? 'التصنيف' : 'Category' }}</th>
                 <th>{{ isAr ? 'التاريخ' : 'Date' }}</th>
                 <th>{{ isAr ? 'المستهدفون' : 'Recipients' }}</th>
+                <th>{{ isAr ? 'وصلت' : 'Delivered' }}</th>
+                <th>{{ isAr ? 'قُرئت' : 'Read' }}</th>
                 <th>{{ isAr ? 'تفاعلات' : 'Clicks' }}</th>
               </tr>
             </thead>
@@ -169,6 +205,8 @@
                 <td>{{ cm.category || '—' }}</td>
                 <td>{{ fmt.date(cm.createdAt) }}</td>
                 <td>{{ fmt.num(cm.targets) }}</td>
+                <td>{{ fmt.num(cm.delivered) }}</td>
+                <td>{{ fmt.num(cm.read) }}</td>
                 <td>{{ fmt.num(cm.interactions) }}</td>
               </tr>
             </tbody>
@@ -202,7 +240,8 @@ const error = ref('')
 const presets = computed(() => [
   { days: 7, label: isAr.value ? '7 أيام' : '7 days' },
   { days: 30, label: isAr.value ? '30 يوماً' : '30 days' },
-  { days: 90, label: isAr.value ? '90 يوماً' : '90 days' }
+  { days: 90, label: isAr.value ? '90 يوماً' : '90 days' },
+  { days: 365, label: isAr.value ? 'سنة' : '1 year' }
 ])
 
 const c = computed(() => data.value.conversations)
@@ -211,8 +250,20 @@ const t = computed(() => data.value.tickets)
 // Categorical slots 1 & 2 (validated pair)
 const trendSeries = computed(() => [
   { key: 'inbound', label: isAr.value ? 'رسائل العملاء' : 'Customer messages', color: '#2a78d6' },
-  { key: 'outbound', label: isAr.value ? 'رسائل الفريق' : 'Team messages', color: '#eb6834' }
+  { key: 'outbound', label: isAr.value ? 'الرسائل المرسلة' : 'Messages sent', color: '#eb6834' }
 ])
+
+const sourceLabel = (key) => ({
+  chat: isAr.value ? 'المحادثات (فريق + أتمتة)' : 'Chats (team + automation)',
+  api: isAr.value ? 'الـ API وصفحة إرسال Meta' : 'API & Meta send page',
+  campaigns: isAr.value ? 'حملات Meta' : 'Meta campaigns'
+}[key] || key)
+
+// Nothing at all in the period → suggest a longer one
+const isEmpty = computed(() => {
+  const d = data.value
+  return !d.conversations.inbound && !d.sent.total && !d.tickets.opened && !d.campaigns.count
+})
 
 const deliveryItems = computed(() => {
   const d = data.value.delivery
