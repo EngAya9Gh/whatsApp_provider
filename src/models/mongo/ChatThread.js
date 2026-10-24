@@ -15,6 +15,9 @@ const ChatThreadSchema = new mongoose.Schema({
   awayMessageSentAt: { type: Date },
   // Running WhatsApp flow: { flowId, version, nodeId (waiting question), attempts, startedAt }
   flowState: { type: mongoose.Schema.Types.Mixed, default: null },
+  // AI: last conversation summary, and a suggested customer stage awaiting accept / reject
+  aiSummary: { type: mongoose.Schema.Types.Mixed, default: null },      // { text, basedOnMessageAt, createdAt }
+  aiSuggestion: { type: mongoose.Schema.Types.Mixed, default: null },   // { stageId, reason, status, basedOnMessageAt, createdAt }
   tagIds: { type: [String], default: [] },
   stageId: { type: String, default: null },
   stageHistory: [{

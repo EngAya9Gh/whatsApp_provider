@@ -21,7 +21,7 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
           <span class="nav-label">{{ $t('sidebar.dashboard') }}</span>
         </router-link>
-        <router-link v-if="$hasFeature('META_API') && (!isSubUser || subUserPerms?.can_view_analytics)" to="/analytics/meta" class="nav-item" active-class="active">
+        <router-link v-if="($hasFeature('META_API') || $hasFeature('META_CAMPAIGN') || $hasFeature('META_AUTORESPONDER') || $hasFeature('META_SEND_MESSAGE') || $hasFeature('META_TEMPLATES')) && (!isSubUser || subUserPerms?.can_view_analytics)" to="/analytics/meta" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
           <span class="nav-label">{{ locale === 'ar' ? 'تحليلات Meta' : 'Meta Analytics' }}</span>
         </router-link>
@@ -107,6 +107,10 @@
           <router-link v-if="$hasFeature('META_AUTORESPONDER') && (!isSubUser || subUserPerms?.can_view_chatbot)" to="/flows" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="5" rx="1"/><rect x="15" y="9" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><path d="M6 8v8"/><path d="M9 5.5h3a3 3 0 0 1 3 3v3"/></svg>
             <span class="nav-label">{{ locale === 'ar' ? 'سير الواتساب' : 'WhatsApp Flows' }}</span>
+          </router-link>
+          <router-link v-if="$hasFeature('META_AUTORESPONDER') && (!isSubUser || subUserPerms?.can_view_chatbot)" to="/ai-agent" class="nav-item" active-class="active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="14" r="1.2"/></svg>
+            <span class="nav-label">{{ locale === 'ar' ? 'الموظف الذكي' : 'AI Agent' }}</span>
           </router-link>
           <router-link v-if="!isSubUser || subUserPerms?.can_view_chatbot" to="/meta-flows" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>

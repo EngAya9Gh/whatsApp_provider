@@ -28,6 +28,9 @@
       <template v-else-if="type === 'stage'">
         {{ ctx.isAr.value ? 'نقل إلى' : 'Move to' }} <strong>{{ ctx.stageMap.value[data.stageId]?.name || '—' }}</strong>
       </template>
+      <template v-else-if="type === 'ai_agent'">
+        {{ ctx.isAr.value ? 'يجيب العميل من معلومات نشاطك، ويحوّله لموظف عند الحاجة' : 'Answers from your business info; hands off when needed' }}
+      </template>
       <template v-else-if="type === 'assign'">
         <template v-if="data.mode === 'AGENT'">{{ ctx.isAr.value ? 'إلى' : 'To' }} <strong>{{ ctx.agentMap.value[data.agentId]?.name || '—' }}</strong></template>
         <template v-else>{{ ctx.isAr.value ? 'إلى فريق هذا الرقم (حسب الدوام والتوزيع)' : "To this number's team (by shift & routing)" }}</template>
@@ -59,6 +62,12 @@
       <div class="branch no">
         <span class="branch-text">{{ ctx.isAr.value ? 'لا' : 'No' }}</span>
         <Handle id="no" type="source" :position="sidePosition" class="fhandle" />
+      </div>
+    </div>
+    <div v-else-if="type === 'ai_agent'" class="fnode-branches">
+      <div class="branch muted">
+        <span class="branch-text">{{ ctx.isAr.value ? 'عند التحويل لموظف' : 'On hand-off' }}</span>
+        <Handle id="handoff" type="source" :position="sidePosition" class="fhandle" />
       </div>
     </div>
     <Handle v-else-if="type !== 'assign' && type !== 'end'" id="out" type="source" :position="Position.Bottom" class="fhandle" />

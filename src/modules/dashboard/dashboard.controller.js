@@ -115,7 +115,8 @@ class DashboardController {
         }
       }
 
-      const deliveryRate = totalSent > 0 ? ((totalDeliveredOrRead / totalSent) * 100).toFixed(1) : 100;
+      // No messages → no rate (null), rather than a misleading 100%
+      const deliveryRate = totalSent > 0 ? ((totalDeliveredOrRead / totalSent) * 100).toFixed(1) : null;
 
       res.status(200).json({
         success: true,
@@ -123,7 +124,7 @@ class DashboardController {
           walletBalance: tenant?.walletBalance || 0,
           currency: tenant?.currency || 'SAR',
           estimatedRemainingMessages,
-          deliveryRate: parseFloat(deliveryRate),
+          deliveryRate: deliveryRate === null ? null : parseFloat(deliveryRate),
           categories
         }
       });

@@ -189,6 +189,34 @@
             :can-manage="canManageLabels"
             @change="updateThreadTags"
           />
+          <button v-if="aiConfigured" type="button" class="ai-summary-btn" :disabled="loadingSummary" @click="loadSummary(!!aiSummary)">
+            <i class="fas" :class="loadingSummary ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'"></i>
+            {{ isAr ? 'ملخص المحادثة' : 'Summarize' }}
+          </button>
+        </div>
+
+        <!-- AI: suggested customer stage -->
+        <div v-if="aiSuggestion && stageMap[aiSuggestion.stageId] && isStageActive(selectedThread)" class="ai-card ai-suggestion">
+          <i class="fas fa-wand-magic-sparkles"></i>
+          <div class="flex-1 min-w-0">
+            <div>
+              {{ isAr ? 'يقترح النظام نقل هذا العميل إلى' : 'Suggested: move this customer to' }}
+              <span class="label-chip" :style="chipStyle(stageMap[aiSuggestion.stageId].color)">{{ stageMap[aiSuggestion.stageId].name }}</span>
+            </div>
+            <div v-if="aiSuggestion.reason" class="ai-reason">{{ aiSuggestion.reason }}</div>
+          </div>
+          <button type="button" class="ai-accept" :disabled="decidingSuggestion" @click="decideSuggestion(true)"><i class="fas fa-check"></i> {{ isAr ? 'قبول' : 'Accept' }}</button>
+          <button type="button" class="ai-reject" :disabled="decidingSuggestion" @click="decideSuggestion(false)">{{ isAr ? 'رفض' : 'Dismiss' }}</button>
+        </div>
+
+        <!-- AI: conversation summary -->
+        <div v-if="aiSummary" class="ai-card ai-summary">
+          <i class="fas fa-file-lines"></i>
+          <div class="flex-1 min-w-0">
+            <div class="ai-summary-title">{{ isAr ? 'ملخص المحادثة' : 'Conversation summary' }}</div>
+            <div class="ai-summary-text">{{ aiSummary.text }}</div>
+          </div>
+          <button type="button" class="ai-close" @click="aiSummary = null" :title="isAr ? 'إغلاق' : 'Close'"><i class="fas fa-xmark"></i></button>
         </div>
 
         <div class="chat-messages" ref="messagesContainer">
@@ -503,6 +531,65 @@ const labelErrorToast = (err) => {
   })
 }
 
+// ─── AI: summary & stage suggestion ───────────────────────────
+const aiConfigured = ref(false)
+const aiSuggestion = ref(null)
+const aiSummary = ref(null)
+const loadingSummary = ref(false)
+const decidingSuggestion = ref(false)
+
+const fetchAiStatus = async () => {
+  try {
+    const res = await axios.get('/api/v1/ai/status')
+    aiConfigured.value = !!res.data.data?.configured
+  } catch {
+    aiConfigured.value = false
+  }
+}
+
+// Runs in the background when a conversation opens; the server reuses its last answer until new messages arrive
+const loadSuggestion = async (thread) => {
+  if (!aiConfigured.value || !isStageActive(thread)) return
+  try {
+    const res = await axios.post(`/api/v1/ai/threads/${thread.id}/stage-suggestion`)
+    if (selectedThread.value?.id === thread.id) aiSuggestion.value = res.data.data || null
+  } catch (e) {
+    console.warn('Stage suggestion unavailable:', e.response?.data?.error?.message || e.message)
+  }
+}
+
+const loadSummary = async (refresh = false) => {
+  const thread = selectedThread.value
+  if (!thread) return
+  loadingSummary.value = true
+  try {
+    const res = await axios.post(`/api/v1/ai/threads/${thread.id}/summary`, { refresh })
+    if (selectedThread.value?.id === thread.id) {
+      aiSummary.value = res.data.data || { text: isAr.value ? 'لا توجد رسائل لتلخيصها.' : 'Nothing to summarize yet.' }
+    }
+  } catch (err) {
+    Swal.fire({ icon: 'error', title: isAr.value ? 'تعذّر إنشاء الملخص' : 'Could not summarize', text: err.response?.data?.error?.message || err.message, confirmButtonColor: '#FF6600' })
+  } finally {
+    loadingSummary.value = false
+  }
+}
+
+const decideSuggestion = async (accept) => {
+  const thread = selectedThread.value
+  if (!thread || !aiSuggestion.value) return
+  decidingSuggestion.value = true
+  try {
+    const res = await axios.post(`/api/v1/ai/threads/${thread.id}/stage-suggestion/${accept ? 'accept' : 'reject'}`)
+    if (accept) thread.stageId = res.data.data.stageId
+    aiSuggestion.value = null
+  } catch (err) {
+    aiSuggestion.value = null
+    labelErrorToast(err)
+  } finally {
+    decidingSuggestion.value = false
+  }
+}
+
 const updateThreadStage = async (stageId) => {
   const thread = selectedThread.value
   if (!thread) return
@@ -712,12 +799,15 @@ const fetchActiveTicket = async (threadId) => {
 
 const selectThread = async (thread) => {
   selectedThread.value = thread
+  aiSuggestion.value = null
+  aiSummary.value = null
   activeTicket.value = null // Reset so old thread's ticket isn't shown while loading
   thread.unreadCount = 0 // Optimistic update
   await Promise.all([
     fetchMessages(thread.id),
     fetchActiveTicket(thread.id)
   ])
+  loadSuggestion(thread)
 
   // Automatically open ticket if no active ticket is open and there are messages from the client
   if (!activeTicket.value || (activeTicket.value.status !== 'OPEN' && activeTicket.value.status !== 'PENDING')) {
@@ -1228,6 +1318,7 @@ onMounted(() => {
   fetchTeamMembers()
   fetchTicketCategories()
   fetchLabels()
+  fetchAiStatus()
   nowTimer = setInterval(() => { nowTick.value = Date.now() }, 60000)
 
   // Initialize Socket.io
@@ -1279,6 +1370,8 @@ onMounted(() => {
       if (updatedThread.flowState !== undefined) threads.value[idx].flowState = updatedThread.flowState
       if (updatedThread.tagIds !== undefined) threads.value[idx].tagIds = updatedThread.tagIds
       if (updatedThread.stageId !== undefined) threads.value[idx].stageId = updatedThread.stageId
+      // Another teammate decided on the AI suggestion
+      if (updatedThread.aiSuggestion === null && selectedThread.value?.id === threads.value[idx].id) aiSuggestion.value = null
 
       // Re-sort
       threads.value.sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt))
@@ -1835,6 +1928,109 @@ onUnmounted(() => {
   border: 1px solid #ddd6fe;
   padding: 3px 10px;
   border-radius: 999px;
+}
+
+.ai-summary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #4f46e5;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.ai-summary-btn:disabled {
+  opacity: 0.6;
+}
+
+.ai-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 8px 25px 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+
+.ai-card > i {
+  margin-top: 3px;
+}
+
+.ai-suggestion {
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  color: #3b0764;
+  align-items: center;
+}
+
+.ai-suggestion > i {
+  color: #7c3aed;
+  margin-top: 0;
+}
+
+.ai-reason {
+  font-size: 0.72rem;
+  color: #6b21a8;
+  opacity: 0.8;
+  margin-top: 3px;
+}
+
+.ai-accept,
+.ai-reject {
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ai-accept {
+  background: #7c3aed;
+  color: white;
+  border: none;
+}
+
+.ai-reject {
+  background: white;
+  color: #6b21a8;
+  border: 1px solid #ddd6fe;
+}
+
+.ai-summary {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.ai-summary > i {
+  color: #4f46e5;
+}
+
+.ai-summary-title {
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: #4f46e5;
+  margin-bottom: 2px;
+}
+
+.ai-summary-text {
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.ai-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
 }
 
 .chat-labels-bar {

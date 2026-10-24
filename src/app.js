@@ -44,6 +44,7 @@ const ticketsRoutes = require('./modules/tickets/tickets.routes');
 const workforceRoutes = require('./modules/workforce/workforce.routes');
 const analyticsRoutes = require('./modules/analytics/analytics.routes');
 const flowRoutes = require('./modules/flows/flow.routes');
+const aiRoutes = require('./modules/ai/ai.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/keys', apiKeyRoutes);
@@ -69,6 +70,7 @@ app.use('/api/contacts', contactRoutes);
 app.use('/api/v1/workforce', workforceRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/flows', flowRoutes);
+app.use('/api/v1/ai', aiRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

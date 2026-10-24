@@ -3,6 +3,7 @@ const prisma = new PrismaClient();
 const ChatFlow = require('../../models/mongo/ChatFlow');
 const ChatThread = require('../../models/mongo/ChatThread');
 const Team = require('../../models/mongo/Team');
+const ChatMessage = require('../../models/mongo/ChatMessage');
 const logger = require('../../utils/logger');
 
 // Guards against loops between steps that do not wait for the customer
@@ -54,11 +55,15 @@ class FlowEngine {
       const state = thread.flowState;
       const ctx = { tenantId, channelId, threadId: thread._id.toString(), flow, graph, input };
 
-      // 1. Waiting for an answer to a question of this same published version
+      // 1. Waiting on a question or an AI agent step of this same published version
       if (state && state.flowId === flow._id.toString() && state.version === flow.published.version && state.nodeId) {
-        const question = graph.nodes.find(n => n.id === state.nodeId);
-        if (question) {
-          await this._answerQuestion(ctx, question, state);
+        const waiting = graph.nodes.find(n => n.id === state.nodeId);
+        if (waiting?.type === 'ai_agent') {
+          await this._aiTurn(ctx, waiting, state);
+          return true;
+        }
+        if (waiting) {
+          await this._answerQuestion(ctx, waiting, state);
           return true;
         }
       }
@@ -134,6 +139,8 @@ class FlowEngine {
           nodeId = this._next(ctx.graph, node.id, 'out');
           break;
         }
+        case 'ai_agent':
+          return this._aiTurn(ctx, node, null);
         case 'assign':
           await this._assign(ctx, d);
           return this._finish(ctx, false);
@@ -147,9 +154,53 @@ class FlowEngine {
     return this._finish(ctx, true);
   }
 
-  async _setState(ctx, nodeId, attempts = 0) {
+  /**
+   * One AI agent reply. Stays on this step (waiting for the customer) until the agent asks for a
+   * person, the turn limit is reached, or the AI fails — then follows the "handoff" branch.
+   */
+  async _aiTurn(ctx, node, state) {
+    const aiAgentService = require('../ai/ai.agent.service');
+    const turns = state?.turns || 0;
+    const maxTurns = await aiAgentService.maxTurns(ctx.tenantId);
+
+    let result;
+    if (turns >= maxTurns) {
+      result = { reply: '', handoff: true, reason: `وصل الموظف الذكي للحد الأقصى (${maxTurns} ردود)` };
+    } else {
+      const history = (await ChatMessage.find({ threadId: ctx.threadId, isInternal: { $ne: true } })
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean()).reverse();
+      try {
+        result = await aiAgentService.reply(ctx.tenantId, history);
+      } catch (err) {
+        logger.error(`[FlowEngine] AI agent failed on thread ${ctx.threadId}: ${err.message}`);
+        result = { reply: '', handoff: true, reason: 'تعذّر رد الذكاء الاصطناعي' };
+      }
+    }
+
+    if (result.reply) await this._sendText(ctx, result.reply);
+    if (result.handoff) {
+      await this._note(ctx, `🤖 حوّل الموظف الذكي المحادثة لفريقك${result.reason ? `: ${result.reason}` : ''}`);
+      return this._run(ctx, this._next(ctx.graph, node.id, 'handoff'));
+    }
+    await this._setState(ctx, node.id, 0, { turns: turns + 1 });
+    return null;
+  }
+
+  /** Internal note for the team (not sent to the customer) */
+  async _note(ctx, text) {
+    try {
+      const chatService = require('../chat/chat.service');
+      await chatService.sendMessage(ctx.tenantId, ctx.threadId, { content: text, type: 'text', isInternal: true, isAutomated: true });
+    } catch (err) {
+      logger.warn(`[FlowEngine] Could not add note: ${err.message}`);
+    }
+  }
+
+  async _setState(ctx, nodeId, attempts = 0, extra = {}) {
     const flowState = nodeId
-      ? { flowId: ctx.flow._id.toString(), version: ctx.flow.published.version, nodeId, attempts, startedAt: new Date() }
+      ? { flowId: ctx.flow._id.toString(), version: ctx.flow.published.version, nodeId, attempts, startedAt: new Date(), ...extra }
       : null;
     await ChatThread.updateOne({ _id: ctx.threadId }, { $set: { flowState } });
     try {

@@ -40,6 +40,12 @@ export const FLOW_NODE_TYPES = {
     descAr: 'نقل العميل لمرحلة', descEn: 'Move the customer to a stage',
     defaults: () => ({ stageId: '' })
   },
+  ai_agent: {
+    icon: 'fas fa-robot', color: '#6366f1',
+    ar: 'موظف ذكي', en: 'AI agent',
+    descAr: 'يرد بالذكاء الاصطناعي من معلومات نشاطك', descEn: 'Answers with AI from your business info',
+    defaults: () => ({})
+  },
   assign: {
     icon: 'fas fa-user-check', color: '#f97316',
     ar: 'تحويل لموظف', en: 'Hand to a person',
@@ -69,6 +75,7 @@ export function outputHandles(node) {
   switch (node.type) {
     case 'question': return [...(node.data?.options || []).map(o => `opt-${o.id}`), 'fallback']
     case 'condition': return ['yes', 'no']
+    case 'ai_agent': return ['handoff']
     case 'assign':
     case 'end': return []
     default: return ['out']

@@ -174,7 +174,9 @@ const PROBLEM_AR = {
   'Choose a team member': 'اختر موظفاً',
   'Unknown step type': 'نوع خطوة غير معروف',
   'A connection leaves from an option that no longer exists': 'يوجد اتصال من خيار لم يعد موجوداً',
-  'Publish the flow before turning it on': 'انشر السير قبل تفعيله'
+  'Publish the flow before turning it on': 'انشر السير قبل تفعيله',
+  'Add a Gemini API key in Settings → AI': 'أضف مفتاح Gemini من الإعدادات ← الذكاء الاصطناعي',
+  'Add business information on the AI agent page': 'أضف معلومات نشاطك في صفحة الموظف الذكي'
 }
 const translate = (message) => {
   if (!isAr.value) return message

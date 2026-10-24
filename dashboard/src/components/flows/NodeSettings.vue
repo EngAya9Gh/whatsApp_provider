@@ -113,6 +113,19 @@
         <p v-if="!stages.length" class="hint">{{ isAr ? 'فعّل مراحل العميل أولاً من صفحة الوسوم ومراحل العميل.' : 'Turn on customer stages first on the Tags & Stages page.' }}</p>
       </template>
 
+      <!-- AI agent -->
+      <template v-else-if="node.type === 'ai_agent'">
+        <p class="text-sm text-slate-700 leading-relaxed">
+          {{ isAr
+            ? 'من هنا يتولى الموظف الذكي المحادثة: يقرأ رسائل العميل ويرد عليها من معلومات نشاطك، ويبقى يرد حتى يطلب العميل موظفاً، أو لا يجد الجواب، أو يصل للحد الأقصى من الردود.'
+            : 'From here the AI agent takes the conversation: it answers from your business info until the customer asks for a person, it cannot find the answer, or it reaches its reply limit.' }}
+        </p>
+        <p class="hint">{{ isAr ? 'وصّل مسار «عند التحويل لموظف» بخطوة «تحويل لموظف». إن تركته فارغاً تُحوَّل المحادثة لفريق الرقم تلقائياً.' : 'Connect "On hand-off" to a "Hand to a person" step. If left empty, the chat goes to the number\'s team.' }}</p>
+        <router-link to="/ai-agent" class="link inline-flex items-center gap-1.5 mt-3 no-underline">
+          <i class="fas fa-gear"></i>{{ isAr ? 'معلومات الموظف الذكي وتجربته' : 'AI agent info & test' }}
+        </router-link>
+      </template>
+
       <!-- Assign -->
       <template v-else-if="node.type === 'assign'">
         <div class="seg">

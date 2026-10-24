@@ -156,32 +156,17 @@ class MetaController {
         ? new Date(req.body.startDate)
         : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-      const startTs = Math.floor(startDate.getTime() / 1000);
-      const endTs = Math.floor(endDate.getTime() / 1000);
-
       logger.info(`[MetaSyncStats] Fetching analytics for channel ${channelId} from ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
-      const response = await axios.get(
-        `https://graph.facebook.com/${GRAPH_API_VERSION}/${channel.metaWabaId}`,
-        {
-          headers: { Authorization: `Bearer ${channel.metaAccessToken}` },
-          params: {
-            fields: `analytics.start(${startTs}).end(${endTs}).granularity(DAY)`
-          }
-        }
-      );
-
-      const analytics = response.data?.analytics?.data_points
-        || response.data?.analytics?.data
-        || [];
-
-      logger.info(`[MetaSyncStats] Received ${analytics.length} data points from Meta`);
-      logger.info(`[MetaSyncStats] Raw Meta Data: ${JSON.stringify(analytics)}`);
+      const { fetchWabaAnalytics } = require('./meta.analytics');
+      const analytics = await fetchWabaAnalytics(channel, startDate, endDate);
+      logger.info(`[MetaSyncStats] Meta reports ${analytics.sent} sent / ${analytics.delivered} delivered`);
 
       res.json({
         success: true,
         message: `Analytics synced for ${startDate.toDateString()} → ${endDate.toDateString()}`,
-        data: analytics,
+        data: analytics.daily,
+        totals: { sent: analytics.sent, delivered: analytics.delivered },
         period: { start: startDate.toISOString(), end: endDate.toISOString() }
       });
     } catch (err) {

@@ -54,7 +54,7 @@
         <div class="kpi-card kpi-green">
           <div class="kpi-bg-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
           <div class="kpi-label">{{ isAr ? 'نسبة الوصول' : 'Delivery Rate' }}</div>
-          <div class="kpi-value">{{ stats?.deliveryRate ?? 0 }}<span class="kpi-unit">%</span></div>
+          <div class="kpi-value">{{ stats?.deliveryRate ?? '—' }}<span v-if="stats?.deliveryRate !== null && stats?.deliveryRate !== undefined" class="kpi-unit">%</span></div>
           <div class="kpi-progress-bar"><div class="kpi-progress-fill" :style="`width: ${stats?.deliveryRate ?? 0}%`"></div></div>
         </div>
 
@@ -66,6 +66,17 @@
             <span class="status-dot"></span>{{ tenant?.sessionStatus || 'DISCONNECTED' }}
           </div>
         </div>
+      </div>
+
+      <!-- Meta's own counts, after "Sync Meta" (includes messages sent outside the platform) -->
+      <div v-if="metaTotals" class="meta-totals">
+        <i class="fas fa-cloud"></i>
+        <span>
+          {{ isAr ? 'حسب Meta للفترة المحددة:' : 'According to Meta for this period:' }}
+          <strong>{{ metaTotals.sent.toLocaleString() }}</strong> {{ isAr ? 'رسالة أُرسلت' : 'sent' }} ·
+          <strong>{{ metaTotals.delivered.toLocaleString() }}</strong> {{ isAr ? 'وصلت' : 'delivered' }}
+        </span>
+        <span class="meta-totals-note">{{ isAr ? 'تشمل الرسائل المرسلة من خارج النظام (مثل لوحة مطوري Meta)، لذلك قد تختلف عن أرقام النظام.' : 'Includes messages sent outside the platform (e.g. Meta’s developer console), so it can differ from platform numbers.' }}</span>
       </div>
 
       <!-- ── Breakdown Card ── -->
@@ -125,7 +136,7 @@
         <div class="summary-row">
           <div class="summary-item"><span class="summary-dot dot-sent"></span><span class="summary-label">{{ isAr ? 'إجمالي المرسلة' : 'Total Sent' }}</span><span class="summary-val">{{ totalMessages.toLocaleString() }}</span></div>
           <div class="summary-item"><span class="summary-dot dot-failed"></span><span class="summary-label">{{ isAr ? 'فاشلة' : 'Failed' }}</span><span class="summary-val">{{ (stats?.totalFailed ?? 0).toLocaleString() }}</span></div>
-          <div class="summary-item"><span class="summary-dot dot-rate"></span><span class="summary-label">{{ isAr ? 'نسبة الوصول' : 'Delivery Rate' }}</span><span class="summary-val">{{ stats?.deliveryRate ?? 0 }}%</span></div>
+          <div class="summary-item"><span class="summary-dot dot-rate"></span><span class="summary-label">{{ isAr ? 'نسبة الوصول' : 'Delivery Rate' }}</span><span class="summary-val">{{ stats?.deliveryRate !== null && stats?.deliveryRate !== undefined ? stats.deliveryRate + '%' : '—' }}</span></div>
         </div>
       </div>
 
@@ -196,7 +207,7 @@
           </div>
           <div class="qs-content">
             <span class="qs-label">{{ isAr ? 'نسبة التسليم' : 'Delivery Rate' }}</span>
-            <strong class="qs-val">{{ stats?.deliveryRate ?? 0 }}%</strong>
+            <strong class="qs-val">{{ stats?.deliveryRate !== null && stats?.deliveryRate !== undefined ? stats.deliveryRate + '%' : '—' }}</strong>
           </div>
         </div>
         <div class="qs-divider"></div>
@@ -244,6 +255,7 @@ const isAr = computed(() => locale.value === 'ar')
 const tenant = ref(JSON.parse(localStorage.getItem('tenant') || '{}'))
 const stats = ref(null)
 const loading = ref(true)
+const metaTotals = ref(null)
 const dateFilter = ref('THIS_MONTH')
 const customDateRange = ref('')
 const datePickerInput = ref(null)
@@ -295,20 +307,39 @@ const syncStats = async () => {
 
   try {
     loading.value = true
-    const res = await axios.post(`/api/v1/meta/channel/${activeChannelId}/sync-stats`, {}, {
+    const range = periodRange()
+    if (!range) return
+    const res = await axios.post(`/api/v1/meta/channel/${activeChannelId}/sync-stats`, {
+      startDate: range.startDate.toISOString(),
+      endDate: range.endDate.toISOString()
+    }, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    
+    metaTotals.value = res.data?.totals || null
+
     // Refresh dashboard stats after syncing
     await fetchDashboardStats()
-    
-    alert(isAr.value ? 'تم جلب الإحصائيات من ميتا بنجاح ✅' : 'Stats synced successfully from Meta ✅')
   } catch (err) {
     console.error('Failed to sync stats', err)
-    alert(isAr.value ? 'حدث خطأ أثناء المزامنة مع ميتا.' : 'Failed to sync with Meta.')
+    const reason = err.response?.data?.message
+    alert((isAr.value ? 'حدث خطأ أثناء المزامنة مع ميتا.' : 'Failed to sync with Meta.') + (reason ? `\n${reason}` : ''))
   } finally {
     loading.value = false
   }
+}
+
+// Start/end of the selected period (null while a custom range is incomplete)
+const periodRange = () => {
+  let startDate = new Date(), endDate = new Date()
+  if (dateFilter.value === 'THIS_MONTH') { startDate.setDate(1); startDate.setHours(0,0,0,0) }
+  else if (dateFilter.value === 'LAST_MONTH') { startDate.setMonth(startDate.getMonth()-1); startDate.setDate(1); startDate.setHours(0,0,0,0); endDate = new Date(); endDate.setDate(0); endDate.setHours(23,59,59,999) }
+  else if (dateFilter.value === 'THIS_YEAR') { startDate.setMonth(0); startDate.setDate(1); startDate.setHours(0,0,0,0) }
+  else if (dateFilter.value === 'CUSTOM') {
+    if (!customDateRange.value?.includes(' to ')) return null
+    const [s,e] = customDateRange.value.split(' to ')
+    startDate = new Date(s); endDate = new Date(e); endDate.setHours(23,59,59,999)
+  }
+  return { startDate, endDate }
 }
 
 const fetchDashboardStats = async () => {
@@ -318,15 +349,9 @@ const fetchDashboardStats = async () => {
     const authRes = await axios.get('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
     if (authRes.data?.data) { tenant.value = authRes.data.data; localStorage.setItem('tenant', JSON.stringify(authRes.data.data)) }
 
-    let startDate = new Date(), endDate = new Date()
-    if (dateFilter.value === 'THIS_MONTH') { startDate.setDate(1) }
-    else if (dateFilter.value === 'LAST_MONTH') { startDate.setMonth(startDate.getMonth()-1); startDate.setDate(1); endDate = new Date(); endDate.setDate(0) }
-    else if (dateFilter.value === 'THIS_YEAR') { startDate.setMonth(0); startDate.setDate(1) }
-    else if (dateFilter.value === 'CUSTOM') {
-      if (!customDateRange.value?.includes(' to ')) return
-      const [s,e] = customDateRange.value.split(' to ')
-      startDate = new Date(s); endDate = new Date(e); endDate.setHours(23,59,59,999)
-    }
+    const range = periodRange()
+    if (!range) return
+    const { startDate, endDate } = range
     const res = await axios.get('/api/dashboard/stats', { headers: { Authorization: `Bearer ${token}` }, params: { startDate: startDate.toISOString(), endDate: endDate.toISOString() } })
     stats.value = res.data.data
 
@@ -339,19 +364,8 @@ const fetchDashboardStats = async () => {
         failed: daily.map(d => d.failed || 0)
       }
     } else {
-      // Generate synthetic data from totals for demonstration
-      const days = 7
-      const labels = []
-      const sentArr = []
-      const failedArr = []
-      for (let i = days - 1; i >= 0; i--) {
-        const d = new Date(); d.setDate(d.getDate() - i)
-        labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
-        const base = Math.floor((totalMessages.value || 100) / days)
-        sentArr.push(Math.max(0, base + Math.floor(Math.random() * 20 - 10)))
-        failedArr.push(Math.max(0, Math.floor((stats.value?.totalFailed || 0) / days)))
-      }
-      chartData.value = { labels, sent: sentArr, failed: failedArr }
+      // No daily breakdown: show an empty chart rather than invented numbers
+      chartData.value = { labels: [], sent: [], failed: [] }
     }
 
     await nextTick()
@@ -561,6 +575,9 @@ watch(activeProvider, async () => {
 .kpi-plan { font-size:1.4rem; }
 .kpi-trend { font-size:.75rem; font-weight:600; opacity:.8; }
 .kpi-progress-bar { height:5px; background:rgba(255,255,255,.3); border-radius:3px; overflow:hidden; }
+.meta-totals { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-bottom:1.25rem; padding:12px 16px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:14px; color:#1e3a8a; font-size:.85rem; }
+.meta-totals i { color:#2a78d6; }
+.meta-totals-note { flex-basis:100%; font-size:.75rem; color:#3b5998; opacity:.85; }
 .kpi-progress-fill { height:100%; background:white; border-radius:3px; transition:width .6s ease; }
 .kpi-status-badge { display:inline-flex; align-items:center; gap:6px; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:20px; background:rgba(255,255,255,.2); letter-spacing:.04em; text-transform:uppercase; margin-top:.5rem; }
 .status-dot { width:6px; height:6px; border-radius:50%; background:white; }

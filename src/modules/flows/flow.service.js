@@ -8,7 +8,7 @@ const MAX_NODES = 150;
 const MAX_EDGES = 300;
 const MAX_DATA_BYTES = 8000;
 
-const NODE_TYPES = ['trigger', 'message', 'question', 'condition', 'tag', 'stage', 'assign', 'end'];
+const NODE_TYPES = ['trigger', 'message', 'question', 'condition', 'tag', 'stage', 'ai_agent', 'assign', 'end'];
 const CONDITIONS = ['ASSIGNED', 'WORKING_HOURS', 'HAS_TAG', 'STAGE_IS', 'TEXT_CONTAINS'];
 
 /** Output handles each node type may connect from */
@@ -16,6 +16,7 @@ function outputHandles(node) {
   switch (node.type) {
     case 'question': return [...(node.data?.options || []).map(o => `opt-${o.id}`), 'fallback'];
     case 'condition': return ['yes', 'no'];
+    case 'ai_agent': return ['handoff'];
     case 'assign':
     case 'end': return [];
     default: return ['out'];
@@ -73,6 +74,16 @@ async function validate(tenantId, { nodes, edges }) {
     prisma.subUser.findMany({ where: { tenantId }, select: { id: true } })
   ]);
   const tagIds = new Set(tags.map(t => t._id.toString()));
+
+  // The AI agent step needs a Gemini key and some business information to answer from
+  let aiProblem = null;
+  if (nodes.some(n => n.type === 'ai_agent')) {
+    const aiClient = require('../ai/ai.client');
+    const AiAgent = require('../../models/mongo/AiAgent');
+    const [configured, agent] = await Promise.all([aiClient.isConfigured(tenantId), AiAgent.findOne({ tenantId }).lean()]);
+    if (!configured) aiProblem = 'Add a Gemini API key in Settings → AI';
+    else if (!(agent?.knowledge || []).some(k => String(k.content || '').trim())) aiProblem = 'Add business information on the AI agent page';
+  }
   const stageIds = new Set(stages.map(s => s._id.toString()));
   const agentIds = new Set(agents.map(a => a.id));
 
@@ -116,6 +127,9 @@ async function validate(tenantId, { nodes, edges }) {
         break;
       case 'assign':
         if (d.mode === 'AGENT' && !agentIds.has(d.agentId)) add(node.id, 'Choose a team member');
+        break;
+      case 'ai_agent':
+        if (aiProblem) add(node.id, aiProblem);
         break;
       default:
         break;

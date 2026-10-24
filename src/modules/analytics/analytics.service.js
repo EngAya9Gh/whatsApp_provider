@@ -4,6 +4,7 @@ const ChatThread = require('../../models/mongo/ChatThread');
 const ChatMessage = require('../../models/mongo/ChatMessage');
 const ChatTag = require('../../models/mongo/ChatTag');
 const CampaignDelivery = require('../../models/mongo/CampaignDelivery');
+const metaAnalytics = require('../meta/meta.analytics');
 const shiftService = require('../workforce/shift.service');
 const { localClock } = require('../workforce/shift.service');
 const chatStageService = require('../chat/chat.stage.service');
@@ -302,9 +303,18 @@ class AnalyticsService {
     ]);
     const lastChat = threads.reduce((max, t) => (t.lastMessageAt && (!max || t.lastMessageAt > max) ? t.lastMessageAt : max), null);
 
+    // Meta's own counts (covers messages sent outside this platform too); credentials never leave the server
+    const credentialChannels = await prisma.whatsAppChannel.findMany({
+      where: { tenantId, id: { in: channelIds } },
+      select: { metaWabaId: true, metaAccessToken: true }
+    });
+    const metaReported = await metaAnalytics.fetchForChannels(credentialChannels, start, end)
+      .catch(err => ({ available: false, reason: 'META_ERROR', message: err.message }));
+
     return {
       range: { days: range.days, start, end, timezone },
       channels: metaChannels,
+      metaReported,
       coverage: {
         metaChannels: metaChannels.length,
         lastApiMessageAt: lastApi?.createdAt || null,

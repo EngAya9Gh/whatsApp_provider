@@ -91,6 +91,23 @@
         </section>
       </div>
 
+      <!-- Meta's own counts -->
+      <section v-if="data.metaReported" class="card meta-reported">
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <h2 class="card-title m-0"><i class="fas fa-cloud text-[#2a78d6] me-1"></i>{{ isAr ? 'حسب أرقام Meta' : 'According to Meta' }}</h2>
+          <template v-if="data.metaReported.available">
+            <span class="text-sm text-slate-600"><strong class="text-slate-900 text-lg">{{ fmt.num(data.metaReported.sent) }}</strong> {{ isAr ? 'أُرسلت' : 'sent' }}</span>
+            <span class="text-sm text-slate-600"><strong class="text-slate-900 text-lg">{{ fmt.num(data.metaReported.delivered) }}</strong> {{ isAr ? 'وصلت' : 'delivered' }}</span>
+          </template>
+          <span v-else class="text-sm text-slate-500">
+            {{ data.metaReported.reason === 'NO_CREDENTIALS'
+              ? (isAr ? 'الرقم بدون بيانات ربط كاملة (WABA ID / Token).' : 'The number is missing WABA ID / token.')
+              : (isAr ? 'تعذّر جلب الأرقام من Meta' : 'Could not load Meta’s numbers') }}<span v-if="data.metaReported.message" dir="ltr">: {{ data.metaReported.message }}</span>
+          </span>
+        </div>
+        <p class="card-sub mt-2 mb-0">{{ isAr ? 'تشمل كل ما أُرسل من الرقم، حتى من خارج النظام (مثل لوحة مطوري Meta). الأرقام أعلاه وأسفله تشمل ما مرّ عبر النظام فقط.' : 'Covers everything the number sent, even outside the platform (e.g. Meta’s developer console). The other figures cover only what went through the platform.' }}</p>
+      </section>
+
       <!-- Sent by source -->
       <section class="card">
         <h2 class="card-title">{{ isAr ? 'الرسائل المرسلة حسب المصدر' : 'Messages sent by source' }}</h2>
