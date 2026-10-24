@@ -50,6 +50,7 @@ const routes = [
   { path: '/analytics/qr', component: () => import('../views/AnalyticsQr.vue'), meta: { requiresAuth: true } },
   { path: '/flows', component: () => import('../views/Flows.vue'), meta: { requiresAuth: true } },
   { path: '/ai-agent', component: () => import('../views/AiAgent.vue'), meta: { requiresAuth: true } },
+  { path: '/team-chat', component: () => import('../views/TeamChat.vue'), meta: { requiresAuth: true } },
   { path: '/flows/:channelId', component: () => import('../views/FlowEditor.vue'), meta: { requiresAuth: true } },
   { path: '/quick-replies', component: QuickReplies, meta: { requiresAuth: true } },
   { path: '/send-message', component: MessageSend, meta: { requiresAuth: true } },
@@ -131,6 +132,12 @@ router.beforeEach((to, from, next) => {
       '/meta-autoreply': perms.can_view_chatbot,
       '/meta-flows': perms.can_view_chatbot,
       '/meta-business-profile': perms.can_manage_settings,
+      '/ticket-categories': perms.can_manage_settings,
+      '/inbox-settings': perms.can_manage_settings,
+      '/analytics': perms.can_view_analytics,
+      '/flows': perms.can_view_chatbot,
+      '/ai-agent': perms.can_view_chatbot,
+      '/quick-replies': perms.can_view_live_chat,
     }
 
     const basePath = '/' + to.path.split('/')[1]

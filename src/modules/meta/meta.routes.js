@@ -1,7 +1,16 @@
 const express = require('express');
 const crypto = require('crypto');
 const metaController = require('./meta.controller');
-const { authMiddleware } = require('../../middleware/auth.middleware');
+const { authMiddleware, requirePermission, requireAnyPermission } = require('../../middleware/auth.middleware');
+
+// Who may do what on Meta numbers (owner & API keys always pass)
+const canSettings = requirePermission('can_manage_settings');
+const canReadTemplates = requireAnyPermission('can_view_templates', 'can_create_templates', 'can_send_message', 'can_view_campaigns', 'can_view_live_chat', 'can_view_chatbot');
+const canWriteTemplates = requirePermission('can_create_templates');
+const canUploadMedia = requireAnyPermission('can_create_templates', 'can_send_message', 'can_create_campaigns', 'can_manage_chatbot');
+const canViewBot = requirePermission('can_view_chatbot');
+const canManageBot = requirePermission('can_manage_chatbot');
+const canReadMetaFlows = requireAnyPermission('can_view_chatbot', 'can_send_message');
 const logger = require('../../utils/logger');
 const multer = require('multer');
 const path = require('path');
@@ -77,14 +86,14 @@ router.use(authMiddleware);
 // Embedded Signup — Only requires JWT auth, no Meta feature flag needed
 // ────────────────────────────────────────────────────────────────────────────
 const embeddedSignupController = require('./meta.embedded-signup.controller');
-router.post('/embedded-signup/exchange', embeddedSignupController.exchangeCode);
+router.post('/embedded-signup/exchange', canSettings, embeddedSignupController.exchangeCode);
 
 router.use(requireMetaEnabled);
 
-router.post('/channel', metaController.addChannel.bind(metaController));
+router.post('/channel', canSettings, metaController.addChannel.bind(metaController));
 router.get('/channels', metaController.getChannels.bind(metaController));
-router.delete('/channel/:id', metaController.deleteChannel.bind(metaController));
-router.get('/channel/:id/templates', metaController.getTemplates.bind(metaController));
+router.delete('/channel/:id', canSettings, metaController.deleteChannel.bind(metaController));
+router.get('/channel/:id/templates', canReadTemplates, metaController.getTemplates.bind(metaController));
 
 // ────────────────────────────────────────────────────────────────────────────
 // Meta Template Management — Create / Read / Delete templates via Meta API
@@ -92,23 +101,23 @@ router.get('/channel/:id/templates', metaController.getTemplates.bind(metaContro
 const metaTemplateController = require('./meta.template.controller');
 
 // List all templates for a channel's WABA
-router.get('/channel/:channelId/meta-templates', metaTemplateController.listTemplates.bind(metaTemplateController));
+router.get('/channel/:channelId/meta-templates', canReadTemplates, metaTemplateController.listTemplates.bind(metaTemplateController));
 
 // Get a single template by Meta template ID
-router.get('/channel/:channelId/meta-templates/:templateId/detail', metaTemplateController.getTemplateDetail.bind(metaTemplateController));
+router.get('/channel/:channelId/meta-templates/:templateId/detail', canReadTemplates, metaTemplateController.getTemplateDetail.bind(metaTemplateController));
 
 // Create a new template (submitted to Meta for review)
-router.post('/channel/:channelId/meta-templates', metaTemplateController.createTemplate.bind(metaTemplateController));
+router.post('/channel/:channelId/meta-templates', canWriteTemplates, metaTemplateController.createTemplate.bind(metaTemplateController));
 
 // Update template components
-router.put('/channel/:channelId/meta-templates/:templateId', metaTemplateController.updateTemplate.bind(metaTemplateController));
+router.put('/channel/:channelId/meta-templates/:templateId', canWriteTemplates, metaTemplateController.updateTemplate.bind(metaTemplateController));
 
 // Delete template by name (Meta uses name, not ID for deletion)
-router.delete('/channel/:channelId/meta-templates/:templateName', metaTemplateController.deleteTemplate.bind(metaTemplateController));
+router.delete('/channel/:channelId/meta-templates/:templateName', canWriteTemplates, metaTemplateController.deleteTemplate.bind(metaTemplateController));
 
 // ────────────────────────────────────────────────────────────────────────────
 // Upload media to Meta servers and get a media handle for use in header examples
-router.post('/channel/:channelId/upload-media', uploadTmp.single('file'), async (req, res, next) => {
+router.post('/channel/:channelId/upload-media', canUploadMedia, uploadTmp.single('file'), async (req, res, next) => {
   try {
     const { PrismaClient } = require('@prisma/client');
     const prisma = new PrismaClient();
@@ -159,11 +168,11 @@ router.post('/channel/:channelId/upload-media', uploadTmp.single('file'), async 
 // ────────────────────────────────────────────────────────────────────────────
 const metaAutoResponderController = require('./meta.autoresponder.controller');
 
-router.get('/channel/:channelId/autoresponders', metaAutoResponderController.getRules.bind(metaAutoResponderController));
-router.post('/channel/:channelId/autoresponders', metaAutoResponderController.createRule.bind(metaAutoResponderController));
-router.put('/channel/:channelId/autoresponders/:id', metaAutoResponderController.updateRule.bind(metaAutoResponderController));
-router.delete('/channel/:channelId/autoresponders/:id', metaAutoResponderController.deleteRule.bind(metaAutoResponderController));
-router.patch('/channel/:channelId/autoresponders/:id/active', metaAutoResponderController.toggleActive.bind(metaAutoResponderController));
+router.get('/channel/:channelId/autoresponders', canViewBot, metaAutoResponderController.getRules.bind(metaAutoResponderController));
+router.post('/channel/:channelId/autoresponders', canManageBot, metaAutoResponderController.createRule.bind(metaAutoResponderController));
+router.put('/channel/:channelId/autoresponders/:id', canManageBot, metaAutoResponderController.updateRule.bind(metaAutoResponderController));
+router.delete('/channel/:channelId/autoresponders/:id', canManageBot, metaAutoResponderController.deleteRule.bind(metaAutoResponderController));
+router.patch('/channel/:channelId/autoresponders/:id/active', canManageBot, metaAutoResponderController.toggleActive.bind(metaAutoResponderController));
 
 // ────────────────────────────────────────────────────────────────────────────
 // WhatsApp Business Profile — View & Update channel profile info
@@ -181,9 +190,9 @@ const photoStorage = multer.diskStorage({
 });
 const uploadPhoto = multer({ storage: photoStorage, limits: { fileSize: 5 * 1024 * 1024 } });
 
-router.get('/channel/:channelId/profile', metaProfileController.getProfile.bind(metaProfileController));
-router.put('/channel/:channelId/profile', metaProfileController.updateProfile.bind(metaProfileController));
-router.post('/channel/:channelId/profile/photo', uploadPhoto.single('photo'), metaProfileController.uploadPhoto.bind(metaProfileController));
+router.get('/channel/:channelId/profile', canSettings, metaProfileController.getProfile.bind(metaProfileController));
+router.put('/channel/:channelId/profile', canSettings, metaProfileController.updateProfile.bind(metaProfileController));
+router.post('/channel/:channelId/profile/photo', canSettings, uploadPhoto.single('photo'), metaProfileController.uploadPhoto.bind(metaProfileController));
 
 // Sync delivery analytics from Meta API (use after server downtime to recover stats)
 router.post('/channel/:channelId/sync-stats', metaController.syncStats.bind(metaController));
@@ -195,10 +204,10 @@ router.post('/channel/:channelId/sync-stats', metaController.syncStats.bind(meta
 const metaFlowController = require('./meta.flow.controller');
 const uploadFlowJson = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // Max 10MB JSON
 
-router.get('/channel/:channelId/flows', metaFlowController.listFlows);
-router.post('/channel/:channelId/flows', metaFlowController.createFlow);
-router.post('/channel/:channelId/flows/:flowId/assets', uploadFlowJson.single('file'), metaFlowController.uploadFlowJson);
-router.post('/channel/:channelId/flows/:flowId/publish', metaFlowController.publishFlow);
-router.delete('/channel/:channelId/flows/:flowId', metaFlowController.deleteFlow);
+router.get('/channel/:channelId/flows', canReadMetaFlows, metaFlowController.listFlows);
+router.post('/channel/:channelId/flows', canManageBot, metaFlowController.createFlow);
+router.post('/channel/:channelId/flows/:flowId/assets', canManageBot, uploadFlowJson.single('file'), metaFlowController.uploadFlowJson);
+router.post('/channel/:channelId/flows/:flowId/publish', canManageBot, metaFlowController.publishFlow);
+router.delete('/channel/:channelId/flows/:flowId', canManageBot, metaFlowController.deleteFlow);
 
 module.exports = router;

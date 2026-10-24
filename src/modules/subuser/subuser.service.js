@@ -71,12 +71,82 @@ function resolvePermissions(role, customPermissions) {
   return { ...base, ...customPermissions };
 }
 
+const ROLES = ['ADMIN', 'MANAGER', 'AGENT'];
+const ROLE_RANK = { ADMIN: 3, MANAGER: 2, AGENT: 1 };
+const SCOPE_RANK = { ALL: 3, TEAM: 2, ASSIGNED: 1 };
+const PERMISSION_KEYS = Object.keys(DEFAULT_PERMISSIONS.AGENT);
+
+/** Keeps only known permission keys with valid values */
+function sanitizePermissions(permissions) {
+  if (permissions === null || permissions === undefined) return null;
+  if (typeof permissions !== 'object' || Array.isArray(permissions)) throw { status: 400, message: 'permissions must be an object' };
+  const clean = {};
+  for (const key of PERMISSION_KEYS) {
+    if (!(key in permissions)) continue;
+    if (key === 'chat_scope') {
+      if (!SCOPE_RANK[permissions[key]]) throw { status: 400, message: 'chat_scope must be ALL, TEAM or ASSIGNED' };
+      clean[key] = permissions[key];
+    } else {
+      clean[key] = !!permissions[key];
+    }
+  }
+  return clean;
+}
+
+/**
+ * The owner manages everyone. A sub-user with can_manage_sub_users may only manage people below
+ * their own role, never themselves, and can only hand out permissions they hold themselves.
+ * actor: { isOwner, id, role, perms }
+ */
+function assertCanManage(actor, { target = null, role = null, permissions = undefined } = {}) {
+  if (actor.isOwner) return;
+  const deny = (message) => { throw { status: 403, message }; };
+
+  if (target) {
+    if (target.id === actor.id) deny('You cannot change your own account here — ask the owner');
+    if (ROLE_RANK[target.role] >= ROLE_RANK[actor.role]) deny('You can only manage users with a lower role than yours');
+  }
+  const finalRole = role || target?.role;
+  if (finalRole && ROLE_RANK[finalRole] >= ROLE_RANK[actor.role]) deny('You can only give roles lower than yours');
+
+  if (permissions !== undefined || role) {
+    const granted = resolvePermissions(finalRole, permissions !== undefined ? permissions : target?.permissions);
+    for (const key of PERMISSION_KEYS) {
+      if (key === 'chat_scope') {
+        if (SCOPE_RANK[granted.chat_scope || 'ALL'] > SCOPE_RANK[actor.perms.chat_scope || 'ALL']) deny('You cannot give wider conversation visibility than your own');
+      } else if (granted[key] && !actor.perms[key]) {
+        deny(`You cannot give a permission you do not have (${key})`);
+      }
+    }
+  }
+}
+
+/** Actor description from an authenticated request */
+function actorFromRequest(req) {
+  return req.isSubUser
+    ? { isOwner: false, id: req.subUser.id, role: req.subUser.role, perms: req.userPerms || {} }
+    : { isOwner: true };
+}
+
+/** Whether the actor may edit this user (used by the UI to show the actions) */
+function canManageUser(actor, user) {
+  try {
+    assertCanManage(actor, { target: user });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 class SubUserService {
   /**
    * إنشاء مستخدم فرعي جديد
    */
-  async create(tenantId, data) {
-    const { name, email, password, role = 'AGENT', channelId, permissions } = data;
+  async create(tenantId, data, actor = { isOwner: true }) {
+    const { name, email, password, role = 'AGENT', channelId } = data;
+    if (!ROLES.includes(role)) throw { status: 400, message: 'Invalid role' };
+    const permissions = sanitizePermissions(data.permissions);
+    assertCanManage(actor, { role, permissions: permissions || undefined });
 
     const existing = await prisma.subUser.findUnique({ where: { email } });
     if (existing) throw { status: 409, message: 'Email already in use' };
@@ -111,7 +181,7 @@ class SubUserService {
   /**
    * قائمة المستخدمين الفرعيين للـ tenant
    */
-  async list(tenantId) {
+  async list(tenantId, actor = { isOwner: true }) {
     const subUsers = await prisma.subUser.findMany({
       where: { tenantId },
       select: {
@@ -125,7 +195,8 @@ class SubUserService {
 
     return subUsers.map(u => ({
       ...u,
-      resolvedPermissions: resolvePermissions(u.role, u.permissions)
+      resolvedPermissions: resolvePermissions(u.role, u.permissions),
+      manageable: canManageUser(actor, u)
     }));
   }
 
@@ -150,9 +221,16 @@ class SubUserService {
   /**
    * تحديث بيانات / صلاحيات مستخدم
    */
-  async update(tenantId, subUserId, data) {
+  async update(tenantId, subUserId, data, actor = { isOwner: true }) {
     const existing = await prisma.subUser.findFirst({ where: { id: subUserId, tenantId } });
     if (!existing) throw { status: 404, message: 'Sub-user not found' };
+    if (data.role !== undefined && !ROLES.includes(data.role)) throw { status: 400, message: 'Invalid role' };
+    if (data.permissions !== undefined) data = { ...data, permissions: sanitizePermissions(data.permissions) };
+    assertCanManage(actor, {
+      target: existing,
+      role: data.role !== undefined ? data.role : null,
+      permissions: data.permissions !== undefined ? data.permissions : undefined
+    });
 
     // التحقق من الـ channel إذا تم تغييره
     if (data.channelId && data.channelId !== existing.channelId) {
@@ -191,9 +269,10 @@ class SubUserService {
   /**
    * إعادة تعيين كلمة المرور
    */
-  async resetPassword(tenantId, subUserId, newPassword) {
+  async resetPassword(tenantId, subUserId, newPassword, actor = { isOwner: true }) {
     const existing = await prisma.subUser.findFirst({ where: { id: subUserId, tenantId } });
     if (!existing) throw { status: 404, message: 'Sub-user not found' };
+    assertCanManage(actor, { target: existing });
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(newPassword, salt);
@@ -209,9 +288,10 @@ class SubUserService {
   /**
    * حذف مستخدم فرعي
    */
-  async delete(tenantId, subUserId) {
+  async delete(tenantId, subUserId, actor = { isOwner: true }) {
     const existing = await prisma.subUser.findFirst({ where: { id: subUserId, tenantId } });
     if (!existing) throw { status: 404, message: 'Sub-user not found' };
+    assertCanManage(actor, { target: existing });
 
     await prisma.subUser.delete({ where: { id: subUserId } });
     return { success: true };
@@ -313,3 +393,6 @@ class SubUserService {
 module.exports = new SubUserService();
 module.exports.DEFAULT_PERMISSIONS = DEFAULT_PERMISSIONS;
 module.exports.resolvePermissions = resolvePermissions;
+module.exports.assertCanManage = assertCanManage;
+module.exports.actorFromRequest = actorFromRequest;
+module.exports.sanitizePermissions = sanitizePermissions;

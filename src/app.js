@@ -45,6 +45,7 @@ const workforceRoutes = require('./modules/workforce/workforce.routes');
 const analyticsRoutes = require('./modules/analytics/analytics.routes');
 const flowRoutes = require('./modules/flows/flow.routes');
 const aiRoutes = require('./modules/ai/ai.routes');
+const teamChatRoutes = require('./modules/team-chat/team-chat.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/keys', apiKeyRoutes);
@@ -71,6 +72,7 @@ app.use('/api/v1/workforce', workforceRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/flows', flowRoutes);
 app.use('/api/v1/ai', aiRoutes);
+app.use('/api/v1/team-chat', teamChatRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

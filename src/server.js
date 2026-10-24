@@ -20,16 +20,8 @@ const io = new Server(server, {
 sessionManager.setIo(io);
 socketService.init(io);
 
-// Socket.io authentication can be added here
-io.on('connection', (socket) => {
-  logger.info(`New dashboard client connected: ${socket.id}`);
-  
-  // Client joins a room based on their tenant ID to receive their specific QR codes
-  socket.on('join-tenant', (tenantId) => {
-    socket.join(`tenant_${tenantId}`);
-    logger.info(`Socket ${socket.id} joined room tenant_${tenantId}`);
-  });
-});
+// Only authenticated dashboard users get a socket; the token decides which rooms they join
+socketService.setupConnections(io, require('./middleware/auth.middleware').resolveToken);
 
 const startServer = async () => {
   try {

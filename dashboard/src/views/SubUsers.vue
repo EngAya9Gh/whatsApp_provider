@@ -95,13 +95,14 @@
               </td>
               <td class="muted">{{ user.lastLoginAt ? formatDate(user.lastLoginAt) : (isAr ? 'لم يسجل بعد' : 'Never') }}</td>
               <td>
-                <button @click="toggleActive(user)" class="status-toggle" :class="user.isActive ? 'active' : 'inactive'">
+                <button @click="toggleActive(user)" :disabled="user.manageable === false" class="status-toggle" :class="user.isActive ? 'active' : 'inactive'">
                   <span class="dot"></span>
                   {{ user.isActive ? (isAr ? 'مفعّل' : 'Active') : (isAr ? 'معطّل' : 'Inactive') }}
                 </button>
               </td>
               <td>
-                <div class="action-btns">
+                <span v-if="user.manageable === false" class="muted text-xs">{{ isAr ? 'لا يمكنك تعديله' : 'Not editable by you' }}</span>
+                <div v-else class="action-btns">
                   <button @click="openEdit(user)" class="btn-icon" :title="isAr ? 'تعديل' : 'Edit'">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   </button>
@@ -160,8 +161,8 @@
               <div class="form-group">
                 <label>{{ isAr ? 'الدور' : 'Role' }}</label>
                 <select v-model="form.role" class="input-std" @change="applyRoleDefaults">
-                  <option value="ADMIN">{{ isAr ? 'مسؤول (Admin)' : 'Admin' }}</option>
-                  <option value="MANAGER">{{ isAr ? 'مدير (Manager)' : 'Manager' }}</option>
+                  <option v-if="canGiveRole('ADMIN')" value="ADMIN">{{ isAr ? 'مسؤول (Admin)' : 'Admin' }}</option>
+                  <option v-if="canGiveRole('MANAGER')" value="MANAGER">{{ isAr ? 'مدير (Manager)' : 'Manager' }}</option>
                   <option value="AGENT">{{ isAr ? 'وكيل (Agent)' : 'Agent' }}</option>
                 </select>
               </div>
@@ -185,8 +186,8 @@
               <span class="section-hint">{{ isAr ? 'أي محادثات يراها في المحادثات والتذاكر' : 'Which conversations they see in Live Chat and Tickets' }}</span>
             </div>
             <div class="scope-options">
-              <label v-for="opt in scopeOptions" :key="opt.key" class="scope-option" :class="{ active: form.chatScope === opt.key }">
-                <input type="radio" :value="opt.key" v-model="form.chatScope" />
+              <label v-for="opt in scopeOptions" :key="opt.key" class="scope-option" :class="{ active: form.chatScope === opt.key, locked: !canGiveScope(opt.key) }">
+                <input type="radio" :value="opt.key" v-model="form.chatScope" :disabled="!canGiveScope(opt.key)" />
                 <span class="scope-title">{{ opt.label }}</span>
                 <span class="scope-desc">{{ opt.desc }}</span>
               </label>
@@ -203,7 +204,7 @@
                   <span class="perm-label">{{ permLabel(key) }}</span>
                   <span class="perm-desc">{{ permDesc(key) }}</span>
                 </div>
-                <button @click="form.permissions[key] = !val" class="toggle-btn" :class="{ 'on': val }">
+                <button @click="form.permissions[key] = !val" class="toggle-btn" :class="{ 'on': val }" :disabled="!val && !canGivePermission(key)" :title="!val && !canGivePermission(key) ? (isAr ? 'لا يمكنك منح صلاحية لا تملكها' : 'You cannot give a permission you do not have') : ''">
                   <span class="toggle-knob"></span>
                 </button>
               </div>
@@ -382,9 +383,28 @@ async function fetchChannels() {
   } catch { channels.value = [] }
 }
 
+// ── What the signed-in person may hand out (the server enforces the same rules) ──
+const ROLE_RANK = { ADMIN: 3, MANAGER: 2, AGENT: 1 }
+const SCOPE_RANK = { ALL: 3, TEAM: 2, ASSIGNED: 1 }
+const me = (() => {
+  try { return JSON.parse(localStorage.getItem('tenant') || '{}') } catch { return {} }
+})()
+const meIsSubUser = !!me.isSubUser
+const myPerms = me.subUser?.permissions || {}
+const canGiveRole = (role) => !meIsSubUser || ROLE_RANK[role] < ROLE_RANK[me.subUser?.role || 'AGENT']
+const canGiveScope = (scope) => !meIsSubUser || SCOPE_RANK[scope] <= SCOPE_RANK[myPerms.chat_scope || 'ALL']
+const canGivePermission = (key) => !meIsSubUser || !!myPerms[key]
+// Role defaults trimmed to what the current user holds
+const allowedDefaults = (role) => Object.fromEntries(Object.entries(ROLE_PERMS[role] || ROLE_PERMS.AGENT).map(([k, v]) => [k, v && canGivePermission(k)]))
+
+function apiError(e, fallback) {
+  const err = e.response?.data?.error
+  return (typeof err === 'string' ? err : err?.message) || e.response?.data?.message || fallback
+}
+
 function openCreate() {
   editingUser.value = null
-  Object.assign(form, { name: '', email: '', password: '', role: 'AGENT', channelId: '', chatScope: 'ALL', permissions: { ...ROLE_PERMS.AGENT } })
+  Object.assign(form, { name: '', email: '', password: '', role: 'AGENT', channelId: '', chatScope: canGiveScope('ALL') ? 'ALL' : (myPerms.chat_scope || 'ASSIGNED'), permissions: allowedDefaults('AGENT') })
   showModal.value = true
 }
 
@@ -410,8 +430,7 @@ function closeModal() {
 }
 
 function applyRoleDefaults() {
-  const roleP = ROLE_PERMS[form.role] || ROLE_PERMS.AGENT
-  Object.assign(form.permissions, roleP)
+  Object.assign(form.permissions, allowedDefaults(form.role))
 }
 
 async function saveUser() {
@@ -437,8 +456,7 @@ async function saveUser() {
     closeModal()
     await fetchUsers()
   } catch (e) {
-    const msg = e.response?.data?.error || (isAr.value ? 'حدث خطأ' : 'An error occurred')
-    showToast(msg, 'error')
+    showToast(apiError(e, isAr.value ? 'حدث خطأ' : 'An error occurred'), 'error')
   } finally {
     saving.value = false
   }
@@ -459,7 +477,7 @@ async function doResetPwd() {
     showToast(isAr.value ? 'تم تحديث كلمة المرور' : 'Password updated successfully')
     showPwdModal.value = false
   } catch (e) {
-    showToast(e.response?.data?.error || (isAr.value ? 'حدث خطأ' : 'Error'), 'error')
+    showToast(apiError(e, isAr.value ? 'حدث خطأ' : 'Error'), 'error')
   } finally {
     savingPwd.value = false
   }
@@ -471,7 +489,7 @@ async function toggleActive(user) {
     user.isActive = !user.isActive
     showToast(user.isActive ? (isAr.value ? 'تم تفعيل المستخدم' : 'User activated') : (isAr.value ? 'تم تعطيل المستخدم' : 'User deactivated'))
   } catch (e) {
-    showToast(isAr.value ? 'حدث خطأ' : 'Error', 'error')
+    showToast(apiError(e, isAr.value ? 'حدث خطأ' : 'Error'), 'error')
   }
 }
 
@@ -485,7 +503,7 @@ async function doDelete() {
     deleteTarget.value = null
     await fetchUsers()
   } catch (e) {
-    showToast(isAr.value ? 'حدث خطأ أثناء الحذف' : 'Failed to delete', 'error')
+    showToast(apiError(e, isAr.value ? 'حدث خطأ أثناء الحذف' : 'Failed to delete'), 'error')
   } finally {
     deleting.value = false
   }
@@ -709,6 +727,9 @@ select.input-std { cursor: pointer; }
 .scope-option:hover { border-color: #CBD5E1; }
 .scope-option.active { border-color: #FF6600; background: #FFF7F2; }
 .scope-option input { display: none; }
+.scope-option.locked { opacity: 0.45; cursor: not-allowed; }
+.toggle-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.status-toggle:disabled { cursor: default; }
 .scope-title { font-size: 0.85rem; font-weight: 700; color: #0F172A; }
 .scope-desc { font-size: 0.72rem; color: #94A3B8; }
 @media (max-width: 640px) { .scope-options { grid-template-columns: 1fr; } }

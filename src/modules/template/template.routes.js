@@ -6,7 +6,7 @@ const fs = require('fs');
 const templateController = require('./template.controller');
 const { validate, createTemplateSchema, sendTemplateSchema } = require('./template.validation');
 const { apiKeyMiddleware } = require('../../middleware/apiKey.middleware');
-const { authMiddleware } = require('../../middleware/auth.middleware');
+const { authMiddleware, requirePermission, requireAnyPermission } = require('../../middleware/auth.middleware');
 const { messageRateLimiter } = require('../../middleware/rateLimiter.middleware');
 const requireFeature = require('../../middleware/requireFeature');
 
@@ -27,15 +27,15 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // The send endpoint must use apiKeyMiddleware so API clients can use it
-router.post('/send', apiKeyMiddleware, validate(sendTemplateSchema), messageRateLimiter, templateController.sendTemplateMessage);
+router.post('/send', apiKeyMiddleware, requirePermission('can_send_message'), validate(sendTemplateSchema), messageRateLimiter, templateController.sendTemplateMessage);
 
 // The CRUD routes should use authMiddleware (JWT) and TEMPLATES feature
 router.use(authMiddleware);
 router.use(requireFeature('TEMPLATES'));
 
-router.get('/', templateController.getTemplates);
-router.post('/', upload.single('media'), templateController.createTemplate);
-router.put('/:id', upload.single('media'), templateController.updateTemplate);
-router.delete('/:id', templateController.deleteTemplate);
+router.get('/', requireAnyPermission('can_view_templates', 'can_send_message', 'can_view_campaigns'), templateController.getTemplates);
+router.post('/', requirePermission('can_create_templates'), upload.single('media'), templateController.createTemplate);
+router.put('/:id', requirePermission('can_create_templates'), upload.single('media'), templateController.updateTemplate);
+router.delete('/:id', requirePermission('can_create_templates'), templateController.deleteTemplate);
 
 module.exports = router;

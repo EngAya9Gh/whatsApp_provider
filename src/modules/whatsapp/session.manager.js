@@ -317,7 +317,8 @@ class SessionManager {
       if (qr) { this.qrs.set(tenantId, qr); }
       if (qr && this.io) {
         // Emit QR code to the dashboard for this specific tenant
-        this.io.to(`tenant_${tenantId}`).emit('qr', { qr });
+        // The QR links a phone to this account: only people allowed to manage connections receive it
+        this.io.to(`tenant_${tenantId}:settings`).emit('qr', { qr });
       }
 
       if (connection === 'close') {

@@ -94,6 +94,17 @@ class ChatService {
     };
   }
 
+  /** One conversation, shaped like the list items (used when opening a shared link) */
+  async getThread(tenantId, threadId) {
+    const thread = await ChatThread.findOne({ _id: threadId, tenantId }).lean();
+    if (!thread) throw { status: 404, message: 'Thread not found' };
+    const channel = await prisma.whatsAppChannel.findUnique({
+      where: { id: thread.channelId },
+      select: { id: true, phoneNumber: true, name: true, displayPhoneNumber: true }
+    });
+    return { ...thread, id: thread._id.toString(), channel: channel || null };
+  }
+
   async getMessages(tenantId, threadId, page = 1, limit = 50) {
     const skip = (page - 1) * limit;
 

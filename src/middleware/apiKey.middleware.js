@@ -15,22 +15,14 @@ const apiKeyMiddleware = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
 
     if (!token.startsWith('sk_')) {
-      // It might be a dashboard JWT token
-      const jwt = require('jsonwebtoken');
-      const config = require('../config/env');
+      // Dashboard JWT: same rules as the rest of the dashboard (disabled sub-users rejected,
+      // sub-user permissions applied by the routes)
+      const { resolveToken, applyIdentity } = require('./auth.middleware');
       try {
-        const decoded = jwt.verify(token, config.jwt.secret);
-        const tenant = await prisma.tenant.findUnique({
-          where: { id: decoded.tenantId },
-          select: { id: true, name: true, email: true, isActive: true, sessionStatus: true }
-        });
-        if (!tenant || !tenant.isActive) return res.status(401).json({ error: 'Unauthorized' });
-        req.tenantId = tenant.id;
-        req.tenant = tenant;
+        applyIdentity(req, await resolveToken(token));
         return next();
       } catch (e) {
-        console.error('JWT fallback verification failed:', e);
-        return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+        return res.status(e.status || 401).json({ error: e.status ? e.message : 'Unauthorized: Invalid token' });
       }
     }
 
@@ -64,6 +56,9 @@ const apiKeyMiddleware = async (req, res, next) => {
     // Attach tenant ID to request context
     req.tenantId = apiKey.tenant.id;
     req.tenant = apiKey.tenant;
+    req.isSubUser = false;
+    req.isApiKey = true;
+    req.userPerms = null; // API keys have owner-level access
     
     next();
   } catch (error) {

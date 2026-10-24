@@ -202,7 +202,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import { io } from 'socket.io-client'
+import { connectSocket } from '../services/realtime'
 import QrcodeVue from 'qrcode.vue'
 
 // ─── Config ───────────────────────────────────────────────────
@@ -440,10 +440,7 @@ const initSocket = () => {
   const tenant = tenantStr ? JSON.parse(tenantStr) : null
   if (!tenant || !tenant.id) return
 
-  socket = io('/', { path: '/socket.io' })
-  socket.on('connect', () => {
-    socket.emit('join-tenant', tenant.id)
-  })
+  socket = connectSocket()
 
   socket.on('qr', (data) => {
     qrCode.value = data.qr

@@ -38,6 +38,12 @@
           <span class="nav-text">{{ isAr ? 'المحادثات المباشرة' : 'Live Chat' }}</span>
         </router-link>
 
+        <router-link to="/team-chat" class="nav-item" active-class="active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2v4l-4-4H9a2 2 0 0 1-2-2v-1"/><path d="M15 4H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2v4l4-4h4a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/></svg>
+          <span class="nav-text">{{ isAr ? 'المحادثات الداخلية' : 'Team Chat' }}</span>
+          <span v-if="teamUnread > 0" class="nav-count">{{ teamUnread > 99 ? '99+' : teamUnread }}</span>
+        </router-link>
+
         <router-link v-if="!isSubUser || subUserPerms?.can_manage_contacts" to="/contacts" class="nav-item" active-class="active">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
           <span class="nav-text">{{ isAr ? 'جهات الاتصال' : 'Contacts' }}</span>
@@ -191,6 +197,7 @@
 
 <script setup>
 import { computed, ref, onMounted } from 'vue'
+import { connectSocket } from './services/realtime'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
@@ -256,6 +263,28 @@ const logout = () => {
   window.location.href = '/login'
 }
 
+// ─── Team chat unread badge ───────────────────────────────────
+const teamUnread = ref(0)
+let unreadTimer = null
+const fetchTeamUnread = async () => {
+  try {
+    const res = await axios.get('/api/v1/team-chat/unread', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+    teamUnread.value = res.data.data.total || 0
+  } catch { /* badge is best-effort */ }
+}
+const startTeamBadge = () => {
+  const myKey = tenant.value?.isSubUser ? tenant.value?.subUser?.id : 'owner'
+  const socket = connectSocket()
+  socket.on('team_unread', ({ total }) => { teamUnread.value = total })
+  socket.on('team_message', (m) => {
+    if (m.senderKey === myKey) return
+    // The open conversation marks itself read; refresh shortly after either way
+    clearTimeout(unreadTimer)
+    unreadTimer = setTimeout(fetchTeamUnread, 600)
+  })
+  fetchTeamUnread()
+}
+
 onMounted(async () => {
   const token = localStorage.getItem('token')
   if (token) {
@@ -266,6 +295,7 @@ onMounted(async () => {
       if (res.data && res.data.data) {
         localStorage.setItem('tenant', JSON.stringify(res.data.data))
         loadTenant()
+        startTeamBadge()
       }
     } catch (e) {
       if (e.response && e.response.status === 401) {
@@ -385,6 +415,17 @@ html {
 
 .nav-section-title.text-emerald-600 {
   color: #10B981;
+}
+
+.nav-count {
+  margin-inline-start: auto;
+  background: #FF6600;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 7px;
+  line-height: 1.5;
 }
 
 .nav-item {

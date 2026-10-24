@@ -108,6 +108,10 @@
             </div>
           </div>
           <div class="chat-header-actions">
+            <button type="button" class="ticket-btn share-btn" @click="showShareModal = true" :title="isAr ? 'مشاركة مع زميل' : 'Share with a colleague'">
+              <i class="fas fa-share"></i>
+              <span>{{ isAr ? 'مشاركة' : 'Share' }}</span>
+            </button>
             <!-- Case 1: Active Ticket is OPEN -->
             <template v-if="activeTicket && activeTicket.status === 'OPEN'">
               <span class="ticket-badge-open">
@@ -402,6 +406,13 @@
         <p>Select a conversation from the sidebar to start messaging.</p>
       </div>
 
+      <ShareToTeamModal
+        v-if="showShareModal && selectedThread"
+        :thread="selectedThread"
+        :is-ar="isAr"
+        @close="showShareModal = false"
+      />
+
       <TemplateSendModal
         v-if="showTemplateModal && selectedThread"
         :channel-id="selectedThread.channelId"
@@ -440,12 +451,14 @@
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
-import { io } from 'socket.io-client'
+import { connectSocket } from '../services/realtime'
 import { useI18n } from 'vue-i18n'
 import FeatureLock from '../components/FeatureLock.vue'
 import StagePicker from '../components/chat/StagePicker.vue'
 import TagPicker from '../components/chat/TagPicker.vue'
 import TemplateSendModal from '../components/chat/TemplateSendModal.vue'
+import ShareToTeamModal from '../components/chat/ShareToTeamModal.vue'
+import { useRoute } from 'vue-router'
 import EmojiPicker from 'vue3-emoji-picker'
 import 'vue3-emoji-picker/css'
 
@@ -532,6 +545,33 @@ const labelErrorToast = (err) => {
 }
 
 // ─── AI: summary & stage suggestion ───────────────────────────
+const showShareModal = ref(false)
+const route = useRoute()
+
+// Opening a conversation shared from team chat (/live-chat?thread=<id>)
+const openThreadFromLink = async () => {
+  const id = route.query.thread
+  if (!id) return
+  let thread = threads.value.find(t => t.id === id)
+  if (!thread) {
+    try {
+      const res = await axios.get(`/api/v1/chat/threads/${id}`)
+      thread = res.data.data
+      threads.value.unshift(thread)
+    } catch (err) {
+      Swal.fire({
+        icon: 'info',
+        title: err.response?.status === 403
+          ? (isAr.value ? 'هذه المحادثة خارج نطاق صلاحياتك' : 'This conversation is outside your access')
+          : (isAr.value ? 'المحادثة غير موجودة' : 'Conversation not found'),
+        confirmButtonColor: '#FF6600'
+      })
+      return
+    }
+  }
+  selectThread(thread)
+}
+
 const aiConfigured = ref(false)
 const aiSuggestion = ref(null)
 const aiSummary = ref(null)
@@ -752,8 +792,10 @@ const insertQuickReply = (reply) => {
   showQuickReplies.value = false;
 }
 
-const fetchThreads = async () => {
-  loadingThreads.value = true
+// silent: background refresh (no spinner, no error popup) — also called as a DOM event handler
+const fetchThreads = async (options) => {
+  const silent = options?.silent === true
+  if (!silent) loadingThreads.value = true
   try {
     const params = { search: searchQuery.value, limit: 50 }
     if (selectedChannel.value) {
@@ -765,9 +807,9 @@ const fetchThreads = async () => {
     threads.value = res.data.data.threads
   } catch (error) {
     console.error('Error fetching threads:', error)
-    alert('Failed to load conversations.')
+    if (!silent) alert('Failed to load conversations.')
   } finally {
-    loadingThreads.value = false
+    if (!silent) loadingThreads.value = false
   }
 }
 
@@ -1091,20 +1133,23 @@ const createManualTicket = async () => {
 }
 ;
 
-const fetchMessages = async (threadId) => {
-  loadingMessages.value = true
-  messages.value = []
+const fetchMessages = async (threadId, { silent = false } = {}) => {
+  if (!silent) {
+    loadingMessages.value = true
+    messages.value = []
+  }
   try {
     const res = await axios.get(`/api/v1/chat/threads/${threadId}/messages`, {
       params: { limit: 100 }
     })
+    if (selectedThread.value?.id !== threadId) return
     messages.value = res.data.data.messages
     scrollToBottom()
   } catch (error) {
     console.error('Error fetching messages:', error)
-    alert('Failed to load messages.')
+    if (!silent) alert('Failed to load messages.')
   } finally {
-    loadingMessages.value = false
+    if (!silent) loadingMessages.value = false
   }
 }
 
@@ -1313,7 +1358,7 @@ const closeEmojiPicker = (e) => {
 onMounted(() => {
   document.addEventListener('click', closeEmojiPicker)
   fetchChannels()
-  fetchThreads()
+  fetchThreads().then(openThreadFromLink)
   fetchQuickReplies()
   fetchTeamMembers()
   fetchTicketCategories()
@@ -1321,20 +1366,18 @@ onMounted(() => {
   fetchAiStatus()
   nowTimer = setInterval(() => { nowTick.value = Date.now() }, 60000)
 
-  // Initialize Socket.io
-  const baseURL = axios.defaults.baseURL || window.location.origin
-  socket.value = io(baseURL)
+  // Initialize Socket.io (authenticated; the server picks the rooms)
+  socket.value = connectSocket()
 
-  socket.value.on('connect', () => {
-    // Join tenant room
-    try {
-      const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
-      if (tenant?.id) {
-        socket.value.emit('join-tenant', tenant.id)
-      }
-    } catch(e) {
-      console.error('Error parsing tenant', e)
+  // Restricted agents get content-free pings and reload through the API, which applies their scope
+  let activityTimer = null
+  socket.value.on('chat_activity', ({ threadId }) => {
+    if (selectedThread.value && threadId === selectedThread.value.id) {
+      fetchMessages(threadId, { silent: true })
+      fetchActiveTicket(threadId)
     }
+    clearTimeout(activityTimer)
+    activityTimer = setTimeout(() => fetchThreads({ silent: true }), 800)
   })
 
   socket.value.on('new_chat_message', (msg) => {
@@ -1915,6 +1958,12 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.6);
   padding: 1px 6px;
   border-radius: 6px;
+}
+
+.share-btn {
+  background: #eef2ff !important;
+  color: #4338ca !important;
+  border: 1px solid #c7d2fe !important;
 }
 
 .bot-chip {

@@ -80,6 +80,38 @@ class AccessService {
       }
     };
   }
+
+  /** Ticket routes (:id): the ticket must belong to the tenant and be inside the user's scope */
+  ticketGuard() {
+    return async (req, res, next) => {
+      try {
+        const ticket = await prisma.ticket.findFirst({
+          where: { id: req.params.id, tenantId: req.tenant.id },
+          select: { threadId: true, channelId: true, assignedToId: true }
+        });
+        if (!ticket) return res.status(404).json({ error: { message: 'Ticket not found' } });
+        const restriction = await this.getRestriction(req);
+        if (!restriction || ticket.assignedToId === restriction.userId) return next();
+        if (restriction.scope === 'TEAM' && restriction.channelIds.includes(ticket.channelId)) return next();
+        if (await this.canAccessThread(req, ticket.threadId)) return next();
+        return res.status(403).json({ error: { message: 'You do not have access to this ticket' } });
+      } catch (err) {
+        next(err);
+      }
+    };
+  }
+
+  /** Creating a ticket: the conversation in the body must be inside the user's scope */
+  bodyThreadGuard() {
+    return async (req, res, next) => {
+      try {
+        if (!req.body?.threadId || await this.canAccessThread(req, req.body.threadId)) return next();
+        return res.status(403).json({ error: { message: 'You do not have access to this conversation' } });
+      } catch (err) {
+        next(err);
+      }
+    };
+  }
 }
 
 module.exports = new AccessService();

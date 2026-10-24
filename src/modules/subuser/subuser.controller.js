@@ -1,4 +1,5 @@
 const subUserService = require('./subuser.service');
+const { actorFromRequest } = require('./subuser.service');
 const logger = require('../../utils/logger');
 
 class SubUserController {
@@ -8,7 +9,7 @@ class SubUserController {
    */
   async list(req, res, next) {
     try {
-      const data = await subUserService.list(req.tenant.id);
+      const data = await subUserService.list(req.tenant.id, actorFromRequest(req));
       res.json({ success: true, data });
     } catch (err) {
       next(err);
@@ -41,7 +42,7 @@ class SubUserController {
 
       const data = await subUserService.create(req.tenant.id, {
         name, email, password, role, channelId, permissions
-      });
+      }, actorFromRequest(req));
       res.status(201).json({ success: true, data });
     } catch (err) {
       next(err);
@@ -54,7 +55,7 @@ class SubUserController {
    */
   async update(req, res, next) {
     try {
-      const data = await subUserService.update(req.tenant.id, req.params.id, req.body);
+      const data = await subUserService.update(req.tenant.id, req.params.id, req.body, actorFromRequest(req));
       res.json({ success: true, data });
     } catch (err) {
       next(err);
@@ -71,7 +72,7 @@ class SubUserController {
       if (!newPassword || newPassword.length < 6) {
         return res.status(400).json({ error: 'newPassword must be at least 6 characters' });
       }
-      await subUserService.resetPassword(req.tenant.id, req.params.id, newPassword);
+      await subUserService.resetPassword(req.tenant.id, req.params.id, newPassword, actorFromRequest(req));
       res.json({ success: true, message: 'Password updated successfully' });
     } catch (err) {
       next(err);
@@ -83,7 +84,7 @@ class SubUserController {
    */
   async delete(req, res, next) {
     try {
-      await subUserService.delete(req.tenant.id, req.params.id);
+      await subUserService.delete(req.tenant.id, req.params.id, actorFromRequest(req));
       res.json({ success: true, message: 'Sub-user deleted successfully' });
     } catch (err) {
       next(err);

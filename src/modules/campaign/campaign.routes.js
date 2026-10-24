@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const campaignController = require('./campaign.controller');
-const { authMiddleware } = require('../../middleware/auth.middleware');
+const { authMiddleware, requirePermission, requireAnyPermission } = require('../../middleware/auth.middleware');
 const requireFeature = require('../../middleware/requireFeature');
 
 const router = express.Router();
@@ -44,14 +44,18 @@ router.use((req, res, next) => {
   }
 });
 
-router.post('/', upload.fields([{ name: 'file', maxCount: 1 }, { name: 'image', maxCount: 1 }]), campaignController.createCampaign);
-router.put('/:id', upload.fields([{ name: 'image', maxCount: 1 }]), campaignController.updateCampaign);
-router.post('/:id/start', campaignController.startCampaign);
-router.post('/:id/retry', campaignController.retryFailed);
-router.get('/:id/targets', campaignController.getTargets);
-router.get('/:id/stats', campaignController.getCampaignStats);
-router.get('/:id/interactions', campaignController.getInteractions);
-router.get('/:id/export', campaignController.exportCampaignData);
-router.get('/', campaignController.getCampaigns);
+const canView = requirePermission('can_view_campaigns');
+const canList = requireAnyPermission('can_view_campaigns', 'can_view_chatbot');
+const canCreate = requirePermission('can_create_campaigns');
+
+router.post('/', canCreate, upload.fields([{ name: 'file', maxCount: 1 }, { name: 'image', maxCount: 1 }]), campaignController.createCampaign);
+router.put('/:id', canCreate, upload.fields([{ name: 'image', maxCount: 1 }]), campaignController.updateCampaign);
+router.post('/:id/start', canCreate, campaignController.startCampaign);
+router.post('/:id/retry', canCreate, campaignController.retryFailed);
+router.get('/:id/targets', canView, campaignController.getTargets);
+router.get('/:id/stats', canView, campaignController.getCampaignStats);
+router.get('/:id/interactions', canView, campaignController.getInteractions);
+router.get('/:id/export', canView, campaignController.exportCampaignData);
+router.get('/', canList, campaignController.getCampaigns);
 
 module.exports = router;

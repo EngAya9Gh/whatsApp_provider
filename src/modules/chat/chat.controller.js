@@ -49,6 +49,15 @@ class ChatController {
     }
   }
 
+  async getThread(req, res, next) {
+    try {
+      const thread = await chatService.getThread(req.tenant.id, req.params.threadId);
+      res.json({ success: true, data: thread });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getMessages(req, res, next) {
     try {
       const { page, limit } = req.query;

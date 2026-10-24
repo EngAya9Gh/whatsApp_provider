@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const contactController = require('./contact.controller');
-const { authMiddleware, requirePermission } = require('../../middleware/auth.middleware');
+const { authMiddleware, requirePermission, requireAnyPermission } = require('../../middleware/auth.middleware');
 const multer = require('multer');
 const path = require('path');
 
@@ -24,21 +24,22 @@ const upload = multer({
 //
 // All routes require auth and 'can_manage_contacts' permission
 router.use(authMiddleware);
-router.use(requirePermission('can_manage_contacts'));
+const canRead = requireAnyPermission('can_manage_contacts', 'can_create_campaigns', 'can_send_message');
+const canManage = requirePermission('can_manage_contacts');
 
 // Groups
-router.get('/groups', contactController.getGroups);
-router.post('/groups', contactController.createGroup);
-router.put('/groups/:id', contactController.updateGroup);
-router.delete('/groups/:id', contactController.deleteGroup);
+router.get('/groups', canRead, contactController.getGroups);
+router.post('/groups', canManage, contactController.createGroup);
+router.put('/groups/:id', canManage, contactController.updateGroup);
+router.delete('/groups/:id', canManage, contactController.deleteGroup);
 
 // Contacts
-router.get('/', contactController.getContacts);
-router.post('/', contactController.createContact);
-router.put('/:id', contactController.updateContact);
-router.delete('/:id', contactController.deleteContact);
+router.get('/', canRead, contactController.getContacts);
+router.post('/', canManage, contactController.createContact);
+router.put('/:id', canManage, contactController.updateContact);
+router.delete('/:id', canManage, contactController.deleteContact);
 
 // Import CSV
-router.post('/import', upload.single('file'), contactController.importCsv);
+router.post('/import', canManage, upload.single('file'), contactController.importCsv);
 
 module.exports = router;

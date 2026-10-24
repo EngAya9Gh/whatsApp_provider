@@ -1,6 +1,6 @@
 const express = require('express');
 const chatbotController = require('./chatbot.controller');
-const { authMiddleware } = require('../../middleware/auth.middleware');
+const { authMiddleware, requirePermission } = require('../../middleware/auth.middleware');
 const requireFeature = require('../../middleware/requireFeature');
 const multer = require('multer');
 const path = require('path');
@@ -26,10 +26,10 @@ const upload = multer({ storage });
 router.use(authMiddleware);
 router.use(requireFeature('AUTO_RESPONDER'));
 
-router.get('/', chatbotController.getRules);
-router.post('/', upload.single('media'), chatbotController.createRule);
-router.put('/:id', upload.single('media'), chatbotController.updateRule);
-router.delete('/:id', chatbotController.deleteRule);
-router.patch('/:id/active', chatbotController.toggleRuleActive);
+router.get('/', requirePermission('can_view_chatbot'), chatbotController.getRules);
+router.post('/', requirePermission('can_manage_chatbot'), upload.single('media'), chatbotController.createRule);
+router.put('/:id', requirePermission('can_manage_chatbot'), upload.single('media'), chatbotController.updateRule);
+router.delete('/:id', requirePermission('can_manage_chatbot'), chatbotController.deleteRule);
+router.patch('/:id/active', requirePermission('can_manage_chatbot'), chatbotController.toggleRuleActive);
 
 module.exports = router;
