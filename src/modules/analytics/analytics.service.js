@@ -90,7 +90,7 @@ class AnalyticsService {
     const channelIds = channelId ? metaChannels.filter(c => c.id === channelId).map(c => c.id) : metaChannels.map(c => c.id);
 
     const threads = await ChatThread.find({ tenantId, channelId: { $in: channelIds } })
-      .select('_id channelId createdAt stageId tagIds stageHistory')
+      .select('_id channelId createdAt lastMessageAt stageId tagIds stageHistory')
       .lean();
 
     // Newest first so a capped result keeps the current period, then back to chronological order
@@ -295,9 +295,22 @@ class AnalyticsService {
     const totalSent = sources.reduce((s, x) => s + x.sent, 0);
     const prevTotalSent = prevOut.length + prevApi.length + prevCampaignSent + prevCampaignTargets.filter(t => t.status === 'FAILED').reduce((s, t) => s + t._count._all, 0);
 
+    // Latest activity on the Meta numbers, whatever the period — explains an empty period
+    const [lastApi, lastCampaign] = await Promise.all([
+      prisma.messageLog.findFirst({ where: { tenantId, channelId: { in: channelIds } }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+      prisma.campaign.findFirst({ where: { tenantId, campaignType: { in: META_CAMPAIGN_TYPES }, ...(channelId ? { channelId } : {}) }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } })
+    ]);
+    const lastChat = threads.reduce((max, t) => (t.lastMessageAt && (!max || t.lastMessageAt > max) ? t.lastMessageAt : max), null);
+
     return {
       range: { days: range.days, start, end, timezone },
       channels: metaChannels,
+      coverage: {
+        metaChannels: metaChannels.length,
+        lastApiMessageAt: lastApi?.createdAt || null,
+        lastCampaignAt: lastCampaign?.createdAt || null,
+        lastChatAt: lastChat
+      },
       truncated: messages.length >= MAX_ROWS,
       conversations: {
         new: newConv,

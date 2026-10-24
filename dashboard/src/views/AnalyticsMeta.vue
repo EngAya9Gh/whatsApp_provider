@@ -30,10 +30,23 @@
     </div>
 
     <div v-else-if="data" class="space-y-5 transition-opacity" :class="{ 'opacity-50': loading }">
-      <div v-if="isEmpty" class="text-sm text-slate-600 bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center gap-3">
-        <i class="fas fa-circle-info text-slate-400"></i>
-        <span class="flex-1">{{ isAr ? `لا توجد رسائل أو تذاكر أو حملات على أرقام Meta خلال آخر ${days} يوماً.` : `No messages, tickets or campaigns on Meta numbers in the last ${days} days.` }}</span>
-        <button v-if="days < 365" type="button" class="text-[#FF6600] font-semibold bg-transparent border-none cursor-pointer" @click="setDays(365)">{{ isAr ? 'عرض آخر سنة' : 'Show last year' }}</button>
+      <div v-if="isEmpty" class="text-sm text-slate-600 bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-start gap-3">
+        <i class="fas fa-circle-info text-slate-400 mt-1"></i>
+        <div class="flex-1">
+          <div>{{ isAr ? `لا توجد رسائل أو تذاكر أو حملات على أرقام Meta خلال آخر ${days} يوماً.` : `No messages, tickets or campaigns on Meta numbers in the last ${days} days.` }}</div>
+          <!-- Last activity whatever the period: tells "too short a period" apart from "nothing recorded" -->
+          <div class="text-xs text-slate-500 mt-1.5">
+            <template v-if="!data.coverage.metaChannels">{{ isAr ? 'لا يوجد رقم Meta مربوط بهذا الحساب.' : 'No Meta number is connected to this account.' }}</template>
+            <template v-else-if="!lastActivity">{{ isAr ? 'لم تُسجَّل أي رسالة أو حملة أو محادثة على أرقام Meta لهذا الحساب حتى الآن.' : 'No message, campaign or conversation has ever been recorded on this account’s Meta numbers.' }}</template>
+            <template v-else>
+              {{ isAr ? 'آخر نشاط مسجّل:' : 'Latest recorded activity:' }}
+              <span v-if="data.coverage.lastApiMessageAt"> {{ isAr ? 'رسالة API' : 'API message' }} {{ fmt.date(data.coverage.lastApiMessageAt) }} ·</span>
+              <span v-if="data.coverage.lastCampaignAt"> {{ isAr ? 'حملة' : 'campaign' }} {{ fmt.date(data.coverage.lastCampaignAt) }} ·</span>
+              <span v-if="data.coverage.lastChatAt"> {{ isAr ? 'محادثة' : 'conversation' }} {{ fmt.date(data.coverage.lastChatAt) }}</span>
+            </template>
+          </div>
+        </div>
+        <button v-if="days < 365 && lastActivity" type="button" class="text-[#FF6600] font-semibold bg-transparent border-none cursor-pointer" @click="setDays(365)">{{ isAr ? 'عرض آخر سنة' : 'Show last year' }}</button>
       </div>
 
       <p v-if="data.truncated" class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
@@ -258,6 +271,11 @@ const sourceLabel = (key) => ({
   api: isAr.value ? 'الـ API وصفحة إرسال Meta' : 'API & Meta send page',
   campaigns: isAr.value ? 'حملات Meta' : 'Meta campaigns'
 }[key] || key)
+
+const lastActivity = computed(() => {
+  const cov = data.value.coverage || {}
+  return cov.lastApiMessageAt || cov.lastCampaignAt || cov.lastChatAt || null
+})
 
 // Nothing at all in the period → suggest a longer one
 const isEmpty = computed(() => {
