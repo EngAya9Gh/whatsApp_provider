@@ -190,6 +190,12 @@ class ChatService {
 
     const activeTicket = await ticketsService.getActiveTicket(tenantId, thread._id.toString());
 
+    // A person writing to the customer takes over from a running WhatsApp flow
+    if (thread.flowState && !payload.isInternal && !payload.isAutomated) {
+      await ChatThread.updateOne({ _id: thread._id }, { $set: { flowState: null } });
+      socketService.emitToTenant(tenantId, 'thread_updated', { id: threadId, flowState: null });
+    }
+
     let metaResponse;
     try {
       if (payload.isInternal) {
@@ -295,6 +301,8 @@ class ChatService {
 
     // Upsert Thread in MongoDB
     let thread = await ChatThread.findOne({ tenantId, channelId, contactPhone });
+    // Previous customer message time (before this one) — flows start after a period of silence
+    const previousInboundAt = thread ? thread.lastInboundAt || null : null;
 
     if (thread) {
       thread = await ChatThread.findOneAndUpdate(
@@ -370,6 +378,9 @@ class ChatService {
     }
 
     let ticketId = null;
+    const flowEngine = require('../flows/flow.engine');
+    const flowInput = { text: content, interactiveId, previousInboundAt };
+    let flowWillHandle = false;
     if (ratingValue && targetTicketId) {
       await ticketsService.saveTicketRating(tenantId, targetTicketId, ratingValue);
       content = `[العميل قام بتقييم التذكرة: ${ratingValue} نجوم]`;
@@ -383,8 +394,9 @@ class ChatService {
         isAutomated: true
       }).catch(e => console.log('Error sending thank you:', e.message));
     } else {
-      // 2. Check/Auto-create Ticket if not a rating
-      const activeTicket = await ticketsService.autoCreateTicketIfNeeded(tenantId, channelId, threadIdStr, crmClientId, content);
+      // 2. Check/Auto-create Ticket if not a rating (not routed to an agent while a flow is talking)
+      flowWillHandle = await flowEngine.wouldHandle(tenantId, channelId, thread, flowInput);
+      const activeTicket = await ticketsService.autoCreateTicketIfNeeded(tenantId, channelId, threadIdStr, crmClientId, content, { skipRouting: flowWillHandle });
       ticketId = activeTicket ? activeTicket.id : null;
     }
 
@@ -415,13 +427,65 @@ class ChatService {
       socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
       socketService.emitToTenant(tenantId, 'thread_updated', threadData);
 
-      // Outside the channel's working hours → automatic away reply (not for rating replies)
-      if (!ratingValue) {
+      // WhatsApp flow of this channel
+      const flowHandled = flowWillHandle ? await flowEngine.handleInbound(tenantId, channelId, thread, flowInput) : false;
+
+      // Outside the channel's working hours → automatic away reply (not for rating replies, not when a flow answered)
+      if (!ratingValue && !flowHandled) {
         const hoursService = require('../workforce/hours.service');
         hoursService.sendAwayMessageIfClosed(tenantId, channelId, thread)
           .catch(e => logger.error('[ChatService] Away message failed: ' + e.message));
       }
+      return { flowHandled };
     }
+    return { flowHandled: false, duplicate: true };
+  }
+
+  /**
+   * Send an interactive choice message (reply buttons for up to 3 options, a list for more).
+   * payload: { body, options: [{ id, title }], buttonLabel }
+   */
+  async sendInteractiveMessage(tenantId, threadId, { body, options, buttonLabel }) {
+    const thread = await ChatThread.findOne({ _id: threadId, tenantId });
+    if (!thread) throw { status: 404, message: 'Thread not found' };
+    const channel = await prisma.whatsAppChannel.findUnique({ where: { id: thread.channelId } });
+    if (!channel) throw { status: 404, message: 'Channel not found' };
+
+    let metaResponse = null;
+    let status = 'SENT';
+    try {
+      if (options.length <= 3) {
+        metaResponse = await metaService.sendButtons(channel, thread.contactPhone, body, options.map(o => ({ id: o.id, text: o.title })));
+      } else {
+        metaResponse = await metaService.sendList(channel, thread.contactPhone, null, body, buttonLabel, [
+          { title: (buttonLabel || 'Options').substring(0, 24), rows: options.map(o => ({ id: o.id, title: o.title })) }
+        ]);
+      }
+      await billingService.incrementUsage(tenantId, 'sent');
+    } catch (error) {
+      logger.error('Error sending interactive message:', error.response?.data || error.message);
+      status = 'FAILED';
+    }
+
+    const ticketsService = require('../tickets/tickets.service');
+    const activeTicket = await ticketsService.getActiveTicket(tenantId, thread._id.toString());
+    const message = await ChatMessage.create({
+      threadId: thread._id,
+      direction: 'OUTBOUND',
+      type: 'INTERACTIVE',
+      content: [body, ...options.map(o => `• ${o.title}`)].join('\n'),
+      status,
+      metaMessageId: metaResponse?.messages?.[0]?.id || null,
+      ticketId: activeTicket ? activeTicket.id : null,
+      isAutomated: true
+    });
+    await ChatThread.updateOne({ _id: thread._id }, { $set: { lastMessageAt: new Date() } });
+
+    const msgData = message.toObject();
+    msgData.id = msgData._id.toString();
+    socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
+    if (status === 'FAILED') throw new Error('Meta rejected the interactive message');
+    return msgData;
   }
 
   /**

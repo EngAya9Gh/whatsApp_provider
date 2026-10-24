@@ -48,6 +48,8 @@ const routes = [
   { path: '/teams', component: () => import('../views/TeamsShifts.vue'), meta: { requiresAuth: true } },
   { path: '/analytics/meta', component: () => import('../views/AnalyticsMeta.vue'), meta: { requiresAuth: true } },
   { path: '/analytics/qr', component: () => import('../views/AnalyticsQr.vue'), meta: { requiresAuth: true } },
+  { path: '/flows', component: () => import('../views/Flows.vue'), meta: { requiresAuth: true } },
+  { path: '/flows/:channelId', component: () => import('../views/FlowEditor.vue'), meta: { requiresAuth: true } },
   { path: '/quick-replies', component: QuickReplies, meta: { requiresAuth: true } },
   { path: '/send-message', component: MessageSend, meta: { requiresAuth: true } },
   { path: '/chatbot', component: Chatbot, meta: { requiresAuth: true } },

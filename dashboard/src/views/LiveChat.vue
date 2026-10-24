@@ -166,6 +166,9 @@
         </div>
 
         <div class="chat-labels-bar">
+          <span v-if="selectedThread.flowState" class="bot-chip" :title="isAr ? 'أي رسالة تكتبها للعميل توقف السير وتتولى المحادثة' : 'Any message you send stops the flow and takes over'">
+            <i class="fas fa-robot"></i> {{ isAr ? 'سير الواتساب يرد على هذه المحادثة' : 'A WhatsApp flow is answering' }}
+          </span>
           <StagePicker
             v-if="isStageActive(selectedThread)"
             :stages="stageConfig.stages"
@@ -1273,6 +1276,7 @@ onMounted(() => {
       }
       if (updatedThread.lastMessageAt) threads.value[idx].lastMessageAt = updatedThread.lastMessageAt
       if (updatedThread.lastInboundAt) threads.value[idx].lastInboundAt = updatedThread.lastInboundAt
+      if (updatedThread.flowState !== undefined) threads.value[idx].flowState = updatedThread.flowState
       if (updatedThread.tagIds !== undefined) threads.value[idx].tagIds = updatedThread.tagIds
       if (updatedThread.stageId !== undefined) threads.value[idx].stageId = updatedThread.stageId
 
@@ -1818,6 +1822,19 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.6);
   padding: 1px 6px;
   border-radius: 6px;
+}
+
+.bot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  padding: 3px 10px;
+  border-radius: 999px;
 }
 
 .chat-labels-bar {

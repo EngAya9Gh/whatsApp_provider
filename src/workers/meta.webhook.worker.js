@@ -38,7 +38,7 @@ async function processIncomingMessage(channelId, tenantId, payload) {
   const contactName = (contacts || []).find(c => c.wa_id === from)?.profile?.name || null;
 
   // 1. Save to Live Chat (throw to trigger retry if fails)
-  await chatService.handleIncomingMessage(tenantId, channelId, from, contactName, msg);
+  const intake = await chatService.handleIncomingMessage(tenantId, channelId, from, contactName, msg);
   logger.info(`[MetaWebhookWorker] ✅ Live chat saved message from ${from}`);
 
   // 2. Track button/text interactions
@@ -60,9 +60,9 @@ async function processIncomingMessage(channelId, tenantId, payload) {
     }
   }
 
-  // 3. Auto Responder
+  // 3. Auto Responder (skipped when the channel's WhatsApp flow already answered)
   const textForBot = buttonText || incomingText;
-  if (textForBot) {
+  if (textForBot && !intake?.flowHandled) {
     const channelRecord = await prisma.whatsAppChannel.findUnique({ where: { id: channelId } }).catch(() => null);
     if (channelRecord) {
       const rules = await prisma.autoResponder.findMany({ where: { tenantId, isActive: true, OR: [{ channelId }, { channelId: null }] } }).catch(() => []);
@@ -102,7 +102,8 @@ async function processIncomingMessage(channelId, tenantId, payload) {
                   hasMedia: ['IMAGE', 'VIDEO', 'DOCUMENT', 'QR_CODE'].includes(rT),
                   mediaUrl: rule.mediaUrl || null,
                   metaMessageId,
-                  status: 'SENT'
+                  status: 'SENT',
+                  isAutomated: true
                 });
                 const msgData = newMsg.toObject();
                 msgData.id = msgData._id.toString();

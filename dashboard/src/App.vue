@@ -104,6 +104,10 @@
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>
             <span class="nav-label">{{ $t('sidebar.meta_chatbot') }}</span>
           </router-link>
+          <router-link v-if="$hasFeature('META_AUTORESPONDER') && (!isSubUser || subUserPerms?.can_view_chatbot)" to="/flows" class="nav-item" active-class="active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="5" rx="1"/><rect x="15" y="9" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><path d="M6 8v8"/><path d="M9 5.5h3a3 3 0 0 1 3 3v3"/></svg>
+            <span class="nav-label">{{ locale === 'ar' ? 'سير الواتساب' : 'WhatsApp Flows' }}</span>
+          </router-link>
           <router-link v-if="!isSubUser || subUserPerms?.can_view_chatbot" to="/meta-flows" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
             <span class="nav-label">{{ $t('sidebar.meta_flows') }}</span>

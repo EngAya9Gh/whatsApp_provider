@@ -13,6 +13,8 @@ const ChatThreadSchema = new mongoose.Schema({
   lastInboundAt: { type: Date },
   // Last automatic "outside working hours" reply (to avoid repeating it)
   awayMessageSentAt: { type: Date },
+  // Running WhatsApp flow: { flowId, version, nodeId (waiting question), attempts, startedAt }
+  flowState: { type: mongoose.Schema.Types.Mixed, default: null },
   tagIds: { type: [String], default: [] },
   stageId: { type: String, default: null },
   stageHistory: [{

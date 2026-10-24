@@ -73,7 +73,7 @@ class TicketsService {
   /**
    * Auto-create a ticket if channel settings allow it and no active ticket exists
    */
-  async autoCreateTicketIfNeeded(tenantId, channelId, threadId, crmClientId, firstMessageText = '') {
+  async autoCreateTicketIfNeeded(tenantId, channelId, threadId, crmClientId, firstMessageText = '', options = {}) {
     try {
       const channel = await prisma.whatsAppChannel.findUnique({
         where: { id: channelId },
@@ -115,7 +115,7 @@ class TicketsService {
 
       
       const subject = firstMessageText ? firstMessageText.substring(0, 100) : 'محادثة دعم فني';
-      return this.createTicket(tenantId, channelId, threadId, crmClientId, subject);
+      return this.createTicket(tenantId, channelId, threadId, crmClientId, subject, null, options);
 
     } catch (error) {
       logger.error(`[TicketsService] Error auto-creating ticket: ${error.message}`);
@@ -126,7 +126,7 @@ class TicketsService {
   /**
    * Create a new ticket (manually or automatically)
    */
-  async createTicket(tenantId, channelId, threadId, crmClientId, subject = 'محادثة واتساب', categoryId = null) {
+  async createTicket(tenantId, channelId, threadId, crmClientId, subject = 'محادثة واتساب', categoryId = null, { skipRouting = false } = {}) {
     try {
       // 1. Generate local ticket number
       const count = await prisma.ticket.count({ where: { tenantId } });
@@ -157,9 +157,12 @@ class TicketsService {
       });
 
       // 3.0 Route to an agent of the team that owns this channel (on shift, by the team's rule)
-      const routingService = require('../workforce/routing.service');
-      const assignedToId = await routingService.autoAssignTicket(tenantId, ticket);
-      if (assignedToId) ticket.assignedToId = assignedToId;
+      // (skipped while a WhatsApp flow is handling the conversation — the flow hands off itself)
+      if (!skipRouting) {
+        const routingService = require('../workforce/routing.service');
+        const assignedToId = await routingService.autoAssignTicket(tenantId, ticket);
+        if (assignedToId) ticket.assignedToId = assignedToId;
+      }
 
       // 3.1 Backfill ticketId on messages that belong to this new ticket
       if (thread) {
