@@ -1,4 +1,5 @@
 const chatService = require('./chat.service');
+const { memberKey } = require('../../middleware/auth.middleware');
 const accessService = require('../workforce/access.service');
 const logger = require('../../utils/logger');
 
@@ -127,7 +128,7 @@ class ChatController {
       const message = await chatService.sendMessage(
         req.tenant.id,
         req.params.threadId,
-        { ...req.body, senderId: req.subUser ? req.subUser.id : null }
+        { ...req.body, senderId: req.subUser ? req.subUser.id : null, senderKey: memberKey(req) }
       );
       res.json({ success: true, data: message });
     } catch (error) {

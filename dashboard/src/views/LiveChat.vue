@@ -240,7 +240,7 @@
               <!-- Internal Note Header -->
               <div v-if="msg.isInternal || msg.type === 'INTERNAL_NOTE'" class="internal-note-header">
                 <i class="fas fa-shield-alt"></i>
-                <span>ملاحظة داخلية (فريق العمل فقط)</span>
+                <span>{{ isAr ? 'ملاحظة داخلية' : 'Team note' }} · {{ noteAuthor(msg) }}</span>
               </div>
 
               <!-- Media Content -->
@@ -261,6 +261,11 @@
               
               <!-- Text Content -->
               <p v-if="msg.content" :class="{ 'internal-note-text': msg.isInternal || msg.type === 'INTERNAL_NOTE' }">{{ msg.content }}</p>
+              <div v-if="msg.mentions && msg.mentions.length" class="note-mentions">
+                <span v-for="key in msg.mentions" :key="key" class="mention-chip" :class="{ me: key === myMemberKey }">
+                  @{{ key === myMemberKey ? (isAr ? 'أنت' : 'you') : memberDisplayName(key) }}
+                </span>
+              </div>
               
               <div class="message-meta">
                 <span class="message-time">{{ formatTime(msg.createdAt) }}</span>
@@ -320,6 +325,15 @@
             <button @click="attachment = null" class="btn-clear"><i class="fas fa-times"></i></button>
           </div>
 
+          <!-- @mention popup (team notes) -->
+          <div v-if="mentionResults.length" class="mention-popup">
+            <div class="mention-popup-title">{{ isAr ? 'أشر إلى زميل — سيصله تنبيه في المحادثات الداخلية' : 'Mention a colleague — they get notified in Team Chat' }}</div>
+            <button v-for="m in mentionResults" :key="m.key" type="button" class="mention-option" @mousedown.prevent="insertMention(m)">
+              <span class="mention-avatar">{{ (m.name || '?').charAt(0) }}</span>
+              <span>{{ m.name }}</span>
+            </button>
+          </div>
+
           <!-- Quick Replies Popup -->
           <div v-if="showQuickReplies && filteredQuickReplies.length > 0" class="quick-replies-popup absolute bottom-full left-4 bg-white border border-slate-200 shadow-lg rounded-xl mb-2 w-72 max-h-64 overflow-y-auto z-50">
             <div class="p-2 border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-500">
@@ -377,7 +391,7 @@
               type="text" 
               v-model="newMessage" 
               @input="handleInput"
-              :placeholder="isRecording ? 'جاري التسجيل...' : (isInternal ? 'اكتب ملاحظة داخلية لفريق العمل (لن يراها العميل)...' : (windowExpired ? (isAr ? 'أرسل قالباً، أو فعّل الملاحظة الداخلية 🔒' : 'Send a template, or switch to an internal note 🔒') : 'Type a message...'))"
+              :placeholder="isRecording ? 'جاري التسجيل...' : (isInternal ? 'اكتب ملاحظة داخلية لفريق العمل (لن يراها العميل)… استخدم @ للإشارة إلى زميل' : (windowExpired ? (isAr ? 'أرسل قالباً، أو فعّل الملاحظة الداخلية 🔒' : 'Send a template, or switch to an internal note 🔒') : 'Type a message...'))"
               class="form-control msg-input"
               :class="{ 'input-internal': isInternal }"
               :disabled="sending || isRecording || (windowExpired && !isInternal)"
@@ -775,7 +789,45 @@ const fetchQuickReplies = async () => {
   }
 }
 
+// ─── Team members (note authors & @mentions) ──────────────────
+const chatMembers = ref([])
+const myMemberKey = ref('')
+const mentionQuery = ref(null)
+
+const fetchChatMembers = async () => {
+  try {
+    const res = await axios.get('/api/v1/team-chat/members')
+    chatMembers.value = res.data.data.members || []
+    myMemberKey.value = res.data.data.me
+  } catch { chatMembers.value = [] }
+}
+const memberDisplayName = (key) => chatMembers.value.find(m => m.key === key)?.name || (isAr.value ? 'زميل' : 'colleague')
+const noteAuthor = (msg) => {
+  if (msg.isAutomated) return isAr.value ? 'النظام' : 'System'
+  return memberDisplayName(msg.senderId || 'owner')
+}
+
+// "@na" at the end of the note being typed → matching colleagues
+const mentionResults = computed(() => {
+  if (!isInternal.value || mentionQuery.value === null) return []
+  const q = mentionQuery.value.toLowerCase()
+  return chatMembers.value.filter(m => m.key !== myMemberKey.value && m.name.toLowerCase().includes(q)).slice(0, 6)
+})
+const updateMentionQuery = () => {
+  const match = isInternal.value ? newMessage.value.match(/(?:^|\s)@([^\s@]*)$/) : null
+  mentionQuery.value = match ? match[1] : null
+}
+const insertMention = (member) => {
+  newMessage.value = newMessage.value.replace(/@([^\s@]*)$/, `@${member.name} `)
+  mentionQuery.value = null
+}
+// Colleagues whose "@Name" is still in the note when it is sent
+const mentionedKeys = (text) => chatMembers.value
+  .filter(m => m.key !== myMemberKey.value && text.includes(`@${m.name}`))
+  .map(m => m.key)
+
 const handleInput = () => {
+  updateMentionQuery()
   if (newMessage.value.startsWith('/')) {
     const term = newMessage.value.substring(1).toLowerCase();
     filteredQuickReplies.value = quickReplies.value.filter(qr => 
@@ -1281,6 +1333,7 @@ const sendMessage = async () => {
     const payload = {
       content: newMessage.value.trim(),
       isInternal: isInternal.value,
+      mentions: isInternal.value ? mentionedKeys(newMessage.value) : [],
       type,
       hasMedia: !!mediaUrl,
       mediaUrl,
@@ -1361,6 +1414,7 @@ onMounted(() => {
   fetchThreads().then(openThreadFromLink)
   fetchQuickReplies()
   fetchTeamMembers()
+  fetchChatMembers()
   fetchTicketCategories()
   fetchLabels()
   fetchAiStatus()
@@ -1958,6 +2012,81 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.6);
   padding: 1px 6px;
   border-radius: 6px;
+}
+
+.note-mentions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.mention-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.mention-chip.me {
+  background: #FF6600;
+  color: white;
+}
+
+.mention-popup {
+  position: absolute;
+  bottom: 100%;
+  inset-inline-start: 16px;
+  width: 280px;
+  margin-bottom: 8px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.mention-popup-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 7px 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.mention-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: white;
+  font-size: 0.85rem;
+  color: #0f172a;
+  cursor: pointer;
+  text-align: start;
+}
+
+.mention-option:hover {
+  background: #fff7f2;
+}
+
+.mention-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4338ca;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .share-btn {

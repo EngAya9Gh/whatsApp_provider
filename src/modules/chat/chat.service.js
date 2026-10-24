@@ -182,8 +182,8 @@ class ChatService {
 
     const ticketsService = require('../tickets/tickets.service');
     
-    // Auto-assign ticket if unassigned and sender is a sub-user
-    if (payload.senderId) {
+    // Auto-assign ticket if unassigned and a sub-user replies to the customer (writing a team note is not taking the chat)
+    if (payload.senderId && !payload.isInternal) {
       try {
         const activeTicket = await ticketsService.getActiveTicket(tenantId, threadId);
         if (activeTicket && !activeTicket.assignedToId) {
@@ -244,8 +244,18 @@ class ChatService {
         ticketId: payload.ticketId || (activeTicket ? activeTicket.id : null),
         isInternal: payload.isInternal || false,
         senderId: payload.senderId || null,
-        isAutomated: !!payload.isAutomated
+        isAutomated: !!payload.isAutomated,
+        mentions: payload.isInternal && Array.isArray(payload.mentions)
+          ? [...new Set(payload.mentions.map(String))].slice(0, 20)
+          : []
       });
+
+      // Colleagues mentioned in a team note get it in team chat, with a link back to this customer
+      if (message.mentions.length && payload.senderKey) {
+        const teamChatService = require('../team-chat/team-chat.service');
+        teamChatService.notifyMentions(tenantId, payload.senderKey, message.mentions, { threadId, text: message.content })
+          .catch(err => logger.error('[ChatService] Mention notification failed: ' + err.message));
+      }
 
       await ChatThread.updateOne(
         { _id: thread._id },

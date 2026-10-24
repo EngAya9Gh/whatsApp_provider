@@ -15,7 +15,9 @@ const ChatMessageSchema = new mongoose.Schema({
   // Sub-user who sent an outbound message (null for the owner, API or automations)
   senderId: { type: String, default: null },
   // Sent by the system (away reply, rating thanks) — excluded from response-time stats
-  isAutomated: { type: Boolean, default: false }
+  isAutomated: { type: Boolean, default: false },
+  // Internal notes: team members mentioned with @ (member keys: 'owner' or sub-user id)
+  mentions: { type: [String], default: [] }
 }, {
   timestamps: true,
   collection: 'chat_messages'

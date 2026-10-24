@@ -78,6 +78,18 @@ class TeamChatController {
         return accessService.canAccessThread(req, threadId);
       };
       const message = await teamChatService.sendMessage(req.tenant.id, me(req), req.params.id, req.body || {}, canShareThread);
+
+      // A shared customer conversation keeps a trace of it in its own timeline (team note)
+      if (message.threadRef) {
+        const chatService = require('../chat/chat.service');
+        const title = await teamChatService.conversationTitle(req.tenant.id, me(req), req.params.id);
+        await chatService.sendMessage(req.tenant.id, message.threadRef.threadId, {
+          content: `🔗 شارك هذه المحادثة مع ${title}${message.text ? `:\n«${message.text}»` : ''}`,
+          type: 'text',
+          isInternal: true,
+          senderId: req.subUser ? req.subUser.id : null
+        }).catch(() => { /* the share itself succeeded */ });
+      }
       res.status(201).json({ success: true, data: message });
     } catch (error) {
       next(error);

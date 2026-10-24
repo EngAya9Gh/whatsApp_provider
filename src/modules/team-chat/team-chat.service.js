@@ -209,6 +209,23 @@ class TeamChatService {
     return formatted;
   }
 
+  /** Title of a conversation as `me` sees it (the other person, or the group name) */
+  async conversationTitle(tenantId, me, conversationId) {
+    const [conversation, memberMap] = await Promise.all([this._conversationFor(tenantId, me, conversationId), this._memberMap(tenantId)]);
+    return this._format(conversation, me, memberMap).title;
+  }
+
+  /** People mentioned in a customer conversation's team note get it in their direct chat with the writer */
+  async notifyMentions(tenantId, fromKey, memberKeys, { threadId, text }) {
+    const memberMap = await this._memberMap(tenantId);
+    for (const key of new Set(memberKeys)) {
+      if (key === fromKey || !memberMap[key]) continue;
+      const direct = await this.openDirect(tenantId, fromKey, key);
+      // The writer is inside the customer conversation, so sharing it is allowed
+      await this.sendMessage(tenantId, fromKey, direct.id, { text: `📌 ${text || ''}`.trim(), threadId }, async () => true);
+    }
+  }
+
   async markRead(tenantId, me, conversationId) {
     const conversation = await this._conversationFor(tenantId, me, conversationId);
     await TeamConversation.updateOne({ _id: conversation._id }, { $set: { [`reads.${me}`]: new Date() } });
