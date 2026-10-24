@@ -46,6 +46,8 @@ const routes = [
   { path: '/ticket-categories', component: () => import('../views/TicketCategories.vue'), meta: { requiresAuth: true } },
   { path: '/inbox-settings', component: () => import('../views/InboxSettings.vue'), meta: { requiresAuth: true } },
   { path: '/teams', component: () => import('../views/TeamsShifts.vue'), meta: { requiresAuth: true } },
+  { path: '/analytics/meta', component: () => import('../views/AnalyticsMeta.vue'), meta: { requiresAuth: true } },
+  { path: '/analytics/qr', component: () => import('../views/AnalyticsQr.vue'), meta: { requiresAuth: true } },
   { path: '/quick-replies', component: QuickReplies, meta: { requiresAuth: true } },
   { path: '/send-message', component: MessageSend, meta: { requiresAuth: true } },
   { path: '/chatbot', component: Chatbot, meta: { requiresAuth: true } },

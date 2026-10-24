@@ -97,7 +97,7 @@ class HoursService {
     if (!claimed) return false;
 
     const chatService = require('../chat/chat.service');
-    await chatService.sendMessage(tenantId, thread._id.toString(), { content: doc.awayMessage, type: 'text' });
+    await chatService.sendMessage(tenantId, thread._id.toString(), { content: doc.awayMessage, type: 'text', isAutomated: true });
     logger.info(`[Hours] Away message sent on channel ${channelId} to thread ${thread._id}`);
     return true;
   }

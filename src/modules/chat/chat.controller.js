@@ -128,7 +128,10 @@ class ChatController {
 
   async sendTemplate(req, res, next) {
     try {
-      const message = await chatService.sendTemplateMessage(req.tenant.id, req.params.threadId, req.body);
+      const message = await chatService.sendTemplateMessage(req.tenant.id, req.params.threadId, {
+        ...req.body,
+        senderId: req.subUser ? req.subUser.id : null
+      });
       res.json({ success: true, data: message });
     } catch (error) {
       next(error);

@@ -225,7 +225,9 @@ class ChatService {
         status: payload.isInternal ? 'READ' : 'SENT', // Internal notes are instantly "READ"
         metaMessageId: metaResponse?.messages?.[0]?.id || null,
         ticketId: payload.ticketId || (activeTicket ? activeTicket.id : null),
-        isInternal: payload.isInternal || false
+        isInternal: payload.isInternal || false,
+        senderId: payload.senderId || null,
+        isAutomated: !!payload.isAutomated
       });
 
       await ChatThread.updateOne(
@@ -377,7 +379,8 @@ class ChatService {
       this.sendMessage(tenantId, threadIdStr, {
         content: "شكراً لتقييمك! نحن سعداء بخدمتك.",
         type: 'text',
-        ticketId: targetTicketId
+        ticketId: targetTicketId,
+        isAutomated: true
       }).catch(e => console.log('Error sending thank you:', e.message));
     } else {
       // 2. Check/Auto-create Ticket if not a rating
@@ -461,6 +464,7 @@ class ChatService {
       type: 'TEMPLATE',
       content: previewText || templateName,
       status,
+      senderId: payload.senderId || null,
       metaMessageId: metaResponse?.messages?.[0]?.id || null,
       ticketId: activeTicket ? activeTicket.id : null
     });

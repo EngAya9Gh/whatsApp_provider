@@ -21,6 +21,14 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
           <span class="nav-label">{{ $t('sidebar.dashboard') }}</span>
         </router-link>
+        <router-link v-if="$hasFeature('META_API') && (!isSubUser || subUserPerms?.can_view_analytics)" to="/analytics/meta" class="nav-item" active-class="active">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+          <span class="nav-label">{{ locale === 'ar' ? 'تحليلات Meta' : 'Meta Analytics' }}</span>
+        </router-link>
+        <router-link v-if="($hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('BAILEYS_CAMPAIGN') || $hasFeature('BAILEYS_AUTORESPONDER')) && (!isSubUser || subUserPerms?.can_view_analytics)" to="/analytics/qr" class="nav-item" active-class="active">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg>
+          <span class="nav-label">{{ locale === 'ar' ? 'تحليلات الربط العادي' : 'QR Analytics' }}</span>
+        </router-link>
         <router-link v-if="!isSubUser || subUserPerms?.can_manage_settings" to="/connect" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
           <span class="nav-label">{{ $t('sidebar.connections') }}</span>
