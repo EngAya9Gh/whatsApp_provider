@@ -4,6 +4,8 @@ const axios = require('axios');
 const prisma = new PrismaClient();
 
 const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'wakeel_meta_secret_1234';
+// Secret of the platform's own Meta app (signs webhooks of Embedded Signup channels)
+const META_APP_SECRET = process.env.META_APP_SECRET;
 const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || 'v21.0';
 const chatService = require('../chat/chat.service');
 const webhookService = require('../webhook/webhook.service');
@@ -66,36 +68,37 @@ class MetaController {
         }).catch(() => null);
 
         if (!channel) {
-          const allChannels = await prisma.whatsAppChannel.findMany({
-            select: { id: true, metaPhoneNumberId: true, status: true, displayPhoneNumber: true }
-          }).catch(() => []);
-          logger.warn(`[MetaWebhook] ⚠️ Unknown phone_number_id: "${metaPhoneNumberId}". All channels: ${JSON.stringify(allChannels)}`);
+          logger.warn(`[MetaWebhook] ⚠️ Unknown phone_number_id: "${metaPhoneNumberId}"`);
           continue;
         }
         logger.info(`[MetaWebhook] ✅ Found channel: ${channel.id} for phone_number_id: ${metaPhoneNumberId}`);
 
         // --- HMAC Signature Verification (Per-Channel) ---
-        // Verify signature ONLY if the channel has a metaAppSecret configured
-        if (channel.metaAppSecret && req.rawBody) {
-          const signature = req.headers['x-hub-signature-256'];
-          if (!signature) {
-            logger.error(`[MetaWebhook] Missing signature for channel ${channel.id}`);
-            return; // Stop processing this invalid request
-          }
+        // Channels added manually carry the secret of the customer's own Meta app; channels connected
+        // through Embedded Signup belong to the platform's app (META_APP_SECRET). Unverifiable → rejected.
+        const appSecret = channel.metaAppSecret || META_APP_SECRET;
+        if (!appSecret || !req.rawBody) {
+          logger.error(`[MetaWebhook] ❌ Rejected webhook for channel ${channel.id}: no app secret to verify it (set META_APP_SECRET)`);
+          return;
+        }
+        const signature = req.headers['x-hub-signature-256'];
+        if (!signature) {
+          logger.error(`[MetaWebhook] Missing signature for channel ${channel.id}`);
+          return; // Stop processing this invalid request
+        }
 
-          const crypto = require('crypto');
-          const expectedSignature = 'sha256=' + crypto
-            .createHmac('sha256', channel.metaAppSecret)
-            .update(req.rawBody)
-            .digest('hex');
+        const crypto = require('crypto');
+        const expectedSignature = 'sha256=' + crypto
+          .createHmac('sha256', appSecret)
+          .update(req.rawBody)
+          .digest('hex');
 
-          const sigBuffer = Buffer.from(signature);
-          const expectedBuffer = Buffer.from(expectedSignature);
+        const sigBuffer = Buffer.from(signature);
+        const expectedBuffer = Buffer.from(expectedSignature);
 
-          if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
-            logger.error(`[MetaWebhook] ❌ Invalid signature for channel ${channel.id}`);
-            return; // Stop processing
-          }
+        if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+          logger.error(`[MetaWebhook] ❌ Invalid signature for channel ${channel.id}`);
+          return; // Stop processing
         }
 
         // ─────────────────────────────────────────────────────────────

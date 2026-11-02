@@ -158,12 +158,28 @@
                   </div>
                   <p>اربط حساب WhatsApp Business الخاص بعميلك في دقيقتين عبر نافذة Facebook الرسمية — بدون نسخ ولصق أي بيانات.</p>
                 </div>
-                <button @click="launchEmbeddedSignup" class="btn-fb">
+                <button @click="launchEmbeddedSignup" class="btn-fb" :disabled="!numberConfirmed" :title="!numberConfirmed ? (isAr ? 'أكّد أولاً أن الرقم غير مستخدم على تطبيق واتساب' : 'First confirm the number is not used in the WhatsApp app') : ''">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
                   Continue with Facebook
                 </button>
+              </div>
+
+              <!-- The sending number leaves the WhatsApp app: make sure the customer knows before connecting -->
+              <div class="number-warning">
+                <div class="nw-text">
+                  <i class="fas fa-triangle-exclamation"></i>
+                  <span>
+                    <strong>{{ isAr ? 'الرقم الذي تربطه هنا لن يعمل على تطبيق واتساب.' : 'The number you connect here will not work in the WhatsApp app.' }}</strong>
+                    {{ isAr ? 'إذا كان مفعّلاً على واتساب أو واتساب للأعمال يجب حذف الحساب منه أولاً.' : 'If it is active on WhatsApp or WhatsApp Business, delete that account first.' }}
+                    <router-link to="/meta-guide" class="nw-link">{{ isAr ? 'اقرأ الدليل قبل الربط' : 'Read the guide first' }}</router-link>
+                  </span>
+                </div>
+                <label class="nw-confirm">
+                  <input type="checkbox" v-model="numberConfirmed" />
+                  <span>{{ isAr ? 'أؤكد أن الرقم غير مستخدم على أي تطبيق واتساب، أو أنني حذفت الحساب منه' : 'I confirm the number is not used on any WhatsApp app, or I deleted its account' }}</span>
+                </label>
               </div>
 
               <!-- Status Feedback -->
@@ -201,9 +217,13 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { connectSocket } from '../services/realtime'
 import QrcodeVue from 'qrcode.vue'
+
+const { locale } = useI18n()
+const isAr = computed(() => locale.value === 'ar')
 
 // ─── Config ───────────────────────────────────────────────────
 const FB_APP_ID = import.meta.env.VITE_FB_APP_ID || ''
@@ -256,6 +276,7 @@ const goToUpgrade = () => { window.location.href = '/' }
 const metaChannels = ref([])
 const baseUrl = ref(window.location.origin)
 const embeddedSignupStatus = ref('') // '', 'loading', 'success', 'error'
+const numberConfirmed = ref(false)
 const embeddedSignupMessage = ref('')
 
 // ─── Facebook SDK ─────────────────────────────────────────────
@@ -613,6 +634,13 @@ const disconnect = async () => {
 .btn-disconnect:hover { background: #FEF2F2; border-color: #EF4444; }
 
 /* Groups UI */
+.number-warning { margin-top: 1rem; background: #fff7ed; border: 1px solid #fdba74; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem; color: #7c2d12; }
+.nw-text { display: flex; gap: 10px; align-items: flex-start; line-height: 1.7; }
+.nw-text i { color: #ea580c; margin-top: 4px; }
+.nw-link { color: #c2410c; font-weight: 700; text-decoration: underline; margin-inline-start: 4px; }
+.nw-confirm { display: flex; gap: 8px; align-items: center; font-weight: 600; cursor: pointer; }
+.nw-confirm input { width: 16px; height: 16px; accent-color: #FF6600; }
+.btn-fb:disabled { opacity: 0.5; cursor: not-allowed; }
 .groups-section { margin-top: 2rem; background: white; padding: 1.5rem; border-radius: 16px; border: 1px solid #E2E8F0; text-align: left; }
 .groups-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .groups-header h3 { margin: 0; font-size: 1.1rem; color: #0F172A; font-weight: 800; }

@@ -6,7 +6,8 @@ const app = express();
 
 // Middleware
 app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:5174'], credentials: true }));
-app.use(express.json());
+// Keep the exact bytes of Meta webhooks: their HMAC signature is computed over the raw body
+app.use(express.json({ verify: require('./middleware/rawBody').captureWebhookRawBody }));
 app.use(express.urlencoded({ extended: true }));
 
 // Basic Request Logging
