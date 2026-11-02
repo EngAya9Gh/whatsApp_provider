@@ -4,7 +4,7 @@ export const COMPANY = {
   product: { ar: 'وكيل', en: 'Wakeel' },
   legalName: { ar: 'شركة رشد إيه أي', en: 'Rushd AI Company' },
   crNumber: '7053993619',
-  email: 'tmelhi@rushdai.com',
+  email: 'aya.ghouri@rushdai.com',
   phone: '+966539592520',
   phoneDisplay: '+966 53 959 2520',
   website: 'https://rushdai.com',
