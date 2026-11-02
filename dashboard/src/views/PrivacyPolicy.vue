@@ -11,87 +11,130 @@
       <template v-if="$i18n.locale === 'ar'">
         <h1>سياسة الخصوصية (Privacy Policy)</h1>
         <p class="intro">نحن في <strong>وكيل (Wakeel)</strong> نلتزم بحماية خصوصية بياناتك ومعلومات عملائك. تشرح هذه السياسة كيفية جمعنا واستخدامنا وتخزيننا للبيانات المتعلقة بخدماتنا، خصوصاً عند ربط حسابك بمنصة WhatsApp Cloud API.</p>
-        
+
         <section>
-          <h2>1. جمع المعرفات التقنية</h2>
-          <p>بمجرد إتمام عملية الربط لتشغيل الخدمة، تقوم المنصة بجمع وتخزين بعض المعرفات التقنية الأساسية لضمان عمل الخدمة بشكل صحيح، وتشمل:</p>
+          <h2>1. من نحن</h2>
+          <p>منصة وكيل منتج تابع لـ <strong>{{ COMPANY.legalName.ar }}</strong> ({{ COMPANY.legalName.en }})، سجل تجاري رقم {{ COMPANY.crNumber }}، وهي الجهة المسؤولة عن البيانات التي تعالجها المنصة.</p>
           <ul>
-            <li>مفاتيح الربط (Access Tokens)</li>
-            <li>معرفات الأعمال في واتساب (WABA IDs و Phone Number IDs)</li>
-            <li>أرقام الهواتف المرتبطة بالحساب</li>
+            <li><strong>العنوان:</strong> {{ COMPANY.address.ar }}</li>
+            <li><strong>البريد الإلكتروني:</strong> <a :href="`mailto:${COMPANY.email}`" dir="ltr">{{ COMPANY.email }}</a></li>
+            <li><strong>الهاتف:</strong> <a :href="`tel:${COMPANY.phone}`" dir="ltr">{{ COMPANY.phoneDisplay }}</a></li>
           </ul>
         </section>
 
         <section>
-          <h2>2. مركزية التخزين</h2>
-          <p>لتقديم خدمة "صندوق الوارد" (Inbox) الموحد وأرشفة الرسائل، يتم تخزين البيانات التالية في قاعدة البيانات المركزية الآمنة الخاصة بمنصتنا:</p>
+          <h2>2. البيانات التي نجمعها</h2>
           <ul>
-            <li>نصوص المحادثات الصادرة والواردة</li>
-            <li>بيانات العملاء (مثل الأسماء والأرقام) التي يتم التواصل معها</li>
-            <li>الوسائط المتعددة المتبادلة (صور، مستندات، إلخ)</li>
+            <li><strong>بيانات حسابك في المنصة:</strong> الاسم، البريد الإلكتروني، اسم المنشأة وبياناتها الضريبية للفواتير، وبيانات أعضاء فريقك.</li>
+            <li><strong>بيانات تسجيل الدخول عبر فيسبوك:</strong> عند ربط رقمك عبر نافذة Facebook الرسمية نحصل على اسمك وصورة ملفك الشخصي بحسب ما توافق عليه في تلك النافذة، دون أي صلاحية للنشر على فيسبوك.</li>
+            <li><strong>المعرفات التقنية للربط:</strong> مفاتيح الربط (Access Tokens)، ومعرفات الأعمال في واتساب (WABA IDs و Phone Number IDs)، وأرقام الهواتف المرتبطة بالحساب.</li>
+            <li><strong>بيانات المحادثات:</strong> نصوص الرسائل الصادرة والواردة، وبيانات عملائك الذين تتواصل معهم (مثل الأسماء والأرقام)، والوسائط المتبادلة (صور، مستندات، إلخ)، والملاحظات الداخلية لفريقك.</li>
           </ul>
         </section>
 
         <section>
-          <h2>3. مشاركة البيانات مع الطرف الثالث (Meta)</h2>
-          <p>تستخدم منصتنا واجهات <strong>WhatsApp Cloud API</strong> الرسمية. وعليه، فإن جميع الرسائل الصادرة والواردة تمر بالضرورة عبر خوادم شركة <strong>Meta (فيسبوك سابقاً)</strong>. تخضع هذه البيانات والمراسلات لسياسة الخصوصية وشروط الاستخدام الخاصة بشركة Meta.</p>
+          <h2>3. كيف نستخدم البيانات</h2>
+          <p>نستخدم البيانات فقط لتقديم الخدمة التي تطلبها: إرسال واستقبال رسائل واتساب، وصندوق الوارد الموحد وأرشفة المحادثات، والتذاكر والتقارير، والأتمتة التي تفعّلها، والفوترة والدعم الفني. لا نبيع بياناتك ولا بيانات عملائك ولا نستخدمها للإعلان.</p>
         </section>
 
         <section>
-          <h2>4. حقوق الحذف وإلغاء التفويض</h2>
+          <h2>4. مشاركة البيانات مع أطراف أخرى</h2>
+          <ul>
+            <li><strong>Meta:</strong> تستخدم منصتنا واجهات <strong>WhatsApp Cloud API</strong> الرسمية، فتمر الرسائل الصادرة والواردة عبر خوادم شركة <strong>Meta</strong>، وتخضع لسياسة الخصوصية وشروط الاستخدام الخاصة بها.</li>
+            <li><strong>Google (Gemini):</strong> عند استخدامك ميزات الذكاء الاصطناعي (ملخص المحادثة، اقتراح مرحلة العميل، الموظف الذكي) تُرسل نصوص المحادثة المعنية إلى خدمة Gemini من Google لمعالجتها. هذه الميزات اختيارية.</li>
+            <li><strong>التكاملات التي تضبطها بنفسك:</strong> مثل نظام CRM أو روابط Webhook، تُرسل إليها البيانات التي تختارها فقط.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>5. التخزين والحماية</h2>
+          <p>تُخزّن البيانات في قواعد بيانات المنصة المحمية، ويقتصر الوصول إليها على حسابك وأعضاء فريقك بحسب الصلاحيات التي تحددها. نحتفظ بالبيانات طوال مدة اشتراكك، ونحذفها عند طلبك أو عند إغلاق الحساب، إلا ما يلزمنا القانون بالاحتفاظ به (مثل الفواتير).</p>
+        </section>
+
+        <section id="data-deletion">
+          <h2>6. حذف البيانات وإلغاء التفويض</h2>
           <p>بصفتك مستخدماً للمنصة، تمتلك كامل الحقوق للتحكم في بياناتك:</p>
           <ul>
-            <li><strong>حذف البيانات:</strong> يمكنك في أي وقت طلب حذف سجل محادثاتك وبيانات عملائك من خوادمنا بشكل نهائي عبر التواصل مع الدعم الفني.</li>
-            <li><strong>إلغاء التفويض:</strong> يمكنك إزالة تفويض تطبيقنا للوصول إلى حسابك عبر الذهاب إلى إعدادات مدير الأعمال الخاص بك (Meta Business Manager) وإلغاء الربط في أي وقت.</li>
+            <li><strong>طلب حذف البيانات:</strong> أرسل بريداً إلى <a :href="`mailto:${COMPANY.email}?subject=${encodeURIComponent('طلب حذف بيانات')}`" dir="ltr">{{ COMPANY.email }}</a> من البريد المسجّل في حسابك بعنوان «طلب حذف بيانات»، وسنحذف حسابك ومحادثاتك وبيانات عملائك من خوادمنا نهائياً خلال 30 يوماً، ونؤكد لك ذلك بالبريد.</li>
+            <li><strong>إلغاء تفويض فيسبوك:</strong> يمكنك إزالة صلاحية تطبيقنا من إعدادات فيسبوك (الإعدادات ← التطبيقات ومواقع الويب) أو من إعدادات مدير الأعمال الخاص بك (Meta Business Manager) في أي وقت.</li>
           </ul>
+        </section>
+
+        <section>
+          <h2>7. التواصل معنا</h2>
+          <p>لأي سؤال عن هذه السياسة أو بياناتك: <a :href="`mailto:${COMPANY.email}`" dir="ltr">{{ COMPANY.email }}</a> أو <a :href="`tel:${COMPANY.phone}`" dir="ltr">{{ COMPANY.phoneDisplay }}</a></p>
         </section>
       </template>
 
       <template v-else>
         <h1>Privacy Policy</h1>
         <p class="intro">At <strong>Wakeel</strong>, we are committed to protecting the privacy of your data and your customers' information. This policy explains how we collect, use, and store data related to our services, especially when connecting your account to the WhatsApp Cloud API.</p>
-        
+
         <section>
-          <h2>1. Technical Identifiers Collection</h2>
-          <p>Once the connection is completed to operate the service, the platform collects and stores some basic technical identifiers to ensure the service functions correctly, including:</p>
+          <h2>1. Who We Are</h2>
+          <p>Wakeel is a product of <strong>{{ COMPANY.legalName.en }}</strong> ({{ COMPANY.legalName.ar }}), Commercial Registration No. {{ COMPANY.crNumber }}, which is responsible for the data processed by the platform.</p>
           <ul>
-            <li>Access Tokens</li>
-            <li>WhatsApp Business Identifiers (WABA IDs and Phone Number IDs)</li>
-            <li>Phone numbers associated with the account</li>
+            <li><strong>Address:</strong> {{ COMPANY.address.en }}</li>
+            <li><strong>Email:</strong> <a :href="`mailto:${COMPANY.email}`">{{ COMPANY.email }}</a></li>
+            <li><strong>Phone:</strong> <a :href="`tel:${COMPANY.phone}`">{{ COMPANY.phoneDisplay }}</a></li>
           </ul>
         </section>
 
         <section>
-          <h2>2. Centralized Storage</h2>
-          <p>To provide a unified "Inbox" service and message archiving, the following data is stored in our platform's secure centralized database:</p>
+          <h2>2. Data We Collect</h2>
           <ul>
-            <li>Sent and received chat texts</li>
-            <li>Customer data (such as names and numbers) communicated with</li>
-            <li>Exchanged multimedia (images, documents, etc.)</li>
+            <li><strong>Your platform account:</strong> name, email, business name and tax details for invoices, and your team members' details.</li>
+            <li><strong>Facebook Login data:</strong> when you connect your number through the official Facebook window, we receive your name and profile picture as you approve in that window, with no permission to post on Facebook.</li>
+            <li><strong>Technical connection identifiers:</strong> Access Tokens, WhatsApp Business identifiers (WABA IDs and Phone Number IDs), and the phone numbers linked to the account.</li>
+            <li><strong>Conversation data:</strong> sent and received messages, details of the customers you communicate with (such as names and numbers), exchanged media (images, documents, etc.), and your team's internal notes.</li>
           </ul>
         </section>
 
         <section>
-          <h2>3. Data Sharing with Third Party (Meta)</h2>
-          <p>Our platform explicitly uses the official <strong>WhatsApp Cloud API</strong>. Therefore, all sent and received messages necessarily pass through <strong>Meta's</strong> servers. This data and communication are subject to Meta's own privacy policy and terms of use.</p>
+          <h2>3. How We Use Data</h2>
+          <p>We use data only to provide the service you request: sending and receiving WhatsApp messages, the unified inbox and archive, tickets and reports, the automations you turn on, billing and support. We do not sell your data or your customers' data, and we do not use it for advertising.</p>
         </section>
 
         <section>
-          <h2>4. Deletion and Revocation Rights</h2>
+          <h2>4. Sharing with Third Parties</h2>
+          <ul>
+            <li><strong>Meta:</strong> our platform uses the official <strong>WhatsApp Cloud API</strong>, so sent and received messages pass through <strong>Meta's</strong> servers and are subject to Meta's own privacy policy and terms.</li>
+            <li><strong>Google (Gemini):</strong> when you use AI features (conversation summary, customer stage suggestions, the AI agent), the relevant conversation text is sent to Google's Gemini service for processing. These features are optional.</li>
+            <li><strong>Integrations you set up:</strong> such as a CRM or webhook URLs receive only the data you choose to send them.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>5. Storage and Security</h2>
+          <p>Data is stored in the platform's protected databases and is accessible only to your account and your team members, according to the permissions you set. We keep data for as long as your subscription is active and delete it on request or when the account is closed, except what the law requires us to keep (such as invoices).</p>
+        </section>
+
+        <section id="data-deletion">
+          <h2>6. Data Deletion and Revocation</h2>
           <p>As a user of the platform, you have full rights to control your data:</p>
           <ul>
-            <li><strong>Data Deletion:</strong> You can request the permanent deletion of your chat history and customer data from our servers at any time by contacting technical support.</li>
-            <li><strong>Revocation of Authorization:</strong> You can remove our application's authorization to access your account by going to your Meta Business Manager settings and unlinking it at any time.</li>
+            <li><strong>Request data deletion:</strong> email <a :href="`mailto:${COMPANY.email}?subject=${encodeURIComponent('Data deletion request')}`">{{ COMPANY.email }}</a> from your account's registered email with the subject "Data deletion request". We permanently delete your account, conversations and customer data from our servers within 30 days and confirm by email.</li>
+            <li><strong>Revoke Facebook access:</strong> you can remove our app's access at any time from Facebook settings (Settings → Apps and Websites) or from your Meta Business Manager settings.</li>
           </ul>
+        </section>
+
+        <section>
+          <h2>7. Contact Us</h2>
+          <p>For any question about this policy or your data: <a :href="`mailto:${COMPANY.email}`">{{ COMPANY.email }}</a> or <a :href="`tel:${COMPANY.phone}`">{{ COMPANY.phoneDisplay }}</a></p>
         </section>
       </template>
 
       <div class="legal-footer">
-        {{ $i18n.locale === 'ar' ? 'آخر تحديث:' : 'Last updated:' }} {{ new Date().toLocaleDateString($i18n.locale === 'ar' ? 'ar-SA' : 'en-US') }}
+        {{ $i18n.locale === 'ar' ? 'آخر تحديث:' : 'Last updated:' }} {{ new Date(COMPANY.legalUpdated).toLocaleDateString($i18n.locale === 'ar' ? 'ar-SA-u-ca-gregory' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }) }}
+        <div class="legal-entity">{{ $i18n.locale === 'ar' ? COMPANY.legalName.ar : COMPANY.legalName.en }} · {{ $i18n.locale === 'ar' ? 'سجل تجاري' : 'CR' }} {{ COMPANY.crNumber }}</div>
       </div>
     </div>
   </div>
 </template>
+
+<script setup>
+import { COMPANY } from '../data/company'
+</script>
 
 <style scoped>
 .legal-page-container {
@@ -178,6 +221,16 @@
 }
 .legal-content li {
   margin-bottom: 0.75rem;
+}
+.legal-content a {
+  color: #c2410c;
+  font-weight: 600;
+}
+.legal-entity {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #9ca3af;
 }
 .legal-footer {
   text-align: center;

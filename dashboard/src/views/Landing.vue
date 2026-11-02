@@ -376,6 +376,18 @@
             <span class="logo-text" style="font-size: 1.2rem;">Wakeel <span class="logo-accent">WhatsApp</span></span>
           </div>
           <p class="footer-desc">{{ c.footer.desc }}</p>
+          <!-- The legal entity behind Wakeel (must match the Meta business verification documents) -->
+          <div class="footer-company">
+            <p class="footer-company-name">
+              {{ isAr ? `${COMPANY.product.ar} منتج من ${COMPANY.legalName.ar}` : `${COMPANY.product.en} is a product of ${COMPANY.legalName.en}` }}
+            </p>
+            <p>{{ isAr ? COMPANY.address.ar : COMPANY.address.en }}</p>
+            <p>{{ isAr ? 'سجل تجاري' : 'CR' }} {{ COMPANY.crNumber }}</p>
+            <p>
+              <a :href="`mailto:${COMPANY.email}`" dir="ltr">{{ COMPANY.email }}</a> ·
+              <a :href="`tel:${COMPANY.phone}`" dir="ltr">{{ COMPANY.phoneDisplay }}</a>
+            </p>
+          </div>
         </div>
 
         <div class="footer-links">
@@ -386,11 +398,12 @@
           <router-link to="/login">{{ $i18n.locale === 'ar' ? 'تسجيل الدخول' : 'Sign In' }}</router-link>
           <router-link to="/privacy">{{ $i18n.locale === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy' }}</router-link>
           <router-link to="/terms">{{ $i18n.locale === 'ar' ? 'شروط الخدمة' : 'Terms of Service' }}</router-link>
+          <router-link to="/privacy#data-deletion">{{ $i18n.locale === 'ar' ? 'حذف البيانات' : 'Data Deletion' }}</router-link>
         </div>
       </div>
       <div class="footer-bottom">
         <p class="copyright">
-          © 2026 Wakeel Tech. All rights reserved.
+          © {{ new Date().getFullYear() }} {{ isAr ? COMPANY.legalName.ar : COMPANY.legalName.en }}. {{ isAr ? 'جميع الحقوق محفوظة.' : 'All rights reserved.' }}
         </p>
       </div>
     </footer>
@@ -404,6 +417,7 @@ import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
 import { setLanguage } from '../i18n'
+import { COMPANY } from '../data/company'
 
 const { locale } = useI18n()
 const pricingPlans = ref([])
@@ -961,6 +975,11 @@ const fetchPlans = async () => {
 .landing-footer { border-top: 1px solid rgba(255,255,255,0.05); padding: 4rem 2rem 2rem; background: #080C17; }
 .footer-container { padding: 0; display: grid; grid-template-columns: 2fr 1fr; gap: 4rem; margin-bottom: 4rem; }
 .footer-desc { color: #94A3B8; margin-top: 1.5rem; max-width: 420px; font-size: 1.05rem; }
+.footer-company { margin-top: 1.25rem; max-width: 460px; color: #64748B; font-size: 0.85rem; line-height: 1.7; }
+.footer-company p { margin: 0; }
+.footer-company-name { color: #CBD5E1; font-weight: 600; }
+.footer-company a { color: #94A3B8; text-decoration: none; }
+.footer-company a:hover { color: #FF6600; }
 .footer-links h4 { color: #FFF; font-size: 1.2rem; margin-bottom: 1.5rem; }
 .footer-links a { display: block; color: #94A3B8; text-decoration: none; margin-bottom: 1rem; transition: 0.2s; }
 .footer-links a:hover { color: #FF6600; }
@@ -998,6 +1017,7 @@ const fetchPlans = async () => {
   .stat-divider { display: none; }
   .footer-container { grid-template-columns: 1fr; text-align: center; }
   .footer-desc { margin: 1.5rem auto 0; }
+  .footer-company { margin-left: auto; margin-right: auto; }
   .footer-brand .logo { justify-content: center; }
 }
 @media (max-width: 600px) {

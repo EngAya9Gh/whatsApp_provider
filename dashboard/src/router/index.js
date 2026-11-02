@@ -81,11 +81,10 @@ const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior(to, from, savedPosition) {
-    if (savedPosition) {
-      return savedPosition
-    } else {
-      return { top: 0 }
-    }
+    if (savedPosition) return savedPosition
+    // e.g. /privacy#data-deletion (the data deletion instructions URL given to Meta)
+    if (to.hash) return { el: to.hash, top: 80 }
+    return { top: 0 }
   }
 })
 

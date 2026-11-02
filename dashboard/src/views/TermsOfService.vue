@@ -10,7 +10,7 @@
     <div class="legal-content" :dir="$i18n.locale === 'ar' ? 'rtl' : 'ltr'">
       <template v-if="$i18n.locale === 'ar'">
         <h1>شروط الخدمة (Terms of Service)</h1>
-        <p class="intro">مرحباً بك في منصة <strong>وكيل (Wakeel)</strong>. باستخدامك لمنصتنا لربط أعمالك عبر واتساب، فإنك توافق بشكل كامل على الشروط والأحكام التالية التي تنظم هذه العلاقة لحماية جميع الأطراف.</p>
+        <p class="intro">مرحباً بك في منصة <strong>وكيل (Wakeel)</strong>، وهي منتج تابع لـ <strong>{{ COMPANY.legalName.ar }}</strong>. باستخدامك لمنصتنا لربط أعمالك عبر واتساب، فإنك توافق بشكل كامل على الشروط والأحكام التالية التي تنظم هذه العلاقة لحماية جميع الأطراف.</p>
         
         <section>
           <h2>1. الامتثال التام لسياسات Meta</h2>
@@ -24,7 +24,7 @@
 
         <section>
           <h2>2. حدود المسؤولية التقنية (Limitation of Liability)</h2>
-          <p>نحن في وكيل نقدم "برمجية التوصيل والإدارة" كطرف تقني مزود للخدمة (Tech Provider). وبناءً عليه:</p>
+          <p>نحن في وكيل نقدم "برمجية التوصيل والإدارة" كمزوّد خدمة تقنية يربط أعمالك بمنصة واتساب الرسمية. وبناءً عليه:</p>
           <ul>
             <li>نخلي مسؤوليتنا القانونية والتقنية في حال تعطلت خوادم شركة Meta أو واجهت انقطاعات في الخدمة.</li>
             <li>نخلي مسؤوليتنا إذا قامت Meta بحظر رقم هاتفك المرتبط بالخدمة نتيجة كثرة الشكاوى أو ارتفاع معدل الحظر (Block Rate) من قبل المستخدمين.</li>
@@ -34,7 +34,7 @@
 
         <section>
           <h2>3. هيكلية الفوترة (Billing Structure)</h2>
-          <p>بما أننا نعمل كمسار تقني (Tech Provider)، يرجى العلم بآلية الفوترة التالية:</p>
+          <p>بما أننا نقدم البرمجية فقط، يرجى العلم بآلية الفوترة التالية:</p>
           <ul>
             <li>الرسوم التي تدفعها لمنصة وكيل (الاشتراكات الشهرية/السنوية) هي نظير <strong>الاستخدام البرمجي للمنصة وميزاتها فقط</strong>.</li>
             <li>تكلفة الرسائل الصادرة والواردة (المحادثات المفتوحة) <strong>تُدفع من قِبلك مباشرة لشركة Meta</strong> من خلال مدير الأعمال الخاص بك، ولا علاقة لمنصة وكيل بتسعيرتها أو تحصيلها.</li>
@@ -45,11 +45,21 @@
           <h2>4. حق إنهاء الخدمة</h2>
           <p>نحتفظ بحقنا الكامل في إغلاق أو تعليق حساب أي عميل داخل منصتنا فوراً وبدون تعويضات، في حال شكلت ممارساته أو استخدامه للخدمة خطراً على استقرار تطبيقنا المركزي لدى Meta، أو في حال اكتشاف استخدامات ضارة أو غير قانونية للمنصة.</p>
         </section>
+
+        <section>
+          <h2>5. الجهة المشغّلة والتواصل</h2>
+          <ul>
+            <li><strong>الجهة:</strong> {{ COMPANY.legalName.ar }} ({{ COMPANY.legalName.en }})، سجل تجاري رقم {{ COMPANY.crNumber }}</li>
+            <li><strong>العنوان:</strong> {{ COMPANY.address.ar }}</li>
+            <li><strong>البريد الإلكتروني:</strong> <a :href="`mailto:${COMPANY.email}`" dir="ltr">{{ COMPANY.email }}</a></li>
+            <li><strong>الهاتف:</strong> <a :href="`tel:${COMPANY.phone}`" dir="ltr">{{ COMPANY.phoneDisplay }}</a></li>
+          </ul>
+        </section>
       </template>
 
       <template v-else>
         <h1>Terms of Service</h1>
-        <p class="intro">Welcome to <strong>Wakeel</strong>. By using our platform to connect your business via WhatsApp, you fully agree to the following terms and conditions that govern this relationship to protect all parties.</p>
+        <p class="intro">Welcome to <strong>Wakeel</strong>, a product of <strong>{{ COMPANY.legalName.en }}</strong>. By using our platform to connect your business via WhatsApp, you fully agree to the following terms and conditions that govern this relationship to protect all parties.</p>
         
         <section>
           <h2>1. Total Compliance with Meta Policies</h2>
@@ -63,7 +73,7 @@
 
         <section>
           <h2>2. Limitation of Liability</h2>
-          <p>At Wakeel, we provide "delivery and management software" as a technical service provider (Tech Provider). Accordingly:</p>
+          <p>At Wakeel, we provide "delivery and management software" as a technology service provider connecting your business to the official WhatsApp platform. Accordingly:</p>
           <ul>
             <li>We disclaim all legal and technical responsibility if Meta's servers crash or face service interruptions.</li>
             <li>We disclaim responsibility if Meta blocks your phone number associated with the service due to frequent complaints or a high Block Rate from users.</li>
@@ -73,7 +83,7 @@
 
         <section>
           <h2>3. Billing Structure</h2>
-          <p>Since we operate as a Tech Provider, please be aware of the following billing mechanism:</p>
+          <p>Since we provide the software only, please be aware of the following billing mechanism:</p>
           <ul>
             <li>The fees you pay to the Wakeel platform (monthly/annual subscriptions) are strictly for <strong>software usage of the platform and its features only</strong>.</li>
             <li>The cost of sent and received messages (conversations) is <strong>paid by you directly to Meta</strong> through your Business Manager, and Wakeel has no relation to its pricing or collection.</li>
@@ -84,14 +94,29 @@
           <h2>4. Right to Terminate Service</h2>
           <p>We retain our full right to close or suspend the account of any customer within our platform immediately and without compensation, if their practices or use of the service pose a risk to the stability of our central application at Meta, or if harmful or illegal uses of the platform are discovered.</p>
         </section>
+
+        <section>
+          <h2>5. Operator and Contact</h2>
+          <ul>
+            <li><strong>Operator:</strong> {{ COMPANY.legalName.en }} ({{ COMPANY.legalName.ar }}), Commercial Registration No. {{ COMPANY.crNumber }}</li>
+            <li><strong>Address:</strong> {{ COMPANY.address.en }}</li>
+            <li><strong>Email:</strong> <a :href="`mailto:${COMPANY.email}`">{{ COMPANY.email }}</a></li>
+            <li><strong>Phone:</strong> <a :href="`tel:${COMPANY.phone}`">{{ COMPANY.phoneDisplay }}</a></li>
+          </ul>
+        </section>
       </template>
 
       <div class="legal-footer">
-        {{ $i18n.locale === 'ar' ? 'آخر تحديث:' : 'Last updated:' }} {{ new Date().toLocaleDateString($i18n.locale === 'ar' ? 'ar-SA' : 'en-US') }}
+        {{ $i18n.locale === 'ar' ? 'آخر تحديث:' : 'Last updated:' }} {{ new Date(COMPANY.legalUpdated).toLocaleDateString($i18n.locale === 'ar' ? 'ar-SA-u-ca-gregory' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }) }}
+        <div class="legal-entity">{{ $i18n.locale === 'ar' ? COMPANY.legalName.ar : COMPANY.legalName.en }} · {{ $i18n.locale === 'ar' ? 'سجل تجاري' : 'CR' }} {{ COMPANY.crNumber }}</div>
       </div>
     </div>
   </div>
 </template>
+
+<script setup>
+import { COMPANY } from '../data/company'
+</script>
 
 <style scoped>
 .legal-page-container {
@@ -178,6 +203,16 @@
 }
 .legal-content li {
   margin-bottom: 0.75rem;
+}
+.legal-content a {
+  color: #c2410c;
+  font-weight: 600;
+}
+.legal-entity {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #9ca3af;
 }
 .legal-footer {
   text-align: center;
