@@ -323,10 +323,12 @@ const handleFbMessage = (event) => {
   try {
     const data = JSON.parse(event.data)
     if (data.type === 'WA_EMBEDDED_SIGNUP') {
-      if (data.event === 'FINISH' || data.event === 'FINISH_ONLY_WABA') {
+      // Embedded Signup v4 finish events (FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING = Coexistence:
+      // the number stays on the WhatsApp Business app).
+      if (data.event?.startsWith('FINISH')) {
         // Store temporarily; the code exchange happens in fbLoginCallback
-        window._embeddedSignupData = data.data
-        console.log('[EmbeddedSignup] Received IDs:', data.data)
+        window._embeddedSignupData = { ...data.data, event: data.event }
+        console.log('[EmbeddedSignup] Received IDs:', data.event, data.data)
       } else if (data.event === 'CANCEL') {
         embeddedSignupStatus.value = 'error'
         embeddedSignupMessage.value = `Signup cancelled at step: ${data.data?.current_step || 'unknown'}`
@@ -347,9 +349,15 @@ const fbLoginCallback = (response) => {
   (async () => {
     if (response.authResponse) {
       const code = response.authResponse.code
+      // The session-info message can land a moment after this callback; the code lives 30s,
+      // so wait briefly for it instead of failing straight away.
+      for (let i = 0; i < 20 && !window._embeddedSignupData; i++) {
+        await new Promise(r => setTimeout(r, 200))
+      }
       const signupData = window._embeddedSignupData || {}
       const phone_number_id = signupData.phone_number_id
-      const waba_id = signupData.waba_id
+      const waba_id = signupData.waba_id || signupData.waba_ids?.[0]
+      const signup_event = signupData.event
 
       if (!phone_number_id || !waba_id) {
         embeddedSignupStatus.value = 'error'
@@ -363,13 +371,14 @@ const fbLoginCallback = (response) => {
       try {
         const token = localStorage.getItem('token')
         const res = await axios.post('/api/v1/meta/embedded-signup/exchange', {
-          code, phone_number_id, waba_id
+          code, phone_number_id, waba_id, signup_event
         }, {
           headers: { Authorization: `Bearer ${token}` }
         })
 
         embeddedSignupStatus.value = 'success'
-        embeddedSignupMessage.value = `✅ Connected! Phone: +${res.data.channel.phoneNumber}`
+        embeddedSignupMessage.value = `✅ Connected! Phone: +${res.data.channel.phoneNumber}` +
+          (res.data.warnings?.length ? ` — ⚠️ ${res.data.warnings.join(' | ')}` : '')
         fetchMetaChannels()
         delete window._embeddedSignupData
       } catch (err) {
@@ -403,7 +412,9 @@ const launchEmbeddedSignup = () => {
     response_type: 'code',
     override_default_response_type: true,
     display: 'popup',
-    extras: { setup: {}, sessionInfoVersion: '3' }
+    // Embedded Signup v4: the version and products come from the Facebook Login for Business
+    // configuration (VITE_FB_CONFIG_ID); sessionInfoVersion is ignored on v4.
+    extras: { setup: {} }
   })
 
   // Update UI after calling FB.login

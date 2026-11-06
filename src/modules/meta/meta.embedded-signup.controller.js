@@ -1,25 +1,46 @@
 const axios = require('axios');
+const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
 
 const META_FB_APP_ID = process.env.META_FB_APP_ID;
 const META_APP_SECRET = process.env.META_APP_SECRET;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const GRAPH = `https://graph.facebook.com/${process.env.GRAPH_API_VERSION || 'v21.0'}`;
+
+/**
+ * The business number's two-step verification PIN, set when we register it on Cloud API.
+ * META_REGISTRATION_PIN (6 digits) wins; otherwise it is derived from JWT_SECRET and the
+ * phone number ID, so it can be recomputed later without being stored.
+ */
+const registrationPin = (phoneNumberId) => {
+  const fixed = process.env.META_REGISTRATION_PIN;
+  if (/^\d{6}$/.test(fixed || '')) return fixed;
+  const hmac = crypto.createHmac('sha256', process.env.JWT_SECRET || 'wakeel').update(String(phoneNumberId)).digest();
+  return String(hmac.readUInt32BE(0) % 1000000).padStart(6, '0');
+};
+
+const metaError = (err) => err.response?.data?.error?.message || err.message;
 
 /**
  * POST /api/v1/meta/embedded-signup/exchange
  *
- * Receives the one-time code from the Embedded Signup popup,
- * exchanges it for a User Access Token via Meta Graph API,
- * then fetches phone number details and saves the channel.
+ * Runs Meta's Tech Provider onboarding after the Embedded Signup popup:
+ *   1. exchange the one-time code (30s TTL) for the business token
+ *   2. save or update the channel
+ *   3. subscribe our app to the WABA's webhooks
+ *   4. register the number on Cloud API (skipped for Coexistence numbers, which stay on the
+ *      WhatsApp Business app)
+ * The customer still has to add a payment method in WhatsApp Manager.
  *
- * Body: { code, phone_number_id, waba_id }
+ * Body: { code, phone_number_id, waba_id, signup_event? }
  */
 exports.exchangeCode = async (req, res, next) => {
   try {
-    const { code, phone_number_id, waba_id } = req.body;
+    const { code, phone_number_id, waba_id, signup_event } = req.body;
     const tenantId = req.tenant.id;
+    const isCoexistence = signup_event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING';
+    const warnings = [];
 
     if (!code || !phone_number_id || !waba_id) {
       return res.status(400).json({
@@ -28,20 +49,19 @@ exports.exchangeCode = async (req, res, next) => {
       });
     }
 
-    // Step 1: Exchange code for User Access Token
+    // Step 1: Exchange code for the business access token
     logger.info('[EmbeddedSignup] Exchanging code for access token...');
-    let userAccessToken;
+    let accessToken;
     try {
-      const tokenRes = await axios.get('https://graph.facebook.com/v22.0/oauth/access_token', {
+      const tokenRes = await axios.get(`${GRAPH}/oauth/access_token`, {
         params: {
           client_id: META_FB_APP_ID,
           client_secret: META_APP_SECRET,
-          code: code,
-          redirect_uri: '' // empty for server-side exchange
+          code
         }
       });
-      userAccessToken = tokenRes.data.access_token;
-      logger.info('[EmbeddedSignup] Got user access token ✅');
+      accessToken = tokenRes.data.access_token;
+      logger.info('[EmbeddedSignup] Got access token ✅');
     } catch (err) {
       logger.error('[EmbeddedSignup] Failed to exchange code:', err.response?.data || err.message);
       return res.status(400).json({
@@ -51,14 +71,14 @@ exports.exchangeCode = async (req, res, next) => {
       });
     }
 
-    // Step 2: Get phone number details from Meta
+    // Step 2: Phone number details
     logger.info(`[EmbeddedSignup] Fetching phone number details for ID: ${phone_number_id}`);
     let phoneNumber = phone_number_id; // fallback
     try {
-      const phoneRes = await axios.get(`https://graph.facebook.com/v22.0/${phone_number_id}`, {
+      const phoneRes = await axios.get(`${GRAPH}/${phone_number_id}`, {
         params: {
           fields: 'display_phone_number,verified_name,quality_rating,status',
-          access_token: userAccessToken
+          access_token: accessToken
         }
       });
       phoneNumber = phoneRes.data.display_phone_number
@@ -66,66 +86,70 @@ exports.exchangeCode = async (req, res, next) => {
         : phone_number_id;
       logger.info(`[EmbeddedSignup] Phone number: ${phoneNumber} ✅`);
     } catch (err) {
-      logger.warn('[EmbeddedSignup] Could not fetch phone details, using ID as fallback', err.response?.data?.error?.message);
+      logger.warn('[EmbeddedSignup] Could not fetch phone details, using ID as fallback', metaError(err));
     }
 
-    // Step 3: Check if channel already exists
+    // Step 3: Save or update the channel. A reconnect (e.g. through a new Meta app) refreshes the
+    // token and WABA, then still runs the webhook subscription and registration below.
     const existing = await prisma.whatsAppChannel.findFirst({
-      where: {
-        tenantId,
-        metaPhoneNumberId: phone_number_id
-      }
+      where: { tenantId, metaPhoneNumberId: phone_number_id }
     });
 
-    if (existing) {
-      // Update the access token if channel already exists
-      await prisma.whatsAppChannel.update({
-        where: { id: existing.id },
-        data: { metaAccessToken: userAccessToken }
-      });
-      return res.json({
-        success: true,
-        message: 'Channel already exists — access token updated.',
-        channel: existing
-      });
-    }
-
-    // Step 4: Save the new channel
-    const channel = await prisma.whatsAppChannel.create({
-      data: {
-        tenantId,
-        providerType: 'META_CLOUD',
-        phoneNumber,
-        metaPhoneNumberId: phone_number_id,
-        metaWabaId: waba_id,
-        metaAccessToken: userAccessToken,
-        status: 'ACTIVE'
-      }
-    });
-
-    logger.info(`[EmbeddedSignup] ✅ Channel created: ${channel.id} for tenant ${tenantId}`);
-
-    // Step 5: Automatically Subscribe the WABA to our App's Webhooks
-    try {
-      logger.info(`[EmbeddedSignup] 🔗 Subscribing WABA ${waba_id} to our App's Webhooks...`);
-      await axios.post(
-        `https://graph.facebook.com/v21.0/${waba_id}/subscribed_apps`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${userAccessToken}`
+    const channel = existing
+      ? await prisma.whatsAppChannel.update({
+          where: { id: existing.id },
+          data: { metaAccessToken: accessToken, metaWabaId: waba_id, status: 'ACTIVE' }
+        })
+      : await prisma.whatsAppChannel.create({
+          data: {
+            tenantId,
+            providerType: 'META_CLOUD',
+            phoneNumber,
+            metaPhoneNumberId: phone_number_id,
+            metaWabaId: waba_id,
+            metaAccessToken: accessToken,
+            status: 'ACTIVE'
           }
-        }
-      );
-      logger.info(`[EmbeddedSignup] 🔗 Successfully subscribed WABA ${waba_id} to App Webhooks!`);
+        });
+
+    logger.info(`[EmbeddedSignup] ✅ Channel ${existing ? 'updated' : 'created'}: ${channel.id} for tenant ${tenantId}`);
+
+    // Step 4: Subscribe the WABA to our app's webhooks
+    try {
+      await axios.post(`${GRAPH}/${waba_id}/subscribed_apps`, {}, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      logger.info(`[EmbeddedSignup] 🔗 Subscribed WABA ${waba_id} to app webhooks`);
     } catch (subErr) {
-      logger.error(`[EmbeddedSignup] ⚠️ Failed to subscribe WABA ${waba_id} to Webhooks automatically. User may need to do it manually. Error: ${subErr.response?.data?.error?.message || subErr.message}`);
+      logger.error(`[EmbeddedSignup] ⚠️ Failed to subscribe WABA ${waba_id} to webhooks: ${metaError(subErr)}`);
+      warnings.push(`Webhook subscription failed: ${metaError(subErr)}`);
     }
 
-    return res.status(201).json({
+    // Step 5: Register the number on Cloud API so it can send messages
+    if (!isCoexistence) {
+      try {
+        await axios.post(`${GRAPH}/${phone_number_id}/register`,
+          { messaging_product: 'whatsapp', pin: registrationPin(phone_number_id) },
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        logger.info(`[EmbeddedSignup] 📱 Registered ${phone_number_id} on Cloud API`);
+      } catch (regErr) {
+        // e.g. already registered with a different two-step PIN: reset it in WhatsApp Manager
+        logger.error(`[EmbeddedSignup] ⚠️ Failed to register ${phone_number_id}: ${metaError(regErr)}`);
+        warnings.push(`Number registration failed: ${metaError(regErr)}`);
+      }
+    }
+
+    // Never send the token or app secret back to the browser
+    const { metaAccessToken: _token, metaAppSecret: _secret, ...safeChannel } = channel;
+
+    return res.status(existing ? 200 : 201).json({
       success: true,
-      message: 'WhatsApp channel connected successfully via Embedded Signup!',
-      channel
+      message: existing
+        ? 'Channel already existed — reconnected with a fresh access token.'
+        : 'WhatsApp channel connected successfully via Embedded Signup!',
+      channel: safeChannel,
+      warnings
     });
 
   } catch (err) {
