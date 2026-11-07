@@ -508,7 +508,7 @@ class ChatService {
     const msgData = message.toObject();
     msgData.id = msgData._id.toString();
     socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
-    if (status === 'FAILED') throw { status: 400, message: `Meta rejected the interactive message: ${failure.details || failure.message}`, metaCode: failure.code };
+    if (status === 'FAILED') throw { status: 400, message: `Meta rejected the interactive message: ${failure.details || failure.message}`, metaCode: failure.code, metaSubcode: failure.subcode };
     return msgData;
   }
 
@@ -581,7 +581,7 @@ class ChatService {
     msgData.id = msgData._id.toString();
     socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
 
-    if (status === 'FAILED') throw { status: 400, message: `Meta rejected the template: ${failure.details || failure.message}`, metaCode: failure.code };
+    if (status === 'FAILED') throw { status: 400, message: `Meta rejected the template: ${failure.details || failure.message}`, metaCode: failure.code, metaSubcode: failure.subcode };
     return msgData;
   }
 }

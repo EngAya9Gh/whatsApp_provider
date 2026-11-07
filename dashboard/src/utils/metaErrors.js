@@ -42,11 +42,22 @@ const HINTS = {
     ar: 'الرقم غير مسجّل على Cloud API. أعد ربطه من صفحة «ربط Meta الرسمي».',
     en: 'The number is not registered on the Cloud API. Reconnect it from the Meta Connection page.'
   },
-  10: { ar: 'ليس لدى التطبيق صلاحية لهذا الإجراء.', en: 'The app does not have permission for this action.' }
+  10: { ar: 'ليس لدى التطبيق صلاحية لهذا الإجراء.', en: 'The app does not have permission for this action.' },
+  // "Object with ID … does not exist, cannot be loaded due to missing permissions…": the saved token cannot see this number
+  '100/33': {
+    ar: 'التوكن المحفوظ في هذه القناة لا يملك صلاحية على هذا الرقم. غالباً الرقم (أو رقم الاختبار) تابع لتطبيق Meta آخر، أو التوكن صادر من تطبيق مختلف. أعد ربط القناة بقيم التطبيق الحالي (رقم ومعرّف حساب وتوكن من نفس التطبيق).',
+    en: 'The token saved on this channel has no access to this number. Most likely the number (or test number) belongs to another Meta app, or the token was issued by a different app. Reconnect the channel with the current app\'s values (number, account ID and token from the same app).'
+  }
 }
 // Permission errors share the 200-299 range
 for (let c = 200; c <= 299; c++) HINTS[c] = HINTS[10]
 HINTS[463] = HINTS[467] = HINTS[102] = HINTS[190]
+
+/** The plain-language explanation for a Meta error code (and sub-code), or '' when we have none. */
+export function metaHint(code, subcode, isAr = true) {
+  const entry = (code != null && subcode != null && HINTS[`${code}/${subcode}`]) || (code != null && HINTS[code])
+  return entry ? entry[isAr ? 'ar' : 'en'] : ''
+}
 
 /** The readable text of a failed request: our hint for known Meta codes, followed by Meta's own message. */
 export function metaErrorText(err, isAr = true) {
@@ -54,6 +65,11 @@ export function metaErrorText(err, isAr = true) {
   const apiError = data?.error
   const message = (typeof apiError === 'string' ? apiError : apiError?.message) || data?.message || err?.message || ''
   const code = typeof apiError === 'object' ? apiError?.metaCode : undefined
-  const hint = code != null ? HINTS[code]?.[isAr ? 'ar' : 'en'] : ''
-  return hint ? `${hint}\n\n${message}` : message
+  const subcode = typeof apiError === 'object' ? apiError?.metaSubcode : undefined
+  const hint = metaHint(code, subcode, isAr)
+  // Errors that usually mean "this channel is not set up for the current app": point to the diagnostic
+  const check = code === 100 && subcode === 33 || [190, 463, 467, 102, 133010].includes(code)
+    ? (isAr ? '\n\nللتأكد: صفحة «ربط Meta الرسمي» ← زر «فحص الاتصال».' : '\n\nTo verify: Meta Connection page → "Check connection".')
+    : ''
+  return hint ? `${hint}${check}\n\n${message}` : message
 }

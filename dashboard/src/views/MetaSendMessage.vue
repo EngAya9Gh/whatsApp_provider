@@ -37,7 +37,7 @@
             <select v-model="channelId" class="form-input" required>
               <option value="" disabled>{{ channels.length ? 'Select Meta Channel' : (isAr ? 'لا توجد قنوات Meta مربوطة' : 'No Meta channels connected') }}</option>
               <option v-for="ch in channels" :key="ch.id" :value="ch.id">
-                +{{ ch.phoneNumber }} (Meta Cloud)
+                {{ plusPhone(ch.phoneNumber) }} (Meta Cloud)
               </option>
             </select>
             <small v-if="channelsLoaded && channels.length === 0" class="hint">
@@ -145,6 +145,7 @@
 </template>
 
 <script setup>
+import { plusPhone } from '../utils/phone'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'

@@ -85,7 +85,7 @@
             </thead>
             <tbody>
               <tr v-for="ch in channels" :key="ch.id" class="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-                <td class="px-6 py-4 font-bold text-slate-800">+{{ ch.phoneNumber }}</td>
+                <td class="px-6 py-4 font-bold text-slate-800">{{ plusPhone(ch.phoneNumber) }}</td>
                 <td class="px-6 py-4">
                   <span :class="ch.providerType === 'META_CLOUD' ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border">
                     {{ ch.providerType }}
@@ -644,6 +644,7 @@ app.post('/webhook/whatsapp', (req, res) => {
 </template>
 
 <script setup>
+import { plusPhone } from '../utils/phone'
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import FeatureLock from '../components/FeatureLock.vue'

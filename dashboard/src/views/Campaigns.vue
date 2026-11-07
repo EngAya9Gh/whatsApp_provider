@@ -243,7 +243,7 @@
                 <select v-model="formData.channelId" class="form-input">
                   <option value="">Default Web QR Connection</option>
                   <option v-for="ch in channels" :key="ch.id" :value="ch.id">
-                    +{{ ch.phoneNumber }} (Meta Cloud API)
+                    {{ plusPhone(ch.phoneNumber) }} (Meta Cloud API)
                   </option>
                 </select>
               </div>
@@ -389,6 +389,7 @@
 </template>
 
 <script setup>
+import { plusPhone } from '../utils/phone'
 import { tenantHasMeta } from '../utils/meta-access'
 import { ref, onMounted, computed, onUnmounted, watch } from 'vue'
 import axios from 'axios'

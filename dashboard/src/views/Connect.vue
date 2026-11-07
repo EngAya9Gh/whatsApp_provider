@@ -203,16 +203,35 @@
 
             <!-- Channels List -->
             <div v-if="metaChannels.length > 0" class="channels-list">
-              <div v-for="channel in metaChannels" :key="channel.id" class="channel-item">
+              <div v-for="channel in metaChannels" :key="channel.id" class="channel-wrap">
+              <div class="channel-item">
                 <div class="ci-left">
-                  <strong class="ci-phone">+{{ channel.phoneNumber }}</strong>
+                  <strong class="ci-phone">{{ plusPhone(channel.phoneNumber) }}</strong>
                   <span class="ci-status"><span class="ci-dot"></span>{{ channel.status }}</span>
                   <label class="flex items-center gap-2 mt-2 cursor-pointer">
                     <input type="checkbox" v-model="channel.autoCreateTickets" @change="toggleAutoCreate(channel)" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500">
                     <span class="text-xs text-slate-600 font-semibold">{{ isAr ? 'استقبال الدعم الفني (فتح تذاكر آلياً)' : 'Support Line (Auto-create tickets)' }}</span>
                   </label>
                 </div>
-                <button @click="deleteMetaChannel(channel.id)" class="btn-remove">Remove</button>
+                <div class="ci-actions">
+                  <button @click="checkChannel(channel)" class="btn-check" :disabled="health[channel.id]?.loading">
+                    {{ health[channel.id]?.loading ? (isAr ? 'جارٍ الفحص…' : 'Checking…') : (isAr ? 'فحص الاتصال' : 'Check connection') }}
+                  </button>
+                  <button @click="deleteMetaChannel(channel.id)" class="btn-remove">Remove</button>
+                </div>
+              </div>
+
+              <!-- Result of "Check connection" -->
+              <div v-if="health[channel.id] && !health[channel.id].loading" class="health-box" :dir="isAr ? 'rtl' : 'ltr'">
+                <div v-if="health[channel.id].failed" class="health-line bad">⚠️ {{ health[channel.id].failed }}</div>
+                <div v-for="(line, i) in health[channel.id].lines" :key="i" :class="['health-line', line.ok ? 'good' : 'bad']">
+                  <span>{{ line.ok ? '✅' : '❌' }}</span>
+                  <span>
+                    <strong>{{ line.title }}</strong> — {{ line.text }}
+                    <em v-if="line.hint" class="health-hint">{{ line.hint }}</em>
+                  </span>
+                </div>
+              </div>
               </div>
             </div>
             <div v-else class="channels-empty">
@@ -226,7 +245,9 @@
 </template>
 
 <script setup>
+import { plusPhone } from '../utils/phone'
 import { tenantHasMeta } from '../utils/meta-access'
+import { metaHint, metaErrorText } from '../utils/metaErrors'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
@@ -446,6 +467,69 @@ const launchEmbeddedSignup = () => {
   embeddedSignupStatus.value = ''
   embeddedSignupMessage.value = ''
   delete window._embeddedSignupData
+}
+
+// ─── Check connection (why does this channel not send?) ───────
+const health = ref({})
+const checkChannel = async (channel) => {
+  health.value = { ...health.value, [channel.id]: { loading: true } }
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.get(`/api/v1/meta/channel/${channel.id}/health`, { headers: { Authorization: `Bearer ${token}` } })
+    health.value = { ...health.value, [channel.id]: { lines: describeHealth(res.data.data) } }
+  } catch (err) {
+    health.value = { ...health.value, [channel.id]: { failed: metaErrorText(err, isAr.value) || 'Check failed' } }
+  }
+}
+
+// Turns the server's three checks into plain sentences (with what to do when one fails)
+const describeHealth = (h) => {
+  const ar = isAr.value
+  const t = (a, e) => (ar ? a : e)
+  const lines = []
+
+  // 1. the number
+  if (h.phone.ok) {
+    const d = h.phone.data
+    lines.push({ ok: true, title: t('الرقم', 'Number'), text: `${d.display_phone_number || ''} · ${d.verified_name || ''} · ${t('الجودة', 'quality')} ${d.quality_rating || '—'}` })
+  } else {
+    lines.push({
+      ok: false, title: t('الرقم', 'Number'), text: h.phone.error.message,
+      hint: metaHint(h.phone.error.code, h.phone.error.subcode, ar)
+    })
+  }
+
+  // 2. the token and the app that issued it
+  if (h.token.ok) {
+    if (!h.token.isValid) {
+      lines.push({ ok: false, title: t('التوكن', 'Token'), text: h.token.error || t('غير صالح', 'invalid'), hint: metaHint(190, null, ar) })
+    } else {
+      const expires = h.token.expiresAt ? t(`ينتهي ${new Date(h.token.expiresAt).toLocaleString()}`, `expires ${new Date(h.token.expiresAt).toLocaleString()}`) : t('لا ينتهي', 'does not expire')
+      const mismatch = h.token.matchesPlatformApp === false
+      lines.push({
+        ok: !mismatch,
+        title: t('التوكن', 'Token'),
+        text: `${t('صالح', 'valid')}، ${expires}. ${t('صادر من التطبيق', 'Issued by app')} ${h.token.appId || '?'}` +
+          (mismatch ? ` (${t('مختلف عن تطبيق المنصة', 'different from the platform app')} ${h.platformAppId})` : h.token.matchesPlatformApp ? ` (${t('تطبيق المنصة', 'the platform app')} ✔)` : ''),
+        hint: mismatch ? t('التوكن من تطبيق آخر غير التطبيق الذي تعمل عليه المنصة، فلن تعمل الرسائل الواردة ولا أرقام التطبيق الحالي. أعد ربط القناة بتوكن التطبيق الحالي.', 'The token comes from another app than the one the platform runs on, so incoming messages and the current app\'s numbers will not work. Reconnect the channel with a token from the current app.') : ''
+      })
+    }
+  } else {
+    lines.push({ ok: false, title: t('التوكن', 'Token'), text: h.token.error.message })
+  }
+
+  // 3. is our app subscribed to this WhatsApp account's webhooks
+  if (h.webhook.ok) {
+    const names = h.webhook.apps.map(a => a.name || a.id).join('، ') || t('لا أحد', 'none')
+    lines.push({
+      ok: h.webhook.subscribed, title: 'Webhook',
+      text: h.webhook.subscribed ? t('تطبيق المنصة مشترك، والرسائل الواردة ستصل.', 'The platform app is subscribed; incoming messages will arrive.') : `${t('تطبيق المنصة غير مشترك. المشتركون الآن:', 'The platform app is not subscribed. Subscribed now:')} ${names}`,
+      hint: h.webhook.subscribed ? '' : t('بدون اشتراك لن تصل الرسائل الواردة ولا حالات التسليم. أعد ربط الرقم من النافذة (تشترك تلقائياً).', 'Without a subscription incoming messages and delivery statuses never arrive. Reconnect the number through the popup (it subscribes automatically).')
+    })
+  } else {
+    lines.push({ ok: false, title: 'Webhook', text: h.webhook.error.message, hint: metaHint(h.webhook.error.code, h.webhook.error.subcode, ar) })
+  }
+  return lines
 }
 
 // ─── Standard Meta Channels CRUD ──────────────────────────────
@@ -758,6 +842,15 @@ const disconnect = async () => {
 .ci-phone { font-size: 1.1rem; font-weight: 800; color: #0F172A; }
 .ci-status { display: flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 800; color: #64748B; text-transform: uppercase; }
 .ci-dot { width: 8px; height: 8px; background: #22C55E; border-radius: 50%; }
+.channel-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
+.ci-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.btn-check { background: #EFF6FF; color: #1D4ED8; border: 1px solid #DBEAFE; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; }
+.btn-check:hover:not(:disabled) { background: #DBEAFE; }
+.btn-check:disabled { opacity: 0.6; cursor: wait; }
+.health-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 0.9rem 1.1rem; display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem; color: #334155; }
+.health-line { display: flex; gap: 0.5rem; line-height: 1.6; }
+.health-line.bad { color: #991B1B; }
+.health-hint { display: block; font-style: normal; color: #475569; margin-top: 2px; }
 .btn-remove { background: #FEF2F2; color: #DC2626; border: 1px solid #FEE2E2; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit; }
 .btn-remove:hover { background: #FCA5A5; color: white; border-color: #FCA5A5; }
 
