@@ -33,12 +33,30 @@
     "no_account": "Don't have an account?",
     "create_one": "Create one",
     "features": {
-      "title": "OTP Platform",
-      "desc": "Send WhatsApp OTP messages to your users with a single API call.",
-      "f1": "Lightning-fast delivery",
-      "f2": "Secure API authentication",
-      "f3": "Real-time usage tracking"
+      "title": "Turn your WhatsApp conversations into organized customer service",
+      "desc": "A shared inbox for your team, tickets routed automatically to the agent on shift, official campaigns and AI-powered replies.",
+      "f1": "Shared inbox and organized tickets",
+      "f2": "Official campaigns, automated flows and an AI agent",
+      "f3": "Real-time analytics and reports"
     }
+  },
+  "register": {
+    "brand_title": "Join wakeel..",
+    "brand_desc": "Create your account and connect your WhatsApp number to start managing your customer conversations and team in minutes.",
+    "f1": "Up and running in minutes",
+    "f2": "Secure & encrypted",
+    "f3": "Full analytics dashboard",
+    "title": "Create account",
+    "subtitle": "Start for free today",
+    "name": "Company / Full Name",
+    "name_placeholder": "Your Company Inc.",
+    "password_placeholder": "Min. 6 characters",
+    "submit": "Create account",
+    "submitting": "Creating account...",
+    "success": "Account created! Redirecting to login...",
+    "failed": "Registration failed",
+    "have_account": "Already have an account?",
+    "sign_in": "Sign in"
   },
   "campaigns": {
     "title": "Bulk Campaigns",

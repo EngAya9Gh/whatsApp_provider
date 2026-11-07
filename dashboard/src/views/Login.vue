@@ -62,7 +62,7 @@
 
         <div v-if="loginMode !== 'sub'" class="form-footer">
           {{ $t('login.no_account') }}
-          <router-link to="/register">{{ $t('login.create_one') }} →</router-link>
+          <router-link to="/register">{{ $t('login.create_one') }} {{ arrow }}</router-link>
         </div>
         <div v-else class="sub-login-hint">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -74,12 +74,14 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
 const { locale } = useI18n()
+// Arrows point in the reading direction: left in Arabic
+const arrow = computed(() => (locale.value === 'ar' ? '←' : '→'))
 const email = ref('')
 const password = ref('')
 const error = ref('')
@@ -151,7 +153,7 @@ const handleLogin = async () => {
 .brand-content { position: relative; z-index: 2; max-width: 400px; }
 .brand-logo { height: 44px; filter: brightness(0) invert(1); margin-bottom: 2rem; }
 .brand-panel h2 { color: white; font-size: 1.875rem; font-weight: 700; margin-bottom: 0.75rem; }
-.brand-panel p { color: #6b7280; font-size: 1rem; line-height: 1.6; margin-bottom: 2rem; }
+.brand-panel p { color: #94a3b8; font-size: 1rem; line-height: 1.6; margin-bottom: 2rem; }
 
 .brand-features { display: flex; flex-direction: column; gap: 0.75rem; }
 .feature-item { color: #CBD5E1; font-size: 0.9rem; font-weight: 500; }
@@ -163,7 +165,7 @@ const handleLogin = async () => {
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 102, 0, 0.12) 0%, transparent 70%);
   top: -100px;
-  right: -100px;
+  inset-inline-end: -100px;
 }
 
 /* Form Panel */
@@ -185,10 +187,10 @@ label { display: block; font-size: 0.875rem; font-weight: 600; color: #1E293B; m
 
 /* Password input wrapper */
 .input-wrapper { position: relative; }
-.input-wrapper input { padding-right: 2.75rem; }
+.input-wrapper input { padding-inline-end: 2.75rem; }
 .eye-btn {
   position: absolute;
-  right: 0.75rem;
+  inset-inline-end: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
   background: none;
@@ -248,7 +250,7 @@ input:focus { outline: none; border-color: #FF6600; box-shadow: 0 0 0 3px rgba(2
 .error-msg { background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-bottom: 1rem; }
 
 .form-footer { text-align: center; margin-top: 1.5rem; color: #64748B; font-size: 0.9rem; }
-.form-footer a { color: #FF6600; font-weight: 600; margin-left: 0.25rem; }
+.form-footer a { color: #FF6600; font-weight: 600; margin-inline-start: 0.25rem; }
 .form-footer a:hover { text-decoration: underline; }
 
 /* Login Tabs */

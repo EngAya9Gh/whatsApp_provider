@@ -69,7 +69,7 @@
         <div class="font-bold text-slate-800">{{ allChecked ? t.ctaReady : t.ctaNotReady }}</div>
         <div class="text-sm text-slate-500">{{ t.ctaHint }}</div>
       </div>
-      <router-link to="/connect" class="cta-btn" :class="{ muted: !allChecked }">
+      <router-link to="/connect-meta" class="cta-btn" :class="{ muted: !allChecked }">
         {{ t.ctaButton }} <i class="fas" :class="isAr ? 'fa-arrow-left' : 'fa-arrow-right'"></i>
       </router-link>
     </div>

@@ -16,8 +16,25 @@ const GRAPH = `https://graph.facebook.com/${process.env.GRAPH_API_VERSION || 'v2
 const registrationPin = (phoneNumberId) => {
   const fixed = process.env.META_REGISTRATION_PIN;
   if (/^\d{6}$/.test(fixed || '')) return fixed;
-  const hmac = crypto.createHmac('sha256', process.env.JWT_SECRET || 'wakeel').update(String(phoneNumberId)).digest();
+  // One different PIN per number; META_PIN_SECRET lets you rotate JWT_SECRET without changing PINs
+  const secret = process.env.META_PIN_SECRET || process.env.JWT_SECRET || 'wakeel';
+  const hmac = crypto.createHmac('sha256', secret).update(String(phoneNumberId)).digest();
   return String(hmac.readUInt32BE(0) % 1000000).padStart(6, '0');
+};
+
+/**
+ * GET /api/v1/meta/embedded-signup/config
+ * The public Embedded Signup values (app ID and configuration ID), read from the server's .env
+ * so changing them needs no dashboard rebuild. Never returns the app secret.
+ */
+exports.getConfig = (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      appId: process.env.META_FB_APP_ID || '',
+      configId: process.env.META_FB_CONFIG_ID || ''
+    }
+  });
 };
 
 const metaError = (err) => err.response?.data?.error?.message || err.message;

@@ -4,6 +4,8 @@ const xlsx = require('xlsx');
 const csv = require('csv-parser');
 const stream = require('stream');
 const { campaignQueue } = require('../../workers/campaign.worker');
+const walletService = require('../wallet/wallet.service');
+const logger = require('../../utils/logger');
 
 const fs = require('fs');
 
@@ -170,57 +172,68 @@ class CampaignService {
       totalCost = totalCostSar / exchangeRate;
     }
 
-    if (settings?.data?.enableWalletDeduction !== false && tenant.deductBalance !== false) {
-      if (tenant.walletBalance < totalCost) {
-        throw { status: 400, message: `Insufficient wallet balance. Estimated cost: ${totalCost.toFixed(4)} ${tenant.currency || 'SAR'}, Available: ${tenant.walletBalance.toFixed(4)} ${tenant.currency || 'SAR'}` };
-      }
-
-      // Deduct from wallet
-      await prisma.tenant.update({
-        where: { id: tenantId },
-        data: {
-          walletBalance: { decrement: totalCost }
-        }
+    // The charge and its ledger row are one atomic step; it fails when the balance does not cover it
+    let charge = null;
+    if (settings?.data?.enableWalletDeduction !== false && tenant.deductBalance !== false && totalCost > 0) {
+      charge = await walletService.debit(tenantId, {
+        amount: totalCost,
+        type: 'CAMPAIGN_CHARGE',
+        description: `${name || 'Campaign'} — ${records.length} recipients`,
+        createdBy: 'SYSTEM'
       });
     }
 
-    // 3. Create Campaign (PENDING state)
-    const campaign = await prisma.campaign.create({
-      data: {
-        tenantId,
-        channelId: channelId || null,
-        name,
-        message: message || null,
-        templateId: templateLanguage ? `${templateLanguage}` : (templateId || null), // store templateLanguage in templateId for META
-        mediaPath: image ? image.path : null,
-        mediaMime: image ? image.mimetype : null,
-        buttons: buttons ? JSON.stringify(buttons) : null,
-        interactiveType: interactiveType || 'TEXT',
-        startDate: startDate || null,
-        endDate: endDate || null,
-        campaignType: campaignType || 'BAILEYS',
-        metaCategory: metaCategory || null,
+    try {
+      // 3. Create Campaign (PENDING state)
+      const campaign = await prisma.campaign.create({
+        data: {
+          tenantId,
+          channelId: channelId || null,
+          name,
+          message: message || null,
+          templateId: templateLanguage ? `${templateLanguage}` : (templateId || null), // store templateLanguage in templateId for META
+          mediaPath: image ? image.path : null,
+          mediaMime: image ? image.mimetype : null,
+          buttons: buttons ? JSON.stringify(buttons) : null,
+          interactiveType: interactiveType || 'TEXT',
+          startDate: startDate || null,
+          endDate: endDate || null,
+          campaignType: campaignType || 'BAILEYS',
+          metaCategory: metaCategory || null,
+          status: 'PENDING'
+        }
+      });
+
+      // 3. Create Campaign Targets
+      const targetData = records.map(record => ({
+        campaignId: campaign.id,
+        phone: record.phone,
+        variables: isMeta ? JSON.stringify(record.variables) : null,
         status: 'PENDING'
-      }
-    });
-
-    // 3. Create Campaign Targets
-    const targetData = records.map(record => ({
-      campaignId: campaign.id,
-      phone: record.phone,
-      variables: isMeta ? JSON.stringify(record.variables) : null,
-      status: 'PENDING'
-    }));
+      }));
     
-    await prisma.campaignTarget.createMany({ data: targetData });
+      await prisma.campaignTarget.createMany({ data: targetData });
 
-    return {
-      success: true,
-      campaignId: campaign.id,
-      totalNumbers: records.length,
-      totalCost,
-      message: 'Campaign created successfully and is ready to start.'
-    };
+      if (charge) {
+        await walletService.linkReference(charge.id, 'CAMPAIGN', campaign.id)
+          .catch(err => logger.error(`[Wallet] Could not link charge ${charge.id} to campaign ${campaign.id}: ${err.message}`));
+      }
+
+      return {
+        success: true,
+        campaignId: campaign.id,
+        totalNumbers: records.length,
+        totalCost,
+        message: 'Campaign created successfully and is ready to start.'
+      };
+    } catch (error) {
+      // The campaign could not be created: give the money back instead of keeping it
+      if (charge) {
+        await walletService.refundCharge(charge, 'Campaign could not be created')
+          .catch(err => logger.error(`[Wallet] Refund of charge ${charge.id} failed: ${err.message}`));
+      }
+      throw error;
+    }
   }
 
   async updateCampaign({ tenantId, id, name, message, templateId, image, buttons, interactiveType, startDate, endDate }) {

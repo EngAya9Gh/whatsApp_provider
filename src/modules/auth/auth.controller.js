@@ -28,10 +28,15 @@ class AuthController {
     try {
       if (req.isSubUser && req.subUser) {
         // Sub-user: إعادة بياناته الخاصة مع بيانات الـ tenant
+        // The AI key is a secret of the account owner: employees' browsers must never receive it
+        const { aiSettings, ...safeFeatures } = req.tenant.customFeatures || {};
         return res.status(200).json({
           success: true,
           data: {
             ...req.tenant,
+            customFeatures: safeFeatures,
+            // Without this the dashboard shows every menu to employees, whatever the plan
+            allowedFeatures: await entitlementService.getTenantFeatures(req.tenant.id),
             isSubUser: true,
             subUser: {
               id: req.subUser.id,

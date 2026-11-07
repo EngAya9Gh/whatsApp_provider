@@ -10,7 +10,7 @@
     <div v-else-if="flows.length === 0" class="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
       <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"><i class="fas fa-diagram-project text-2xl text-slate-400"></i></div>
       <h3 class="text-lg font-bold text-slate-800 mb-2">{{ isAr ? 'لا توجد أرقام Meta مربوطة' : 'No Meta numbers connected' }}</h3>
-      <router-link to="/connect" class="text-[#FF6600] font-semibold text-sm">{{ isAr ? 'اربط رقماً' : 'Connect a number' }}</router-link>
+      <router-link to="/connect-meta" class="text-[#FF6600] font-semibold text-sm">{{ isAr ? 'اربط رقماً' : 'Connect a number' }}</router-link>
     </div>
 
     <div v-else class="grid md:grid-cols-2 gap-4">

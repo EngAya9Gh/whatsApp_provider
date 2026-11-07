@@ -1,4 +1,5 @@
 const billingService = require('./billing.service');
+const walletService = require('../wallet/wallet.service');
 const logger = require('../../utils/logger');
 
 class BillingController {
@@ -31,6 +32,27 @@ class BillingController {
       res.status(200).json({ success: true, data: result });
     } catch (error) {
       logger.error('Get Invoices error:', error);
+      next(error);
+    }
+  }
+
+  /** Balance, charges on/off, and what was spent this month */
+  async getWallet(req, res, next) {
+    try {
+      res.status(200).json({ success: true, data: await walletService.getSummary(req.tenant.id) });
+    } catch (error) {
+      logger.error('Get Wallet error:', error);
+      next(error);
+    }
+  }
+
+  /** Every wallet movement of the account, newest first */
+  async getWalletTransactions(req, res, next) {
+    try {
+      const { page, limit, type } = req.query;
+      res.status(200).json({ success: true, data: await walletService.list(req.tenant.id, { page, limit, type }) });
+    } catch (error) {
+      logger.error('Get Wallet Transactions error:', error);
       next(error);
     }
   }

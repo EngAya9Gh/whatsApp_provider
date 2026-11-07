@@ -53,6 +53,7 @@ model Tenant {
   subUsers         SubUser[]
   contactGroups    ContactGroup[]
   contacts         Contact[]
+  walletTransactions WalletTransaction[]
 
   @@map("tenants")
 }
@@ -511,4 +512,32 @@ model Contact {
   @@index([tenantId], map: "contacts_tenant_id_fkey")
   @@index([groupId], map: "contacts_group_id_fkey")
   @@map("contacts")
+}
+
+// ══════════════════════════════════════════
+// Wallet ledger: every movement of Tenant.walletBalance
+// ══════════════════════════════════════════
+
+model WalletTransaction {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  // TOP_UP | ADMIN_DEDUCTION | ADMIN_SET | CAMPAIGN_CHARGE | REFUND
+  type          String
+  // Signed: positive adds money to the wallet, negative spends it
+  amount        Float
+  balanceAfter  Float    @map("balance_after")
+  currency      String   @default("SAR")
+  description   String?  @db.Text
+  // What the movement belongs to, e.g. CAMPAIGN + the campaign id
+  referenceType String?  @map("reference_type")
+  referenceId   String?  @map("reference_id")
+  // Admin id, or "SYSTEM"
+  createdBy     String?  @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt], map: "wallet_transactions_tenant_id_created_at_idx")
+  @@index([referenceType, referenceId], map: "wallet_transactions_reference_idx")
+  @@map("wallet_transactions")
 }

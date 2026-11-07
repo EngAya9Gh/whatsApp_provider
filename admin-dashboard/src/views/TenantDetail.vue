@@ -229,6 +229,38 @@
               {{ isUpdatingWallet ? 'Updating...' : 'Update' }}
             </button>
           </div>
+          <div class="mt-3">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Note <span class="font-normal text-slate-400">(shown to the customer in their wallet history)</span></label>
+            <input type="text" maxlength="500" v-model="walletForm.note" placeholder="e.g. Bank transfer #1042" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none" />
+          </div>
+
+          <h4 class="text-sm font-bold text-slate-900 mt-6 mb-3 pt-4 border-t border-slate-100">Wallet history
+            <span v-if="walletSummary" class="font-normal text-slate-500"> — spent this month: {{ walletSummary.spentThisMonth }} {{ walletSummary.currency }}</span>
+          </h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left text-slate-600 border-collapse" v-if="walletTx.length">
+              <thead class="text-xs text-slate-500 uppercase bg-slate-50">
+                <tr>
+                  <th class="px-3 py-2 font-bold">Date</th>
+                  <th class="px-3 py-2 font-bold">Type</th>
+                  <th class="px-3 py-2 font-bold">Details</th>
+                  <th class="px-3 py-2 font-bold text-right">Amount</th>
+                  <th class="px-3 py-2 font-bold text-right">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="tx in walletTx" :key="tx.id" class="border-b border-slate-100">
+                  <td class="px-3 py-2 whitespace-nowrap">{{ new Date(tx.createdAt).toLocaleString() }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap">{{ tx.type }}</td>
+                  <td class="px-3 py-2">{{ tx.description || '—' }}</td>
+                  <td class="px-3 py-2 text-right font-semibold whitespace-nowrap" :class="tx.amount >= 0 ? 'text-emerald-600' : 'text-red-600'">{{ tx.amount >= 0 ? '+' : '' }}{{ tx.amount }}</td>
+                  <td class="px-3 py-2 text-right whitespace-nowrap">{{ tx.balanceAfter }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-else class="text-sm text-slate-400 py-3">No wallet activity yet.</p>
+          </div>
+          <button v-if="walletPage < walletPages" @click="loadWalletTx(false)" class="mt-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold px-4 py-1.5 rounded-lg border-none cursor-pointer">Load more</button>
         </div>
 
         <!-- Invoices Panel -->
@@ -484,9 +516,32 @@ const metaForm = ref({
 
 const walletForm = ref({
   amount: '',
-  action: 'ADD'
+  action: 'ADD',
+  note: ''
 })
 const isUpdatingWallet = ref(false)
+const walletTx = ref([])
+const walletSummary = ref(null)
+const walletPage = ref(1)
+const walletPages = ref(1)
+
+const loadWalletTx = async (reset = true) => {
+  const next = reset ? 1 : walletPage.value + 1
+  try {
+    const token = localStorage.getItem('admin_token')
+    const res = await axios.get(`/api/admin/tenants/${route.params.id}/wallet/transactions`, {
+      params: { page: next, limit: 20 },
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const data = res.data.data
+    walletSummary.value = data.summary
+    walletTx.value = reset ? data.transactions : [...walletTx.value, ...data.transactions]
+    walletPage.value = data.pagination.page
+    walletPages.value = data.pagination.pages
+  } catch (err) {
+    console.error('Failed to load wallet history:', err)
+  }
+}
 
 const availableFeatures = ['META_CAMPAIGN', 'BAILEYS_CAMPAIGN', 'META_SEND_MESSAGE', 'BAILEYS_SEND_MESSAGE', 'META_AUTORESPONDER', 'BAILEYS_AUTORESPONDER', 'META_TEMPLATES', 'TEMPLATES', 'LIVE_CHAT', 'EXCEL_EXPORT', 'API_ACCESS']
 
@@ -595,16 +650,19 @@ const updateWallet = async () => {
     const token = localStorage.getItem('admin_token')
     await axios.put(`/api/admin/tenants/${route.params.id}/wallet`, {
       amount: walletForm.value.amount,
-      action: walletForm.value.action
+      action: walletForm.value.action,
+      note: walletForm.value.note
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })
     
     // Refresh tenant data to see new balance
     await fetchTenant()
+    await loadWalletTx(true)
     
     walletForm.value.amount = ''
     walletForm.value.action = 'ADD'
+    walletForm.value.note = ''
     alert('Wallet updated successfully!')
   } catch (err) {
     console.error('Failed to update wallet:', err)
@@ -857,7 +915,7 @@ const toggleStatus = async () => {
   }
 }
 
-onMounted(fetchTenant)
+onMounted(() => { fetchTenant(); loadWalletTx(true) })
 </script>
 
 

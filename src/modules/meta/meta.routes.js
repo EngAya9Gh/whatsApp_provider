@@ -86,6 +86,7 @@ router.use(authMiddleware);
 // Embedded Signup — Only requires JWT auth, no Meta feature flag needed
 // ────────────────────────────────────────────────────────────────────────────
 const embeddedSignupController = require('./meta.embedded-signup.controller');
+router.get('/embedded-signup/config', canSettings, embeddedSignupController.getConfig);
 router.post('/embedded-signup/exchange', canSettings, embeddedSignupController.exchangeCode);
 
 router.use(requireMetaEnabled);

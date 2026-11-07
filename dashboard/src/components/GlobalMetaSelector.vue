@@ -19,7 +19,7 @@
   </div>
   <div class="global-meta-selector empty-state" v-else-if="loading === false">
     <div class="selector-title">No Meta Channels</div>
-    <router-link to="/connect" class="add-channel-link">Connect a Channel</router-link>
+    <router-link to="/connect-meta" class="add-channel-link">Connect a Channel</router-link>
   </div>
 </template>
 

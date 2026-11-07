@@ -41,6 +41,7 @@ const routes = [
   { path: '/invoice/:id', component: InvoiceView, meta: { hideSidebar: true } },
   { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/connect', component: Connect, meta: { requiresAuth: true } },
+  { path: '/connect-meta', component: () => import('../views/ConnectMeta.vue'), meta: { requiresAuth: true } },
   { path: '/live-chat', component: LiveChat, meta: { requiresAuth: true } },
   { path: '/tickets', component: Tickets, meta: { requiresAuth: true } },
   { path: '/ticket-categories', component: () => import('../views/TicketCategories.vue'), meta: { requiresAuth: true } },
@@ -116,6 +117,7 @@ router.beforeEach((to, from, next) => {
       '/billing': perms.can_view_billing,
       '/settings': perms.can_manage_settings,
       '/connect': perms.can_manage_settings,
+      '/connect-meta': perms.can_manage_settings,
       '/live-chat': perms.can_view_live_chat,
       '/tickets': perms.can_view_live_chat, // Using live-chat permission for tickets for now, or true
       '/contacts': perms.can_manage_contacts,

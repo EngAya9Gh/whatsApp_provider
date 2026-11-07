@@ -176,37 +176,51 @@ class AdminController {
 
   async updateWalletBalance(req, res, next) {
     try {
-      // Direct prisma call for simplicity, or could go through adminService
       const { PrismaClient } = require('@prisma/client');
       const prisma = new PrismaClient();
-      
-      const { amount, action } = req.body; // action: 'ADD', 'SET', 'DEDUCT'
-      let numAmount = parseFloat(amount);
+      const walletService = require('../wallet/wallet.service');
+
+      const { amount, action, note } = req.body; // action: 'ADD', 'SET', 'DEDUCT'
+      const numAmount = parseFloat(amount);
       if (isNaN(numAmount) || numAmount < 0) {
         return res.status(400).json({ error: 'Invalid amount' });
       }
 
-      const tenant = await prisma.tenant.findUnique({ where: { id: req.params.id } });
+      const tenantId = req.params.id;
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
       if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
 
-      let newBalance = tenant.walletBalance;
+      const meta = {
+        createdBy: req.admin?.id || req.admin?.email || 'ADMIN',
+        description: typeof note === 'string' && note.trim() ? note.trim().slice(0, 500) : null
+      };
       if (action === 'ADD') {
-        newBalance += numAmount;
+        if (numAmount > 0) await walletService.credit(tenantId, { amount: numAmount, ...meta });
       } else if (action === 'DEDUCT') {
-        newBalance -= numAmount;
-        if (newBalance < 0) newBalance = 0;
+        if (numAmount > 0) await walletService.deductUpTo(tenantId, numAmount, meta);
       } else if (action === 'SET') {
-        newBalance = numAmount;
+        await walletService.setBalance(tenantId, numAmount, meta);
       } else {
         return res.status(400).json({ error: 'Invalid action' });
       }
 
-      const updated = await prisma.tenant.update({
-        where: { id: req.params.id },
-        data: { walletBalance: newBalance }
-      });
-
+      const updated = await prisma.tenant.findUnique({ where: { id: tenantId } });
       res.json({ success: true, data: updated });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /** The wallet ledger of one account, newest first */
+  async getWalletTransactions(req, res, next) {
+    try {
+      const walletService = require('../wallet/wallet.service');
+      const { page, limit, type } = req.query;
+      const [summary, list] = await Promise.all([
+        walletService.getSummary(req.params.id),
+        walletService.list(req.params.id, { page, limit, type })
+      ]);
+      res.json({ success: true, data: { summary, ...list } });
     } catch (error) {
       next(error);
     }

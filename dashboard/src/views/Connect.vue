@@ -10,16 +10,20 @@
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
           </div>
           <div>
-            <h1 class="hero-title">WhatsApp Connections</h1>
-            <p class="hero-sub">Manage your messaging channels (Web QR & Official Meta API)</p>
+            <h1 class="hero-title">{{ showMeta
+              ? (isAr ? 'ربط واتساب الرسمي (Meta Cloud API)' : 'WhatsApp Business Platform (Meta Cloud API)')
+              : (isAr ? 'الربط عبر الباركود' : 'QR Code Connection') }}</h1>
+            <p class="hero-sub">{{ showMeta
+              ? (isAr ? 'اربط أرقامك عبر واجهة واتساب للأعمال الرسمية من Meta' : 'Connect your numbers through the official WhatsApp Business Platform from Meta')
+              : (isAr ? 'اربط جلسة واتساب عبر مسح رمز QR' : 'Link a WhatsApp session by scanning a QR code') }}</p>
           </div>
         </div>
       </div>
     </div>
 
     <div class="cn-body">
-      <!-- 1. Web QR Connection -->
-      <div class="cn-card">
+      <!-- 1. Web QR Connection (its own page: /connect) -->
+      <div v-if="showQr" class="cn-card">
         <div class="card-head">
           <div class="ch-left">
             <div class="ch-icon qr">
@@ -89,8 +93,14 @@
         </div>
       </div>
 
-      <!-- 2. Meta API Connection -->
-      <div class="cn-card meta-card">
+      <!-- Tenants without the Meta plan get a pointer to the upgrade page from here -->
+      <div v-if="showQr && !isMetaEnabled" class="qr-meta-hint">
+        {{ isAr ? 'تريد واجهة واتساب الرسمية من Meta (قوالب وأزرار تفاعلية)؟' : 'Want the official WhatsApp Business Platform from Meta (templates and interactive buttons)?' }}
+        <router-link to="/connect-meta">{{ isAr ? 'اعرف المزيد' : 'Learn more' }}</router-link>
+      </div>
+
+      <!-- 2. Meta API Connection (its own page: /connect-meta) -->
+      <div v-if="showMeta" class="cn-card meta-card">
         <div class="card-accent"></div>
         <div class="card-head">
           <div class="ch-left">
@@ -225,9 +235,23 @@ import QrcodeVue from 'qrcode.vue'
 const { locale } = useI18n()
 const isAr = computed(() => locale.value === 'ar')
 
+// 'qr' = /connect (WhatsApp Web session), 'meta' = /connect-meta (official Embedded Signup)
+const props = defineProps({ mode: { type: String, default: 'qr' } })
+const showQr = computed(() => props.mode === 'qr')
+const showMeta = computed(() => props.mode === 'meta')
+
 // ─── Config ───────────────────────────────────────────────────
-const FB_APP_ID = import.meta.env.VITE_FB_APP_ID || ''
-const FB_CONFIG_ID = import.meta.env.VITE_FB_CONFIG_ID || ''
+// App ID and configuration ID come from the server (.env); the build-time VITE_ values are only a fallback.
+let FB_APP_ID = import.meta.env.VITE_FB_APP_ID || ''
+let FB_CONFIG_ID = import.meta.env.VITE_FB_CONFIG_ID || ''
+const loadFbConfig = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.get('/api/v1/meta/embedded-signup/config', { headers: { Authorization: `Bearer ${token}` } })
+    FB_APP_ID = res.data.data.appId || FB_APP_ID
+    FB_CONFIG_ID = res.data.data.configId || FB_CONFIG_ID
+  } catch { /* keep the fallback */ }
+}
 
 // ─── QR Session State ────────────────────────────────────────
 const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
@@ -517,8 +541,14 @@ const stopQrPolling = () => {
 }
 
 onMounted(async () => {
-  loadFbSdk()
-  window.addEventListener('message', handleFbMessage)
+  if (showMeta.value) {
+    // Official Meta page: only here do we load Facebook's SDK
+    await loadFbConfig()
+    loadFbSdk()
+    window.addEventListener('message', handleFbMessage)
+    fetchMetaChannels()
+    return
+  }
 
   const token = localStorage.getItem('token')
   try {
@@ -530,12 +560,11 @@ onMounted(async () => {
       startQrPolling()
     }
   } catch (err) { console.error('Failed to get status') }
-
-  fetchMetaChannels()
 })
 
 onUnmounted(() => {
   if (socket) socket.disconnect()
+  stopQrPolling()
   window.removeEventListener('message', handleFbMessage)
 })
 
@@ -686,6 +715,8 @@ const disconnect = async () => {
 .btn-connect:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* Meta Card */
+.qr-meta-hint { text-align: center; color: #64748B; font-size: 0.9rem; margin: 0.25rem 0 1.25rem; }
+.qr-meta-hint a { color: #FF6600; font-weight: 600; margin-inline-start: 6px; }
 .upgrade-banner { display: flex; align-items: center; gap: 1.5rem; background: #FFFBEB; border: 1px solid #FDE68A; padding: 1.5rem; border-radius: 16px; margin-top: 1rem; }
 .ub-icon { width: 48px; height: 48px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #D97706; box-shadow: 0 4px 10px rgba(217,119,6,0.1); flex-shrink: 0; }
 .ub-content h3 { margin: 0 0 0.25rem; font-size: 1.15rem; font-weight: 800; color: #92400E; }
