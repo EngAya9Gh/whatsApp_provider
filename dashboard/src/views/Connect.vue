@@ -423,10 +423,12 @@ const fbLoginCallback = (response) => {
         })
 
         embeddedSignupStatus.value = 'success'
-        embeddedSignupMessage.value = `✅ Connected! Phone: +${res.data.channel.phoneNumber}` +
+        embeddedSignupMessage.value = `✅ ${isAr.value ? 'تم الربط' : 'Connected'}! ${isAr.value ? 'الرقم' : 'Phone'}: ${plusPhone(res.data.channel.phoneNumber)}` +
           (res.data.warnings?.length ? ` — ⚠️ ${res.data.warnings.join(' | ')}` : '')
-        fetchMetaChannels()
+        await fetchMetaChannels()
         delete window._embeddedSignupData
+        // Right away show whether this channel can really send (number, token, webhook)
+        checkChannel(res.data.channel)
       } catch (err) {
         embeddedSignupStatus.value = 'error'
         embeddedSignupMessage.value = err.response?.data?.message || 'Failed to save channel. Please try again.'

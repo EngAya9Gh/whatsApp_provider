@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
+const { metaErrorText } = require('./meta.errors');
 
 const META_FB_APP_ID = process.env.META_FB_APP_ID;
 const META_APP_SECRET = process.env.META_APP_SECRET;
@@ -103,7 +104,11 @@ exports.exchangeCode = async (req, res, next) => {
         : phone_number_id;
       logger.info(`[EmbeddedSignup] Phone number: ${phoneNumber} ✅`);
     } catch (err) {
-      logger.warn('[EmbeddedSignup] Could not fetch phone details, using ID as fallback', metaError(err));
+      // The new token cannot read the number it was just given: typically a Meta TEST number that belongs to
+      // another app. The channel is still saved (the WABA subscription below may work), but say so now
+      // instead of letting the first send fail with a cryptic error.
+      logger.warn(`[EmbeddedSignup] Could not read phone ${phone_number_id}: ${metaErrorText(err)}`);
+      warnings.push(`The selected number could not be read with the new access token (${metaErrorText(err)}). If it is a Meta test number, it may belong to another app.`);
     }
 
     // Step 3: Save or update the channel. A reconnect (e.g. through a new Meta app) refreshes the
