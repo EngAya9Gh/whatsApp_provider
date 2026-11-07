@@ -35,11 +35,15 @@
           <div class="form-group">
             <label>Sending Channel</label>
             <select v-model="channelId" class="form-input" required>
-              <option value="" disabled>Select Meta Channel</option>
+              <option value="" disabled>{{ channels.length ? 'Select Meta Channel' : (isAr ? 'لا توجد قنوات Meta مربوطة' : 'No Meta channels connected') }}</option>
               <option v-for="ch in channels" :key="ch.id" :value="ch.id">
                 +{{ ch.phoneNumber }} (Meta Cloud)
               </option>
             </select>
+            <small v-if="channelsLoaded && channels.length === 0" class="hint">
+              {{ isAr ? 'اربط رقماً من' : 'Connect a number from' }}
+              <router-link to="/connect-meta" style="color:#FF6600;font-weight:600">{{ isAr ? 'ربط Meta الرسمي' : 'Meta Connection' }}</router-link>
+            </small>
           </div>
 
           <!-- Text Input -->
@@ -71,8 +75,11 @@
 
           <div v-if="messageType === 'meta_template'" class="form-group">
             <label>Select Meta Template</label>
-            <div v-if="metaTemplates.length === 0" style="color: #64748B; font-size: 0.85rem; margin-bottom: 0.5rem;">
+            <div v-if="templatesLoading" style="color: #64748B; font-size: 0.85rem; margin-bottom: 0.5rem;">
               Fetching Meta templates...
+            </div>
+            <div v-else-if="metaTemplates.length === 0" style="color: #64748B; font-size: 0.85rem; margin-bottom: 0.5rem;">
+              {{ templatesError || (isAr ? 'لا توجد قوالب معتمدة لهذه القناة' : 'No approved templates for this channel') }}
             </div>
             <select v-model="selectedTemplateId" required class="form-input">
               <option value="" disabled>Choose an approved Meta template...</option>
@@ -80,9 +87,31 @@
                 {{ tpl.name }} ({{ tpl.language }})
               </option>
             </select>
+
+            <!-- Variables of the chosen template -->
+            <div v-if="selectedMeta" style="margin-top: 1rem;">
+              <div v-if="!selectedMeta.supported" class="error-msg">
+                {{ isAr ? 'هذا القالب فيه وسائط أو أزرار (نسخ الكود/OTP) أو متغيرات لا يدعمها هذا النموذج.' : 'This template has media, copy-code/OTP buttons or variables this form cannot send.' }}
+              </div>
+              <template v-else>
+                <div v-for="(n, i) in selectedMeta.variables" :key="'v' + n" style="margin-bottom: 0.75rem;">
+                  <label>{{ isAr ? 'المتغير' : 'Variable' }} <span dir="ltr" v-text="varToken(n)"></span></label>
+                  <input v-model="metaVarValues[i]" required class="form-input" />
+                </div>
+                <div v-for="(b, i) in selectedMeta.buttonVars" :key="'b' + b.index" style="margin-bottom: 0.75rem;">
+                  <label>{{ isAr ? 'نهاية رابط الزر' : 'Button link ending' }} «{{ b.text }}»</label>
+                  <div dir="ltr" style="display:flex; align-items:center; gap:0.5rem;">
+                    <span style="font-size:0.8rem; color:#94A3B8;">{{ urlPrefix(b.url) }}</span>
+                    <input v-model="metaButtonValues[i]" required class="form-input" style="flex:1; min-width:0;" />
+                  </div>
+                </div>
+                <div style="font-size:0.8rem; color:#64748B; margin-bottom:0.25rem;">{{ isAr ? 'معاينة' : 'Preview' }}</div>
+                <div style="background:#DCF8C6; border-radius:12px; padding:0.75rem; white-space:pre-line; font-size:0.9rem;">{{ metaPreview }}</div>
+              </template>
+            </div>
           </div>
 
-          <div v-if="error" class="error-msg">{{ error }}</div>
+          <div v-if="error" class="error-msg" style="white-space: pre-line;">{{ error }}</div>
           <div v-if="success" class="success-msg">{{ success }}</div>
 
           <button type="submit" class="btn-submit" :disabled="loading">
@@ -117,7 +146,15 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
+import { useMetaChannel } from '../composables/useMetaChannel'
+import { normalizeTemplate, buildPreview, buildComponents, varToken, urlPrefix } from '../utils/metaTemplate'
+import { metaErrorText } from '../utils/metaErrors'
+
+const { locale } = useI18n()
+const isAr = computed(() => locale.value === 'ar')
+const { activeMetaChannelId } = useMetaChannel()
 
 const phone = ref('')
 const channelId = ref('')
@@ -167,6 +204,22 @@ const loading = ref(false)
 const error = ref('')
 const success = ref('')
 const channels = ref([])
+const channelsLoaded = ref(false)
+const templatesLoading = ref(false)
+const templatesError = ref('')
+const metaVarValues = ref([])
+const metaButtonValues = ref([])
+
+// The chosen Meta template (selectedTemplateId is "name||language") and what the recipient will read
+const selectedMeta = computed(() => {
+  const [name, language] = (selectedTemplateId.value || '').split('||')
+  return metaTemplates.value.find(t => t.name === name && t.language === language) || null
+})
+const metaPreview = computed(() => selectedMeta.value ? buildPreview(selectedMeta.value, metaVarValues.value, metaButtonValues.value) : '')
+watch(selectedTemplateId, () => {
+  metaVarValues.value = (selectedMeta.value?.variables || []).map(() => '')
+  metaButtonValues.value = (selectedMeta.value?.buttonVars || []).map(() => '')
+})
 
 const isMetaChannel = computed(() => {
   const ch = channels.value.find(c => c.id === channelId.value)
@@ -176,15 +229,21 @@ const isMetaChannel = computed(() => {
 watch(channelId, async (newId) => {
   if (isMetaChannel.value) {
     messageType.value = 'meta_template'
+    templatesLoading.value = true
+    templatesError.value = ''
+    selectedTemplateId.value = ''
     try {
       metaTemplates.value = []
       const res = await axios.get(`/api/v1/meta/channel/${newId}/templates`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       })
-      if (res.data && res.data.data && res.data.data.data) {
-        metaTemplates.value = res.data.data.data
-      }
-    } catch(e) {}
+      const list = res.data?.data?.data || []
+      metaTemplates.value = list.filter(t => t.status === 'APPROVED').map(normalizeTemplate)
+    } catch (e) {
+      templatesError.value = metaErrorText(e, isAr.value) || (isAr.value ? 'تعذّر تحميل القوالب' : 'Could not load templates')
+    } finally {
+      templatesLoading.value = false
+    }
     
     try {
       metaFlows.value = []
@@ -217,19 +276,17 @@ const fetchTemplates = async () => {
 }
 
 const fetchChannels = async () => {
-  const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
-  if (!tenant.allowedFeatures || !tenant.allowedFeatures.includes('META_API')) {
-    channels.value = []
-    return
-  }
   try {
-    const res = await axios.get('/api/v1/channels', {
+    const res = await axios.get('/api/v1/meta/channels', {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
-    channels.value = res.data.data.filter(c => c.providerType === 'META_CLOUD')
-    if (channels.value.length > 0) { channelId.value = channels.value[0].id }
+    channels.value = (res.data.data || []).filter(c => c.providerType === 'META_CLOUD')
+    const preferred = channels.value.find(c => c.id === activeMetaChannelId.value) || channels.value[0]
+    if (preferred) channelId.value = preferred.id
   } catch (err) {
-    console.error('Failed to load channels', err)
+    error.value = metaErrorText(err, isAr.value) || 'Failed to load channels'
+  } finally {
+    channelsLoaded.value = true
   }
 }
 
@@ -333,13 +390,13 @@ const handleSend = async () => {
         channel_id: channelId.value
       }, config)
     } else if (messageType.value === 'meta_template') {
-      if (!selectedTemplateId.value) throw new Error('Please select a Meta template');
-      const parts = selectedTemplateId.value.split('||'); // name||language
+      if (!selectedMeta.value) throw new Error('Please select a Meta template');
+      if (!selectedMeta.value.supported) throw new Error(isAr.value ? 'هذا القالب غير مدعوم في هذا النموذج' : 'This template cannot be sent from this form');
       res = await axios.post('/api/v1/message/send-meta-template', {
         phone: phone.value,
-        templateName: parts[0],
-        languageCode: parts[1],
-        components: [],
+        templateName: selectedMeta.value.name,
+        languageCode: selectedMeta.value.language,
+        components: buildComponents(selectedMeta.value, metaVarValues.value, metaButtonValues.value),
         channelId: channelId.value
       }, config)
     } else {
@@ -373,7 +430,7 @@ const handleSend = async () => {
       extractVariables(); // Reset variable values
     }
   } catch (err) {
-    error.value = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to send message.'
+    error.value = metaErrorText(err, isAr.value) || 'Failed to send message.'
   } finally {
     loading.value = false
   }

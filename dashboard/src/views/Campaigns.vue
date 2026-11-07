@@ -389,6 +389,7 @@
 </template>
 
 <script setup>
+import { tenantHasMeta } from '../utils/meta-access'
 import { ref, onMounted, computed, onUnmounted, watch } from 'vue'
 import axios from 'axios'
 import FeatureLock from '../components/FeatureLock.vue'
@@ -468,8 +469,7 @@ const fetchTemplates = async () => {
 }
 
 const fetchChannels = async () => {
-  const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
-  if (!tenant.allowedFeatures || !tenant.allowedFeatures.includes('META_API')) { channels.value = []; return }
+  if (!tenantHasMeta()) { channels.value = []; return }
   try {
     const res = await axios.get('/api/v1/meta/channels', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
     channels.value = res.data.data

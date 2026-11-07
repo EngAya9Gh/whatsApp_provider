@@ -1,5 +1,6 @@
 const whatsappService = require('../whatsapp/whatsapp.service');
 const metaService = require('../meta/meta.service');
+const { metaErrorText } = require('../meta/meta.errors');
 const billingService = require('../billing/billing.service');
 const { PrismaClient } = require('@prisma/client');
 const logger = require('../../utils/logger');
@@ -68,7 +69,7 @@ class MessageService {
       return { success: true, message: 'Template sent successfully', metaMessageId };
     } catch (error) {
       await prisma.messageLog.create({
-        data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'FAILED', errorMessage: error.message || 'Sending failed' }
+        data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'FAILED', errorMessage: metaErrorText(error) || 'Sending failed' }
       });
       await billingService.incrementUsage(tenantId, 'failed');
       throw error;

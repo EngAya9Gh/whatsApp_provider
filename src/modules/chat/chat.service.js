@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const metaService = require('../meta/meta.service');
+const { metaErrorInfo, metaErrorText } = require('../meta/meta.errors');
 const socketService = require('../../services/socket.service');
 const billingService = require('../billing/billing.service');
 const logger = require('../../utils/logger');
@@ -474,6 +475,7 @@ class ChatService {
 
     let metaResponse = null;
     let status = 'SENT';
+    let failure = null;
     try {
       if (options.length <= 3) {
         metaResponse = await metaService.sendButtons(channel, thread.contactPhone, body, options.map(o => ({ id: o.id, text: o.title })));
@@ -484,8 +486,9 @@ class ChatService {
       }
       await billingService.incrementUsage(tenantId, 'sent');
     } catch (error) {
-      logger.error('Error sending interactive message:', error.response?.data || error.message);
+      logger.error(`Error sending interactive message: ${metaErrorText(error)}`);
       status = 'FAILED';
+      failure = metaErrorInfo(error);
     }
 
     const ticketsService = require('../tickets/tickets.service');
@@ -505,7 +508,7 @@ class ChatService {
     const msgData = message.toObject();
     msgData.id = msgData._id.toString();
     socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
-    if (status === 'FAILED') throw new Error('Meta rejected the interactive message');
+    if (status === 'FAILED') throw { status: 400, message: `Meta rejected the interactive message: ${failure.details || failure.message}`, metaCode: failure.code };
     return msgData;
   }
 
@@ -552,12 +555,14 @@ class ChatService {
 
     let metaResponse = null;
     let status = 'SENT';
+    let failure = null;
     try {
       metaResponse = await metaService.sendTemplate(channel, thread.contactPhone, templateName, language, components);
       await billingService.incrementUsage(tenantId, 'sent');
     } catch (error) {
-      logger.error('Error sending chat template:', error.response?.data || error.message);
+      logger.error(`Error sending chat template: ${metaErrorText(error)}`);
       status = 'FAILED';
+      failure = metaErrorInfo(error);
     }
 
     const message = await ChatMessage.create({
@@ -576,7 +581,7 @@ class ChatService {
     msgData.id = msgData._id.toString();
     socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
 
-    if (status === 'FAILED') throw { status: 400, message: 'Meta rejected the template message. Check the template and its variables.' };
+    if (status === 'FAILED') throw { status: 400, message: `Meta rejected the template: ${failure.details || failure.message}`, metaCode: failure.code };
     return msgData;
   }
 }

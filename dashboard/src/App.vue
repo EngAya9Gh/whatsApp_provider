@@ -200,6 +200,7 @@
 </template>
 
 <script setup>
+import { tenantHasMeta } from './utils/meta-access'
 import { computed, ref, onMounted } from 'vue'
 import { connectSocket } from './services/realtime'
 import { useRouter, useRoute } from 'vue-router'
@@ -233,12 +234,7 @@ const showSidebar = computed(() => !route.meta.guest && !route.meta.hideSidebar 
 
 // Any Meta feature (or the admin's "Meta enabled" switch) unlocks the official connection page,
 // matching the backend's requireMetaEnabled and the Meta analytics link.
-const hasAnyMeta = computed(() => {
-  const t = tenant.value || {}
-  if (t.metaEnabled === true) return true
-  if (!t.allowedFeatures) return true // old session without a feature list: show everything, like $hasFeature
-  return ['META_API', 'META_CAMPAIGN', 'META_AUTORESPONDER', 'META_SEND_MESSAGE', 'META_TEMPLATES'].some(f => t.allowedFeatures.includes(f))
-})
+const hasAnyMeta = computed(() => tenantHasMeta(tenant.value))
 
 // ── Sub-user awareness ────────────────────────────────────
 const isSubUser   = computed(() => !!tenant.value?.isSubUser)

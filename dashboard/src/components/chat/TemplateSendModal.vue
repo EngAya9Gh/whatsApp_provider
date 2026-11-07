@@ -79,6 +79,8 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
+import { normalizeTemplate as normalize, buildPreview, varToken, urlPrefix } from '../../utils/metaTemplate'
+import { metaErrorText } from '../../utils/metaErrors'
 
 const props = defineProps({
   channelId: { type: String, required: true },
@@ -96,62 +98,12 @@ const values = ref([])
 const buttonValues = ref([])
 const sending = ref(false)
 
-const POSITIONAL = /\{\{\s*(\d+)\s*\}\}/g
-
-// A dynamic URL button without its {{1}} placeholder: the fixed part the agent's value is appended to
-// (kept out of the template: a literal braces pair inside a Vue interpolation breaks the compile)
-const urlPrefix = (url) => url.replace('{{1}}', '')
-
-// Shows a variable as it appears in the template, e.g. {{1}}
-const varToken = (n) => `{{${n}}}`
-const ANY_VARIABLE = /\{\{[^}]*\}\}/
-
-// Only text templates whose variables are positional body variables can be sent from the chat
-const normalize = (tpl) => {
-  const components = tpl.components || []
-  const body = components.find(c => c.type === 'BODY')?.text || ''
-  const header = components.find(c => c.type === 'HEADER')
-  const buttons = components.find(c => c.type === 'BUTTONS')?.buttons || []
-  const variables = [...new Set([...body.matchAll(POSITIONAL)].map(m => Number(m[1])))].sort((a, b) => a - b)
-  const bodyHasNamed = ANY_VARIABLE.test(body.replace(POSITIONAL, ''))
-  const headerUnsupported = header && (header.format !== 'TEXT' || ANY_VARIABLE.test(header.text || ''))
-  // A URL button may end with a single {{1}} (e.g. https://shop.com/track/{{1}}): the agent fills it in.
-  // Any other variable placement, copy-code and OTP buttons cannot be sent from the chat.
-  const DYNAMIC_URL = /^[^{}]*\{\{1\}\}$/
-  const buttonVars = buttons
-    .map((b, index) => ({ b, index }))
-    .filter(({ b }) => b.type === 'URL' && DYNAMIC_URL.test(b.url || ''))
-    .map(({ b, index }) => ({ index, text: b.text, url: b.url }))
-  const buttonsUnsupported = buttons.some(b =>
-    (b.type === 'URL' && ANY_VARIABLE.test(b.url || '') && !DYNAMIC_URL.test(b.url || '')) || ['COPY_CODE', 'OTP'].includes(b.type))
-  return {
-    id: tpl.id,
-    name: tpl.name,
-    language: tpl.language,
-    category: tpl.category,
-    body,
-    headerText: header?.format === 'TEXT' ? header.text : '',
-    variables,
-    buttonVars,
-    supported: !bodyHasNamed && !headerUnsupported && !buttonsUnsupported
-  }
-}
-
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
   return templates.value.filter(t => !q || t.name.toLowerCase().includes(q) || t.body.toLowerCase().includes(q))
 })
 
-const preview = computed(() => {
-  if (!selected.value) return ''
-  const body = selected.value.body.replace(POSITIONAL, (_, n) => {
-    const v = values.value[selected.value.variables.indexOf(Number(n))]
-    return v || `{{${n}}}`
-  })
-  const text = selected.value.headerText ? `${selected.value.headerText}\n\n${body}` : body
-  const links = selected.value.buttonVars.map((b, i) => `🔗 ${b.text}: ${b.url.replace('{{1}}', buttonValues.value[i] || '{{1}}')}`)
-  return links.length ? `${text}\n\n${links.join('\n')}` : text
-})
+const preview = computed(() => selected.value ? buildPreview(selected.value, values.value, buttonValues.value) : '')
 
 const choose = (tpl) => {
   selected.value = tpl
@@ -175,7 +127,7 @@ const send = async () => {
     Swal.fire({
       icon: 'error',
       title: props.isAr ? 'لم يُرسل القالب' : 'Template not sent',
-      text: err.response?.data?.error?.message || err.message,
+      text: metaErrorText(err, props.isAr),
       confirmButtonColor: '#FF6600'
     })
   } finally {

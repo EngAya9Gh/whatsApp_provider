@@ -226,6 +226,7 @@
 </template>
 
 <script setup>
+import { tenantHasMeta } from '../utils/meta-access'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
@@ -255,7 +256,7 @@ const loadFbConfig = async () => {
 
 // ─── QR Session State ────────────────────────────────────────
 const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
-const isMetaEnabled = ref(!!(tenant.metaEnabled || (tenant.allowedFeatures && ['META_API', 'META_CAMPAIGN', 'META_AUTORESPONDER', 'META_SEND_MESSAGE', 'META_TEMPLATES'].some(f => tenant.allowedFeatures.includes(f)))))
+const isMetaEnabled = ref(tenantHasMeta(tenant))
 const status = ref(tenant.sessionStatus || 'DISCONNECTED')
 const phone = ref(tenant.whatsappPhone || '')
 const qrCode = ref('')

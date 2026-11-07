@@ -109,7 +109,7 @@
             </div>
           </div>
 
-          <div v-if="template.rejected_reason" class="reject-box">
+          <div v-if="template.rejected_reason && template.rejected_reason !== 'NONE'" class="reject-box">
             <strong>Rejection Reason:</strong> {{ template.rejected_reason }}
           </div>
 
