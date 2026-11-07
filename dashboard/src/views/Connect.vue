@@ -255,7 +255,7 @@ const loadFbConfig = async () => {
 
 // ─── QR Session State ────────────────────────────────────────
 const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
-const isMetaEnabled = ref(tenant.metaEnabled || (tenant.allowedFeatures && tenant.allowedFeatures.includes('META_API')))
+const isMetaEnabled = ref(!!(tenant.metaEnabled || (tenant.allowedFeatures && ['META_API', 'META_CAMPAIGN', 'META_AUTORESPONDER', 'META_SEND_MESSAGE', 'META_TEMPLATES'].some(f => tenant.allowedFeatures.includes(f)))))
 const status = ref(tenant.sessionStatus || 'DISCONNECTED')
 const phone = ref(tenant.whatsappPhone || '')
 const qrCode = ref('')

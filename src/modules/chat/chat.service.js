@@ -511,11 +511,19 @@ class ChatService {
 
   /**
    * Send an approved Meta template inside a conversation (works outside the 24h window).
-   * payload: { templateName, language, bodyParams: [..], previewText, senderId }
+   * payload: { templateName, language, bodyParams: [..], buttonParams: [{ index, text }], previewText, senderId }
+   * buttonParams fills the {{1}} of a dynamic URL button; index is the button's position among ALL
+   * the template's buttons (0-based), text is the value that replaces {{1}}.
    */
   async sendTemplateMessage(tenantId, threadId, payload) {
-    const { templateName, language, bodyParams = [], previewText } = payload;
+    const { templateName, language, bodyParams = [], buttonParams = [], previewText } = payload;
     if (!templateName || !language) throw { status: 400, message: 'templateName and language are required' };
+    if (!Array.isArray(bodyParams) || !Array.isArray(buttonParams)) throw { status: 400, message: 'bodyParams and buttonParams must be arrays' };
+    for (const b of buttonParams) {
+      if (!Number.isInteger(b?.index) || b.index < 0 || b.index > 9 || typeof b.text !== 'string' || !b.text.trim() || b.text.length > 1000) {
+        throw { status: 400, message: 'Each button parameter needs a button index (0-9) and a non-empty text value' };
+      }
+    }
 
     const thread = await ChatThread.findOne({ _id: threadId, tenantId });
     if (!thread) throw { status: 404, message: 'Thread not found' };
@@ -526,9 +534,18 @@ class ChatService {
     const canSend = await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
-    const components = bodyParams.length > 0
-      ? [{ type: 'body', parameters: bodyParams.map(text => ({ type: 'text', text: String(text) })) }]
-      : [];
+    const components = [];
+    if (bodyParams.length > 0) {
+      components.push({ type: 'body', parameters: bodyParams.map(text => ({ type: 'text', text: String(text) })) });
+    }
+    for (const b of buttonParams) {
+      components.push({
+        type: 'button',
+        sub_type: 'url',
+        index: String(b.index),
+        parameters: [{ type: 'text', text: b.text.trim() }]
+      });
+    }
 
     const ticketsService = require('../tickets/tickets.service');
     const activeTicket = await ticketsService.getActiveTicket(tenantId, thread._id.toString());

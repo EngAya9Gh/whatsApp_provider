@@ -26,7 +26,7 @@
             :disabled="!tpl.supported"
             @click="choose(tpl)"
             class="w-full text-start border border-slate-200 rounded-xl p-3 bg-white transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:border-[#FF6600]"
-            :title="tpl.supported ? '' : (isAr ? 'يحتوي وسائط أو متغيرات غير مدعومة هنا — أرسله من صفحة الإرسال' : 'Has media or variables not supported here — use the send page')"
+            :title="tpl.supported ? '' : (isAr ? 'يحتوي وسائط أو أزرار نسخ/رمز تحقق أو متغيرات غير مدعومة هنا — أرسله من صفحة الإرسال' : 'Has media or variables not supported here — use the send page')"
           >
             <div class="flex items-center gap-2 mb-1">
               <span class="font-bold text-sm text-slate-800" dir="ltr">{{ tpl.name }}</span>
@@ -47,6 +47,17 @@
           <div v-for="(n, i) in selected.variables" :key="n">
             <label class="block text-xs font-semibold text-slate-600 mb-1">{{ isAr ? 'المتغير' : 'Variable' }} <span dir="ltr" v-text="varToken(n)"></span></label>
             <input v-model="values[i]" required class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm outline-none focus:border-[#FF6600]" />
+          </div>
+        </div>
+        <div v-if="selected.buttonVars.length > 0" class="space-y-3">
+          <div v-for="(b, i) in selected.buttonVars" :key="b.index">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+              {{ isAr ? 'نهاية رابط الزر' : 'Button link ending' }} «{{ b.text }}»
+            </label>
+            <div class="flex items-center gap-2" dir="ltr">
+              <span class="text-xs text-slate-400 truncate max-w-[55%]">{{ urlPrefix(b.url) }}</span>
+              <input v-model="buttonValues[i]" required class="flex-1 min-w-0 px-3 py-2 rounded-xl border border-slate-300 text-sm outline-none focus:border-[#FF6600]" />
+            </div>
           </div>
         </div>
         <div>
@@ -82,9 +93,14 @@ const templates = ref([])
 const search = ref('')
 const selected = ref(null)
 const values = ref([])
+const buttonValues = ref([])
 const sending = ref(false)
 
 const POSITIONAL = /\{\{\s*(\d+)\s*\}\}/g
+
+// A dynamic URL button without its {{1}} placeholder: the fixed part the agent's value is appended to
+// (kept out of the template: a literal braces pair inside a Vue interpolation breaks the compile)
+const urlPrefix = (url) => url.replace('{{1}}', '')
 
 // Shows a variable as it appears in the template, e.g. {{1}}
 const varToken = (n) => `{{${n}}}`
@@ -99,7 +115,15 @@ const normalize = (tpl) => {
   const variables = [...new Set([...body.matchAll(POSITIONAL)].map(m => Number(m[1])))].sort((a, b) => a - b)
   const bodyHasNamed = ANY_VARIABLE.test(body.replace(POSITIONAL, ''))
   const headerUnsupported = header && (header.format !== 'TEXT' || ANY_VARIABLE.test(header.text || ''))
-  const buttonsUnsupported = buttons.some(b => (b.type === 'URL' && ANY_VARIABLE.test(b.url || '')) || ['COPY_CODE', 'OTP'].includes(b.type))
+  // A URL button may end with a single {{1}} (e.g. https://shop.com/track/{{1}}): the agent fills it in.
+  // Any other variable placement, copy-code and OTP buttons cannot be sent from the chat.
+  const DYNAMIC_URL = /^[^{}]*\{\{1\}\}$/
+  const buttonVars = buttons
+    .map((b, index) => ({ b, index }))
+    .filter(({ b }) => b.type === 'URL' && DYNAMIC_URL.test(b.url || ''))
+    .map(({ b, index }) => ({ index, text: b.text, url: b.url }))
+  const buttonsUnsupported = buttons.some(b =>
+    (b.type === 'URL' && ANY_VARIABLE.test(b.url || '') && !DYNAMIC_URL.test(b.url || '')) || ['COPY_CODE', 'OTP'].includes(b.type))
   return {
     id: tpl.id,
     name: tpl.name,
@@ -108,6 +132,7 @@ const normalize = (tpl) => {
     body,
     headerText: header?.format === 'TEXT' ? header.text : '',
     variables,
+    buttonVars,
     supported: !bodyHasNamed && !headerUnsupported && !buttonsUnsupported
   }
 }
@@ -123,12 +148,15 @@ const preview = computed(() => {
     const v = values.value[selected.value.variables.indexOf(Number(n))]
     return v || `{{${n}}}`
   })
-  return selected.value.headerText ? `${selected.value.headerText}\n\n${body}` : body
+  const text = selected.value.headerText ? `${selected.value.headerText}\n\n${body}` : body
+  const links = selected.value.buttonVars.map((b, i) => `🔗 ${b.text}: ${b.url.replace('{{1}}', buttonValues.value[i] || '{{1}}')}`)
+  return links.length ? `${text}\n\n${links.join('\n')}` : text
 })
 
 const choose = (tpl) => {
   selected.value = tpl
   values.value = tpl.variables.map(() => '')
+  buttonValues.value = tpl.buttonVars.map(() => '')
 }
 
 const send = async () => {
@@ -138,6 +166,7 @@ const send = async () => {
       templateName: selected.value.name,
       language: selected.value.language,
       bodyParams: values.value,
+      buttonParams: selected.value.buttonVars.map((b, i) => ({ index: b.index, text: buttonValues.value[i] })),
       previewText: preview.value
     })
     emit('sent', res.data.data)

@@ -29,7 +29,7 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/></svg>
           <span class="nav-label">{{ locale === 'ar' ? 'تحليلات الربط العادي' : 'QR Analytics' }}</span>
         </router-link>
-        <router-link v-if="$hasFeature('META_API') && (!isSubUser || subUserPerms?.can_manage_settings)" to="/connect-meta" class="nav-item" active-class="active">
+        <router-link v-if="hasAnyMeta && (!isSubUser || subUserPerms?.can_manage_settings)" to="/connect-meta" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
           <span class="nav-label">{{ locale === 'ar' ? 'ربط Meta الرسمي' : 'Meta Connection' }}</span>
         </router-link>
@@ -230,6 +230,15 @@ const loadTenant = () => {
 loadTenant()
 
 const showSidebar = computed(() => !route.meta.guest && !route.meta.hideSidebar && route.path !== '/' && !!localStorage.getItem('token'))
+
+// Any Meta feature (or the admin's "Meta enabled" switch) unlocks the official connection page,
+// matching the backend's requireMetaEnabled and the Meta analytics link.
+const hasAnyMeta = computed(() => {
+  const t = tenant.value || {}
+  if (t.metaEnabled === true) return true
+  if (!t.allowedFeatures) return true // old session without a feature list: show everything, like $hasFeature
+  return ['META_API', 'META_CAMPAIGN', 'META_AUTORESPONDER', 'META_SEND_MESSAGE', 'META_TEMPLATES'].some(f => t.allowedFeatures.includes(f))
+})
 
 // ── Sub-user awareness ────────────────────────────────────
 const isSubUser   = computed(() => !!tenant.value?.isSubUser)
