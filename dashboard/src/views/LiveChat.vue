@@ -108,6 +108,9 @@
             </div>
           </div>
           <div class="chat-header-actions">
+            <button v-if="canManageLabels" type="button" class="ticket-btn delete-thread-btn" @click="deleteThread" :title="isAr ? 'حذف المحادثة' : 'Delete conversation'">
+              <i class="fas fa-trash"></i>
+            </button>
             <button type="button" class="ticket-btn share-btn" @click="showShareModal = true" :title="isAr ? 'مشاركة مع زميل' : 'Share with a colleague'">
               <i class="fas fa-share"></i>
               <span>{{ isAr ? 'مشاركة' : 'Share' }}</span>
@@ -305,6 +308,15 @@
             </button>
           </div>
 
+          <!-- The number behind this conversation was removed -->
+          <div v-if="channelMissing" class="window-banner">
+            <i class="fas fa-link-slash"></i>
+            <div class="window-banner-text">
+              <strong>{{ isAr ? 'رقم هذه المحادثة لم يعد موجوداً' : 'The number of this conversation no longer exists' }}</strong>
+              <span>{{ isAr ? 'حُذفت القناة التي أُنشئت عليها هذه المحادثة، لذلك لا يمكن الإرسال منها. يمكنك قراءتها أو حذفها. إذا كتب العميل إلى رقمك الحالي ستظهر محادثة جديدة.' : 'The channel this conversation was created on was removed, so nothing can be sent from it. You can read it or delete it. If the customer writes to your current number, a new conversation appears.' }}</span>
+            </div>
+          </div>
+
           <!-- Meta 24h customer-service window -->
           <div v-if="windowExpired && !isInternal" class="window-banner">
             <i class="fas fa-triangle-exclamation"></i>
@@ -394,14 +406,14 @@
               :placeholder="isRecording ? 'جاري التسجيل...' : (isInternal ? 'اكتب ملاحظة داخلية لفريق العمل (لن يراها العميل)… استخدم @ للإشارة إلى زميل' : (windowExpired ? (isAr ? 'أرسل قالباً، أو فعّل الملاحظة الداخلية 🔒' : 'Send a template, or switch to an internal note 🔒') : 'Type a message...'))"
               class="form-control msg-input"
               :class="{ 'input-internal': isInternal }"
-              :disabled="sending || isRecording || (windowExpired && !isInternal)"
+              :disabled="sending || isRecording || channelMissing || (windowExpired && !isInternal)"
             />
             
             <button 
               type="submit" 
               class="btn-send" 
               :class="{ 'btn-send-internal': isInternal }"
-              :disabled="sending || isRecording || (!newMessage.trim() && !attachment) || (windowExpired && !isInternal)"
+              :disabled="sending || isRecording || channelMissing || (!newMessage.trim() && !attachment) || (windowExpired && !isInternal)"
               :title="isInternal ? 'حفظ ملاحظة داخلية' : 'إرسال'"
             >
               <template v-if="!sending">
@@ -693,6 +705,34 @@ const lastInboundTime = computed(() => {
 // The 24h customer-service window and templates exist only on Meta's official API, not on QR (Baileys) numbers
 const isMetaThread = computed(() => selectedThread.value?.channel?.providerType === 'META_CLOUD')
 
+// The number this conversation was created on has been removed (it can be read, but nothing can be sent)
+const channelMissing = computed(() => !!selectedThread.value && !selectedThread.value.channel)
+
+const deleteThread = async () => {
+  const thread = selectedThread.value
+  if (!thread) return
+  const ok = await Swal.fire({
+    icon: 'warning',
+    title: isAr.value ? 'حذف هذه المحادثة؟' : 'Delete this conversation?',
+    text: isAr.value
+      ? 'ستُحذف المحادثة وكل رسائلها نهائياً ولا يمكن التراجع. جهة الاتصال تبقى في «جهات الاتصال» والتذاكر تبقى كما هي.'
+      : 'The conversation and all its messages will be deleted permanently. The contact stays in Contacts and tickets are kept.',
+    showCancelButton: true,
+    confirmButtonText: isAr.value ? 'نعم، احذف' : 'Yes, delete',
+    cancelButtonText: isAr.value ? 'إلغاء' : 'Cancel',
+    confirmButtonColor: '#DC2626'
+  })
+  if (!ok.isConfirmed) return
+  try {
+    await axios.delete(`/api/v1/chat/threads/${thread.id}`)
+    threads.value = threads.value.filter(t => t.id !== thread.id)
+    selectedThread.value = null
+    messages.value = []
+  } catch (err) {
+    Swal.fire({ icon: 'error', title: isAr.value ? 'تعذّر الحذف' : 'Could not delete', text: err.response?.data?.message || err.message, confirmButtonColor: '#FF6600' })
+  }
+}
+
 const windowExpired = computed(() => {
   if (!selectedThread.value || !isMetaThread.value || loadingMessages.value) return false
   return !lastInboundTime.value || nowTick.value - lastInboundTime.value >= WINDOW_MS
@@ -700,9 +740,9 @@ const windowExpired = computed(() => {
 
 // Shown during the last 3 hours of the window
 const windowRemainingLabel = computed(() => {
-  if (!lastInboundTime.value || windowExpired.value) return ''
+  if (!isMetaThread.value || !lastInboundTime.value || windowExpired.value) return ''
   const left = WINDOW_MS - (nowTick.value - lastInboundTime.value)
-  if (left > 3 * 60 * 60 * 1000) return ''
+  if (left <= 0 || left > 3 * 60 * 60 * 1000) return ''
   const h = Math.floor(left / 3600000)
   const m = Math.floor((left % 3600000) / 60000)
   return isAr.value ? `تنتهي نافذة المحادثة خلال ${h}س ${m}د` : `Conversation window closes in ${h}h ${m}m`
@@ -2092,6 +2132,8 @@ onUnmounted(() => {
   justify-content: center;
 }
 
+.delete-thread-btn { color: #DC2626; }
+.delete-thread-btn:hover { background: #FEF2F2; }
 .share-btn {
   background: #eef2ff !important;
   color: #4338ca !important;

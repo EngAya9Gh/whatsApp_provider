@@ -50,6 +50,15 @@ class ChatController {
     }
   }
 
+  async deleteThread(req, res, next) {
+    try {
+      const result = await chatService.deleteThread(req.tenant.id, req.params.threadId);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getThread(req, res, next) {
     try {
       const thread = await chatService.getThread(req.tenant.id, req.params.threadId);

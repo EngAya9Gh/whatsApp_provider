@@ -95,6 +95,19 @@ class ChatService {
     };
   }
 
+  /**
+   * Permanently deletes one conversation and all its messages (the contact stays in Contacts, and tickets
+   * stay for the reports). If the customer writes again, a fresh conversation is created.
+   */
+  async deleteThread(tenantId, threadId) {
+    const thread = await ChatThread.findOne({ _id: threadId, tenantId });
+    if (!thread) throw { status: 404, message: 'Thread not found' };
+    const { deletedCount } = await ChatMessage.deleteMany({ threadId: thread._id });
+    await ChatThread.deleteOne({ _id: thread._id, tenantId });
+    logger.info(`[Chat] Thread ${threadId} deleted for tenant ${tenantId} (${deletedCount} messages)`);
+    return { deletedMessages: deletedCount };
+  }
+
   /** One conversation, shaped like the list items (used when opening a shared link) */
   async getThread(tenantId, threadId) {
     const thread = await ChatThread.findOne({ _id: threadId, tenantId }).lean();

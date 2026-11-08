@@ -43,6 +43,8 @@ const upload = multer({ storage });
 router.get('/threads', chatController.getThreads.bind(chatController));
 router.get('/threads/:threadId', chatController.getThread.bind(chatController));
 router.get('/threads/:threadId/messages', chatController.getMessages.bind(chatController));
+// Destructive: owner / settings managers only
+router.delete('/threads/:threadId', requirePermission('can_manage_settings'), chatController.deleteThread.bind(chatController));
 router.put('/threads/:threadId/name', chatController.renameThread.bind(chatController));
 router.post('/threads/:threadId/messages', chatController.sendMessage.bind(chatController));
 router.post('/threads/:threadId/template', chatController.sendTemplate.bind(chatController));
