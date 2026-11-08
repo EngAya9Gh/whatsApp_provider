@@ -1,6 +1,10 @@
 const crypto = require('crypto');
+const { PrismaClient } = require('@prisma/client');
 const AiAgent = require('../../models/mongo/AiAgent');
+const ChatFlow = require('../../models/mongo/ChatFlow');
 const aiClient = require('./ai.client');
+
+const prisma = new PrismaClient();
 
 const MAX_KNOWLEDGE_CHARS = 40000;
 const MAX_ENTRIES = 60;
@@ -58,11 +62,25 @@ const REPLY_SCHEMA = {
 
 class AiAgentService {
   async getAgent(tenantId) {
-    const [doc, configured] = await Promise.all([
+    const [doc, configured, activeChannels] = await Promise.all([
       AiAgent.findOne({ tenantId }).lean(),
-      aiClient.isConfigured(tenantId)
+      aiClient.isConfigured(tenantId),
+      this.activeChannels(tenantId)
     ]);
-    return formatAgent(doc, configured);
+    return { ...formatAgent(doc, configured), activeChannels };
+  }
+
+  /** Numbers whose published, switched-on WhatsApp flow has an AI agent step (where the agent really talks to customers) */
+  async activeChannels(tenantId) {
+    const flows = await ChatFlow.find({ tenantId, isActive: true, 'published.version': { $gt: 0 }, 'published.nodes.type': 'ai_agent' })
+      .select('channelId')
+      .lean();
+    if (flows.length === 0) return [];
+    const channels = await prisma.whatsAppChannel.findMany({
+      where: { tenantId, id: { in: flows.map(f => f.channelId) } },
+      select: { id: true, name: true, displayPhoneNumber: true, phoneNumber: true }
+    });
+    return channels.map(c => ({ id: c.id, label: c.name || c.displayPhoneNumber || c.phoneNumber || c.id }));
   }
 
   async saveAgent(tenantId, data, updatedBy) {
@@ -87,7 +105,8 @@ class AiAgentService {
       { $set: { name, instructions, knowledge, maxTurns, updatedBy } },
       { upsert: true, returnDocument: 'after' }
     ).lean();
-    return formatAgent(doc, await aiClient.isConfigured(tenantId));
+    const [configured, activeChannels] = await Promise.all([aiClient.isConfigured(tenantId), this.activeChannels(tenantId)]);
+    return { ...formatAgent(doc, configured), activeChannels };
   }
 
   /**

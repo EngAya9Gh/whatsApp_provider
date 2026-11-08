@@ -137,6 +137,8 @@ app.use((err, req, res, next) => {
   res.status(err?.status || 500).json({
     error: {
       message: err?.message || 'Internal Server Error',
+      // AI failures carry a code (AI_BUSY, AI_KEY_INVALID…) so the dashboard can explain them in plain words
+      ...(typeof err?.code === 'string' && err.code.startsWith('AI_') && { code: err.code }),
       ...(process.env.NODE_ENV === 'development' && { stack: err?.stack })
     }
   });

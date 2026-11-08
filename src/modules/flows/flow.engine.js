@@ -175,7 +175,11 @@ class FlowEngine {
         result = await aiAgentService.reply(ctx.tenantId, history);
       } catch (err) {
         logger.error(`[FlowEngine] AI agent failed on thread ${ctx.threadId}: ${err.message}`);
-        result = { reply: '', handoff: true, reason: 'تعذّر رد الذكاء الاصطناعي' };
+        const busy = ['AI_BUSY', 'AI_TIMEOUT', 'AI_RATE_LIMIT', 'AI_NETWORK'].includes(err.code);
+        const reason = busy ? 'خدمة الذكاء الاصطناعي مزدحمة أو متأخرة الآن'
+          : err.code === 'AI_KEY_INVALID' ? 'مفتاح Gemini غير صالح، راجعه في الإعدادات'
+          : 'تعذّر رد الذكاء الاصطناعي';
+        result = { reply: '', handoff: true, reason };
       }
     }
 

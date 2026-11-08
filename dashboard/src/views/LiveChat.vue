@@ -174,7 +174,7 @@
 
         <div class="chat-labels-bar">
           <span v-if="selectedThread.flowState" class="bot-chip" :title="isAr ? 'أي رسالة تكتبها للعميل توقف السير وتتولى المحادثة' : 'Any message you send stops the flow and takes over'">
-            <i class="fas fa-robot"></i> {{ isAr ? 'سير الواتساب يرد على هذه المحادثة' : 'A WhatsApp flow is answering' }}
+            <i class="fas fa-robot"></i> {{ isAr ? 'سير الواتساب يرد على هذه المحادثة' : 'A chat flow is answering' }}
           </span>
           <StagePicker
             v-if="isStageActive(selectedThread)"
@@ -476,6 +476,7 @@ import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import { connectSocket } from '../services/realtime'
+import { aiErrorMessage } from '../utils/aiErrors'
 import { useI18n } from 'vue-i18n'
 import FeatureLock from '../components/FeatureLock.vue'
 import StagePicker from '../components/chat/StagePicker.vue'
@@ -632,7 +633,7 @@ const loadSummary = async (refresh = false) => {
       aiSummary.value = res.data.data || { text: isAr.value ? 'لا توجد رسائل لتلخيصها.' : 'Nothing to summarize yet.' }
     }
   } catch (err) {
-    Swal.fire({ icon: 'error', title: isAr.value ? 'تعذّر إنشاء الملخص' : 'Could not summarize', text: err.response?.data?.error?.message || err.message, confirmButtonColor: '#FF6600' })
+    Swal.fire({ icon: 'error', title: isAr.value ? 'تعذّر إنشاء الملخص' : 'Could not summarize', text: aiErrorMessage(err, isAr.value), confirmButtonColor: '#FF6600' })
   } finally {
     loadingSummary.value = false
   }

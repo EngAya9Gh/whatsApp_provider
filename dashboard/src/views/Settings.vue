@@ -295,7 +295,7 @@
           <div class="card-header">
             <div>
               <h3 class="card-title">{{ isAr ? 'إعدادات الذكاء الاصطناعي (Gemini AI)' : 'AI Configuration' }}</h3>
-              <p class="card-desc">{{ isAr ? 'ربط مفتاح API لمساعد الذكاء الاصطناعي لتوليد الردود التلقائية الذكية وتحليل المحادثات' : 'Connect Gemini API Key for smart auto-replies and message analysis' }}</p>
+              <p class="card-desc">{{ isAr ? 'مفتاح Gemini يشغّل الموظف الذكي وملخّص المحادثات واقتراح مراحل العملاء' : 'The Gemini key powers the AI agent, conversation summaries and customer stage suggestions' }}</p>
             </div>
             <div class="header-icon-bg">🤖</div>
           </div>
@@ -312,7 +312,7 @@
                 />
               </div>
               <span style="font-size: 0.8rem; color: #64748B; margin-top: 4px;">
-                {{ isAr ? 'يمكنك الحصول على مفتاح API مجاناً من Google AI Studio لتفعيل الردود الذكية في المحادثة المباشرة والمساعد الآلي.' : 'Get a free API key from Google AI Studio to power smart replies in Live Chat and bot.' }}
+                {{ isAr ? 'يمكنك الحصول على مفتاح مجاناً من Google AI Studio. المفتاح المجاني له حد للطلبات؛ للاستخدام الكثيف فعّل الفوترة في حساب Google.' : 'Get a free key from Google AI Studio. Free keys have request limits; for heavy use, enable billing on your Google account.' }}
               </span>
             </div>
 

@@ -116,7 +116,7 @@
           </router-link>
           <router-link v-if="$hasFeature('META_AUTORESPONDER') && (!isSubUser || subUserPerms?.can_view_chatbot)" to="/flows" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="5" rx="1"/><rect x="15" y="9" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><path d="M6 8v8"/><path d="M9 5.5h3a3 3 0 0 1 3 3v3"/></svg>
-            <span class="nav-label">{{ locale === 'ar' ? 'سير الواتساب' : 'WhatsApp Flows' }}</span>
+            <span class="nav-label">{{ locale === 'ar' ? 'سير الواتساب' : 'Chat Flows' }}</span>
           </router-link>
           <router-link v-if="$hasFeature('META_AUTORESPONDER') && (!isSubUser || subUserPerms?.can_view_chatbot)" to="/ai-agent" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="14" r="1.2"/></svg>

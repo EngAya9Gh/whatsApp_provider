@@ -1,7 +1,7 @@
 <template>
   <div class="p-6 max-w-5xl mx-auto" :dir="isAr ? 'rtl' : 'ltr'">
     <div class="mb-6">
-      <h1 class="text-2xl font-bold text-slate-800">{{ isAr ? 'سير الواتساب' : 'WhatsApp Flows' }}</h1>
+      <h1 class="text-2xl font-bold text-slate-800">{{ isAr ? 'سير الواتساب' : 'Chat Flows' }}</h1>
       <p class="text-slate-500 mt-1">{{ isAr ? 'صمّم ما يحدث عندما يراسلك العميل: رسائل، أسئلة بأزرار، شروط، ثم تحويل للفريق المناسب.' : 'Design what happens when a customer writes: messages, button questions, conditions, then hand-off to the right team.' }}</p>
     </div>
 
@@ -63,7 +63,7 @@ onMounted(async () => {
     flows.value = res.data.data || []
   } catch (err) {
     error.value = err.response?.status === 403
-      ? (isAr.value ? 'سير الواتساب غير متاح في اشتراكك أو صلاحياتك.' : 'WhatsApp flows are not available on your plan or permissions.')
+      ? (isAr.value ? 'سير الواتساب غير متاح في اشتراكك أو صلاحياتك.' : 'Chat flows are not available on your plan or permissions.')
       : (isAr.value ? 'تعذّر تحميل البيانات.' : 'Could not load data.')
   } finally {
     loading.value = false

@@ -6,7 +6,7 @@
         <i class="fas" :class="isAr ? 'fa-arrow-right' : 'fa-arrow-left'"></i>
       </router-link>
       <div class="min-w-0">
-        <div class="font-bold text-slate-800">{{ isAr ? 'سير الواتساب' : 'WhatsApp flow' }}</div>
+        <div class="font-bold text-slate-800">{{ isAr ? 'سير الواتساب' : 'Chat flow' }}</div>
         <div class="text-xs text-slate-500 truncate" dir="ltr">{{ channelLabel }}</div>
       </div>
       <span class="save-state" :class="saveState">
@@ -376,7 +376,7 @@ onMounted(async () => {
     await applyFlow(flow)
   } catch (err) {
     loadError.value = err.response?.status === 403
-      ? (isAr.value ? 'سير الواتساب غير متاح في اشتراكك أو صلاحياتك.' : 'WhatsApp flows are not available on your plan or permissions.')
+      ? (isAr.value ? 'سير الواتساب غير متاح في اشتراكك أو صلاحياتك.' : 'Chat flows are not available on your plan or permissions.')
       : (isAr.value ? 'تعذّر تحميل السير.' : 'Could not load the flow.')
   } finally {
     loading.value = false
