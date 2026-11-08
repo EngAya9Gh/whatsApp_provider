@@ -1,7 +1,7 @@
 const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { metaErrorInfo } = require('./meta.errors');
+const { metaErrorInfo, metaErrorText } = require('./meta.errors');
 
 const GRAPH = `https://graph.facebook.com/${process.env.GRAPH_API_VERSION || 'v21.0'}`;
 
@@ -76,6 +76,36 @@ exports.getChannelHealth = async (req, res, next) => {
         phone, webhook, token
       }
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/v1/meta/channel/:id/subscribe-webhook
+ *
+ * Subscribes OUR app to the channel's WhatsApp account so incoming messages and delivery statuses
+ * arrive. The Embedded Signup popup does this by itself; a channel added by hand (e.g. a Meta test
+ * number saved from the admin dashboard) needs this call once.
+ */
+exports.subscribeWebhook = async (req, res, next) => {
+  try {
+    const channel = await prisma.whatsAppChannel.findFirst({
+      where: { id: req.params.id, tenantId: req.tenant.id, providerType: 'META_CLOUD' }
+    });
+    if (!channel) return res.status(404).json({ success: false, message: 'Channel not found' });
+    if (!channel.metaWabaId || !channel.metaAccessToken) {
+      return res.status(400).json({ success: false, message: 'The channel has no WhatsApp Business Account ID or access token.' });
+    }
+    try {
+      await axios.post(`${GRAPH}/${channel.metaWabaId}/subscribed_apps`, {}, {
+        headers: { Authorization: `Bearer ${channel.metaAccessToken}` }, timeout: 15000
+      });
+    } catch (e) {
+      const info = metaErrorInfo(e);
+      return res.status(400).json({ success: false, message: metaErrorText(e), metaCode: info.code, metaSubcode: info.subcode });
+    }
+    res.json({ success: true, message: 'Webhook subscription is active.' });
   } catch (err) {
     next(err);
   }

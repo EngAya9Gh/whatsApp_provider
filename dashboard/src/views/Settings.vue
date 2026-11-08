@@ -81,6 +81,13 @@
 
           <form @submit.prevent="saveGeneralSettings('business')" class="form-grid">
             <div class="form-group full-width">
+              <label>{{ isAr ? 'اسم الحساب (يظهر في القائمة الجانبية)' : 'Account name (shown in the sidebar)' }}</label>
+              <div class="input-wrap">
+                <input type="text" v-model="form.accountName" maxlength="80" :placeholder="isAr ? 'مثال: متجر وكيل' : 'e.g. Wakeel Store'" required class="input-std" />
+              </div>
+            </div>
+
+            <div class="form-group full-width">
               <label>{{ isAr ? 'اسم المنشأة / الشركة' : 'Company Name' }}</label>
               <div class="input-wrap">
                 <input type="text" v-model="form.companyName" :placeholder="isAr ? 'مثال: شركة وكيـل' : 'e.g. Wakeel Trading Co.'" required class="input-std" />
@@ -403,6 +410,7 @@ const savedSuccess = ref(null)
 const passwordError = ref('')
 
 const form = ref({
+  accountName: '',
   companyName: '',
   vatNumber: '',
   crn: '',
@@ -436,6 +444,7 @@ const fetchProfile = async () => {
     
     const data = res.data.data
     form.value.companyName = data.companyName || data.name || ''
+    form.value.accountName = data.name || ''
     
     const details = data.customFeatures?.companyDetails || {}
     const ticketSettings = data.customFeatures?.ticketSettings || {}
@@ -467,6 +476,7 @@ const saveGeneralSettings = async (section) => {
   try {
     const token = localStorage.getItem('token')
     await axios.put('/api/auth/profile', {
+      name: form.value.accountName.trim() || undefined,
       companyName: form.value.companyName,
       vatNumber: form.value.vatNumber,
       crn: form.value.crn,
@@ -489,6 +499,7 @@ const saveGeneralSettings = async (section) => {
     // Update local storage tenant cache
     const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
     tenant.companyName = form.value.companyName
+    if (form.value.accountName.trim()) tenant.name = form.value.accountName.trim()
     if (!tenant.customFeatures) tenant.customFeatures = {}
     tenant.customFeatures.companyDetails = { 
       vatNumber: form.value.vatNumber,
@@ -511,6 +522,7 @@ const saveGeneralSettings = async (section) => {
       geminiKey: form.value.geminiKey
     }
     localStorage.setItem('tenant', JSON.stringify(tenant))
+    window.dispatchEvent(new Event('tenant-updated')) // the sidebar re-reads the name
     
     savedSuccess.value = section
     setTimeout(() => {

@@ -96,6 +96,7 @@ router.get('/channels', metaController.getChannels.bind(metaController));
 router.delete('/channel/:id', canSettings, metaController.deleteChannel.bind(metaController));
 router.get('/channel/:id/templates', canReadTemplates, metaController.getTemplates.bind(metaController));
 router.get('/channel/:id/health', canSettings, require('./meta.health.controller').getChannelHealth);
+router.post('/channel/:id/subscribe-webhook', canSettings, require('./meta.health.controller').subscribeWebhook);
 
 // ────────────────────────────────────────────────────────────────────────────
 // Meta Template Management — Create / Read / Delete templates via Meta API

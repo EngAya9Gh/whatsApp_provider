@@ -372,7 +372,7 @@
             >
               <i class="fas fa-lock"></i>
             </button>
-            <button type="button" class="btn-attach" @click="showTemplateModal = true" :title="isAr ? 'إرسال قالب' : 'Send template'">
+            <button v-if="isMetaThread" type="button" class="btn-attach" @click="showTemplateModal = true" :title="isAr ? 'إرسال قالب' : 'Send template'">
               <i class="fas fa-file-lines"></i>
             </button>
             <button type="button" class="btn-attach" @click="toggleRecording" :class="{'recording': isRecording}" title="تسجيل صوتي">
@@ -428,7 +428,7 @@
       />
 
       <TemplateSendModal
-        v-if="showTemplateModal && selectedThread"
+        v-if="showTemplateModal && selectedThread && isMetaThread"
         :channel-id="selectedThread.channelId"
         :thread-id="selectedThread.id"
         :is-ar="isAr"
@@ -690,8 +690,11 @@ const lastInboundTime = computed(() => {
   return Math.max(fromThread, fromMessages)
 })
 
+// The 24h customer-service window and templates exist only on Meta's official API, not on QR (Baileys) numbers
+const isMetaThread = computed(() => selectedThread.value?.channel?.providerType === 'META_CLOUD')
+
 const windowExpired = computed(() => {
-  if (!selectedThread.value || loadingMessages.value) return false
+  if (!selectedThread.value || !isMetaThread.value || loadingMessages.value) return false
   return !lastInboundTime.value || nowTick.value - lastInboundTime.value >= WINDOW_MS
 })
 

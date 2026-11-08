@@ -72,7 +72,7 @@ class ChatService {
     const channelIds = [...new Set(threads.map(t => t.channelId))];
     const channels = await prisma.whatsAppChannel.findMany({
       where: { id: { in: channelIds } },
-      select: { id: true, phoneNumber: true, name: true, displayPhoneNumber: true }
+      select: { id: true, phoneNumber: true, name: true, displayPhoneNumber: true, providerType: true }
     });
     
     const channelMap = {};
@@ -101,7 +101,7 @@ class ChatService {
     if (!thread) throw { status: 404, message: 'Thread not found' };
     const channel = await prisma.whatsAppChannel.findUnique({
       where: { id: thread.channelId },
-      select: { id: true, phoneNumber: true, name: true, displayPhoneNumber: true }
+      select: { id: true, phoneNumber: true, name: true, displayPhoneNumber: true, providerType: true }
     });
     return { ...thread, id: thread._id.toString(), channel: channel || null };
   }

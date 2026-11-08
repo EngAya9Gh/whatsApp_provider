@@ -229,6 +229,7 @@ const loadTenant = () => {
   try { tenant.value = JSON.parse(localStorage.getItem('tenant') || '{}') } catch { tenant.value = {} }
 }
 loadTenant()
+window.addEventListener('tenant-updated', loadTenant)
 
 const showSidebar = computed(() => !route.meta.guest && !route.meta.hideSidebar && route.path !== '/' && !!localStorage.getItem('token'))
 

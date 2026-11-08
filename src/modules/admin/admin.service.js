@@ -147,7 +147,24 @@ class AdminService {
     });
   }
 
+  /**
+   * Saves the channel, then subscribes our app to its WhatsApp account so incoming messages and delivery
+   * statuses arrive (the Embedded Signup popup does this itself; a hand-entered channel would otherwise
+   * stay silent). A failed subscription never blocks the save: the tenant's "Check connection" shows it.
+   */
   async addMetaChannel(tenantId, channelData) {
+    const channel = await this._saveMetaChannel(tenantId, channelData);
+    try {
+      await axios.post(`https://graph.facebook.com/${process.env.GRAPH_API_VERSION || 'v21.0'}/${channel.metaWabaId}/subscribed_apps`, {}, {
+        headers: { Authorization: `Bearer ${channel.metaAccessToken}` }, timeout: 15000
+      });
+    } catch (e) {
+      logger.warn(`[Admin] Could not subscribe WABA ${channel.metaWabaId} to the app webhooks: ${e.response?.data?.error?.message || e.message}`);
+    }
+    return channel;
+  }
+
+  async _saveMetaChannel(tenantId, channelData) {
     const { phoneNumber, metaPhoneNumberId, metaWabaId, metaAccessToken, metaAppSecret, displayPhoneNumber, name } = channelData;
     
     if (!phoneNumber || !metaPhoneNumberId || !metaWabaId || !metaAccessToken || !metaAppSecret) {

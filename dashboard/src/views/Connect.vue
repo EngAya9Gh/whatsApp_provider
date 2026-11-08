@@ -231,6 +231,9 @@
                     <em v-if="line.hint" class="health-hint">{{ line.hint }}</em>
                   </span>
                 </div>
+                <button v-if="health[channel.id].canSubscribe" @click="subscribeWebhook(channel)" class="btn-check btn-fix" :disabled="health[channel.id].subscribing">
+                  {{ health[channel.id].subscribing ? (isAr ? 'جارٍ الاشتراك…' : 'Subscribing…') : (isAr ? 'اشتراك Webhook الآن' : 'Subscribe webhook now') }}
+                </button>
               </div>
               </div>
             </div>
@@ -407,7 +410,14 @@ const fbLoginCallback = (response) => {
 
       if (!phone_number_id || !waba_id) {
         embeddedSignupStatus.value = 'error'
-        embeddedSignupMessage.value = 'Could not capture phone_number_id or waba_id from Meta. Please try again.'
+        // Finished with a WhatsApp account but without adding a number (e.g. an account that has none yet)
+        embeddedSignupMessage.value = waba_id && !phone_number_id
+          ? (isAr.value
+              ? 'تم اختيار حساب واتساب لكن لم يُضف أي رقم. أعد المحاولة، واختر «إضافة رقم هاتف» وأدخل رقماً حقيقياً غير مستخدم على تطبيق واتساب. (أرقام الاختبار من Meta لا تظهر في هذه النافذة.)'
+              : 'A WhatsApp account was selected but no phone number was added. Try again, choose "Add phone number" and enter a real number that is not used on the WhatsApp app. (Meta\'s test numbers do not appear in this popup.)')
+          : (isAr.value
+              ? 'لم يصلنا من Meta معرّف الرقم أو الحساب. أعد المحاولة.'
+              : 'Could not capture the phone number or account ID from Meta. Please try again.')
         return
       }
 
@@ -478,9 +488,22 @@ const checkChannel = async (channel) => {
   try {
     const token = localStorage.getItem('token')
     const res = await axios.get(`/api/v1/meta/channel/${channel.id}/health`, { headers: { Authorization: `Bearer ${token}` } })
-    health.value = { ...health.value, [channel.id]: { lines: describeHealth(res.data.data) } }
+    const h = res.data.data
+    health.value = { ...health.value, [channel.id]: { lines: describeHealth(h), canSubscribe: h.webhook.ok && !h.webhook.subscribed } }
   } catch (err) {
     health.value = { ...health.value, [channel.id]: { failed: metaErrorText(err, isAr.value) || 'Check failed' } }
+  }
+}
+
+// Subscribes our app to the channel's WhatsApp account (needed once for a number added by hand), then re-checks
+const subscribeWebhook = async (channel) => {
+  health.value = { ...health.value, [channel.id]: { ...health.value[channel.id], subscribing: true } }
+  try {
+    const token = localStorage.getItem('token')
+    await axios.post(`/api/v1/meta/channel/${channel.id}/subscribe-webhook`, {}, { headers: { Authorization: `Bearer ${token}` } })
+    await checkChannel(channel)
+  } catch (err) {
+    health.value = { ...health.value, [channel.id]: { ...health.value[channel.id], subscribing: false, failed: metaErrorText(err, isAr.value) || 'Subscription failed' } }
   }
 }
 
@@ -526,7 +549,7 @@ const describeHealth = (h) => {
     lines.push({
       ok: h.webhook.subscribed, title: 'Webhook',
       text: h.webhook.subscribed ? t('تطبيق المنصة مشترك، والرسائل الواردة ستصل.', 'The platform app is subscribed; incoming messages will arrive.') : `${t('تطبيق المنصة غير مشترك. المشتركون الآن:', 'The platform app is not subscribed. Subscribed now:')} ${names}`,
-      hint: h.webhook.subscribed ? '' : t('بدون اشتراك لن تصل الرسائل الواردة ولا حالات التسليم. أعد ربط الرقم من النافذة (تشترك تلقائياً).', 'Without a subscription incoming messages and delivery statuses never arrive. Reconnect the number through the popup (it subscribes automatically).')
+      hint: h.webhook.subscribed ? '' : t('بدون اشتراك لن تصل الرسائل الواردة ولا حالات التسليم. اضغط «اشتراك Webhook الآن» أدناه.', 'Without a subscription incoming messages and delivery statuses never arrive. Press "Subscribe webhook now" below.')
     })
   } else {
     lines.push({ ok: false, title: 'Webhook', text: h.webhook.error.message, hint: metaHint(h.webhook.error.code, h.webhook.error.subcode, ar) })
@@ -850,6 +873,7 @@ const disconnect = async () => {
 .btn-check:hover:not(:disabled) { background: #DBEAFE; }
 .btn-check:disabled { opacity: 0.6; cursor: wait; }
 .health-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 0.9rem 1.1rem; display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem; color: #334155; }
+.btn-fix { align-self: flex-start; }
 .health-line { display: flex; gap: 0.5rem; line-height: 1.6; }
 .health-line.bad { color: #991B1B; }
 .health-hint { display: block; font-style: normal; color: #475569; margin-top: 2px; }

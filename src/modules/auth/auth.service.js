@@ -126,6 +126,14 @@ class AuthService {
       customFeatures: updatedFeatures
     };
 
+    // The account name shown in the sidebar (separate from the company name used on invoices)
+    if (data.name !== undefined) {
+      const name = String(data.name).trim();
+      if (!name) throw { status: 400, message: 'Account name cannot be empty' };
+      if (name.length > 80) throw { status: 400, message: 'Account name is too long (max 80 characters)' };
+      updateData.name = name;
+    }
+
     if (data.webhookUrl !== undefined) {
       updateData.webhookUrl = data.webhookUrl;
     }
