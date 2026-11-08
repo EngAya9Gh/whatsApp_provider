@@ -132,27 +132,6 @@
 
           <!-- Enabled Users -->
           <div v-else>
-            <!-- Webhook Info -->
-            <div class="webhook-box">
-              <h4 class="wh-title">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                Meta Webhook Setup
-              </h4>
-              <p class="wh-desc">Configure this Webhook in your Meta Developer App (only once per app):</p>
-              
-              <div class="wh-grid">
-                <div class="wh-row">
-                  <span class="wh-lbl">Callback URL:</span>
-                  <code class="wh-val">{{ baseUrl }}/api/v1/meta/webhook</code>
-                </div>
-                <div class="wh-row">
-                  <span class="wh-lbl">Verify Token:</span>
-                  <code class="wh-val">wakeel_meta_secret_1234</code>
-                </div>
-              </div>
-              <small class="wh-hint">* You can change the Verify Token in your .env file (META_VERIFY_TOKEN)</small>
-            </div>
-
             <!-- Embedded Signup -->
             <div class="embedded-box">
               <div class="eb-flex">
@@ -323,7 +302,6 @@ const goToUpgrade = () => { window.location.href = '/' }
 
 // ─── Meta State ───────────────────────────────────────────────
 const metaChannels = ref([])
-const baseUrl = ref(window.location.origin)
 const embeddedSignupStatus = ref('') // '', 'loading', 'success', 'error'
 const numberConfirmed = ref(false)
 const embeddedSignupMessage = ref('')
@@ -834,14 +812,6 @@ const disconnect = async () => {
 .btn-upgrade { background: #F59E0B; color: white; padding: 0.6rem 1.25rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; transition: all 0.2s; font-family: inherit; }
 .btn-upgrade:hover { background: #D97706; }
 
-.webhook-box { background: #F8FAFC; border: 1px solid #E2E8F0; padding: 1.25rem; border-radius: 16px; margin-bottom: 1.5rem; }
-.wh-title { display: flex; align-items: center; gap: 6px; font-size: 0.95rem; font-weight: 800; color: #0F172A; margin: 0 0 0.5rem; }
-.wh-desc { font-size: 0.85rem; color: #64748B; margin: 0 0 1rem; }
-.wh-grid { display: flex; flex-direction: column; gap: 8px; }
-.wh-row { display: flex; align-items: center; gap: 1rem; background: white; padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid #E2E8F0; }
-.wh-lbl { font-size: 0.85rem; font-weight: 700; color: #64748B; width: 100px; }
-.wh-val { flex: 1; font-family: monospace; font-size: 0.85rem; color: #0F172A; background: #F1F5F9; padding: 4px 8px; border-radius: 6px; user-select: all; }
-.wh-hint { display: block; margin-top: 0.75rem; font-size: 0.75rem; color: #94A3B8; font-weight: 500; }
 
 .embedded-box { background: linear-gradient(135deg, #EFF6FF, #E0E7FF); border: 1px solid #BFDBFE; padding: 1.5rem; border-radius: 16px; margin-bottom: 2rem; }
 .eb-flex { display: flex; align-items: center; gap: 1.5rem; }
@@ -892,6 +862,5 @@ const disconnect = async () => {
   .eb-flex { flex-direction: column; align-items: stretch; text-align: center; }
   .eb-icon { margin: 0 auto; }
   .eb-title-row { justify-content: center; }
-  .wh-row { flex-direction: column; align-items: flex-start; gap: 4px; }
 }
 </style>
