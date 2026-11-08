@@ -8,6 +8,9 @@ const logger = require('../../utils/logger');
 const ChatThread = require('../../models/mongo/ChatThread');
 const ChatMessage = require('../../models/mongo/ChatMessage');
 
+// The channel fields the conversation list shows (and uses to tell Meta from QR conversations)
+const CHANNEL_FIELDS = { id: true, phoneNumber: true, name: true, displayPhoneNumber: true, providerType: true };
+
 class ChatService {
   async getQuickReplies(tenantId) {
     return prisma.quickReply.findMany({
@@ -72,7 +75,7 @@ class ChatService {
     const channelIds = [...new Set(threads.map(t => t.channelId))];
     const channels = await prisma.whatsAppChannel.findMany({
       where: { id: { in: channelIds } },
-      select: { id: true, phoneNumber: true, name: true, displayPhoneNumber: true, providerType: true }
+      select: CHANNEL_FIELDS
     });
     
     const channelMap = {};
@@ -96,6 +99,53 @@ class ChatService {
   }
 
   /**
+   * Records a message that was sent outside Live Chat (the Send Message page, the API) in its conversation,
+   * creating the conversation on first contact, so the whole history is in one place and delivery ticks work.
+   * Never throws: a failure to record must not turn a delivered message into an error.
+   */
+  async recordOutbound(tenantId, channelId, phone, { type = 'TEXT', content = '', metaMessageId = null, status = 'SENT' } = {}) {
+    try {
+      const contactPhone = String(phone || '').replace(/\D/g, '');
+      if (!channelId || !contactPhone) return null;
+      const now = new Date();
+
+      let thread = await ChatThread.findOne({ tenantId, channelId, contactPhone });
+      let isNew = false;
+      if (!thread) {
+        const contact = await prisma.contact.findFirst({ where: { tenantId, phone: contactPhone }, select: { name: true } }).catch(() => null);
+        try {
+          thread = await ChatThread.create({ tenantId, channelId, contactPhone, contactName: contact?.name || contactPhone, lastMessageAt: now, unreadCount: 0 });
+          isNew = true;
+        } catch (e) {
+          if (e.code !== 11000) throw e; // created at the same moment by another message
+          thread = await ChatThread.findOne({ tenantId, channelId, contactPhone });
+        }
+      }
+      if (!isNew) await ChatThread.updateOne({ _id: thread._id }, { $set: { lastMessageAt: now } });
+
+      const message = await ChatMessage.create({
+        threadId: thread._id, direction: 'OUTBOUND', type, content, status, metaMessageId
+      });
+      const msgData = message.toObject();
+      msgData.id = msgData._id.toString();
+      socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
+
+      if (isNew) {
+        const threadData = thread.toObject();
+        threadData.id = threadData._id.toString();
+        threadData.channel = await prisma.whatsAppChannel.findUnique({ where: { id: channelId }, select: CHANNEL_FIELDS });
+        socketService.emitToTenant(tenantId, 'thread_updated', threadData);
+      } else {
+        socketService.emitToTenant(tenantId, 'thread_updated', { id: thread._id.toString(), lastMessageAt: now });
+      }
+      return msgData;
+    } catch (error) {
+      logger.warn(`[ChatService] Could not record an outbound message in the conversation: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
    * Permanently deletes one conversation and all its messages (the contact stays in Contacts, and tickets
    * stay for the reports). If the customer writes again, a fresh conversation is created.
    */
@@ -114,7 +164,7 @@ class ChatService {
     if (!thread) throw { status: 404, message: 'Thread not found' };
     const channel = await prisma.whatsAppChannel.findUnique({
       where: { id: thread.channelId },
-      select: { id: true, phoneNumber: true, name: true, displayPhoneNumber: true, providerType: true }
+      select: CHANNEL_FIELDS
     });
     return { ...thread, id: thread._id.toString(), channel: channel || null };
   }
@@ -336,6 +386,7 @@ class ChatService {
 
     // Upsert Thread in MongoDB
     let thread = await ChatThread.findOne({ tenantId, channelId, contactPhone });
+    const isNewThread = !thread;
     // Previous customer message time (before this one) — flows start after a period of silence
     const previousInboundAt = thread ? thread.lastInboundAt || null : null;
 
@@ -454,6 +505,8 @@ class ChatService {
 
       const threadData = thread.toObject();
       threadData.id = threadData._id.toString();
+      // A conversation that appears live needs its channel too (the list shows it, and Meta-only tools depend on it)
+      if (isNewThread) threadData.channel = await prisma.whatsAppChannel.findUnique({ where: { id: channelId }, select: CHANNEL_FIELDS }).catch(() => null);
 
       const msgData = chatMessage.toObject();
       msgData.id = msgData._id.toString();

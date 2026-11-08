@@ -401,26 +401,24 @@
             
             <input 
               type="text" 
+              ref="msgInput"
               v-model="newMessage" 
               @input="handleInput"
               :placeholder="isRecording ? 'جاري التسجيل...' : (isInternal ? 'اكتب ملاحظة داخلية لفريق العمل (لن يراها العميل)… استخدم @ للإشارة إلى زميل' : (windowExpired ? (isAr ? 'أرسل قالباً، أو فعّل الملاحظة الداخلية 🔒' : 'Send a template, or switch to an internal note 🔒') : 'Type a message...'))"
               class="form-control msg-input"
               :class="{ 'input-internal': isInternal }"
-              :disabled="sending || isRecording || channelMissing || (windowExpired && !isInternal)"
+              :disabled="isRecording || channelMissing || (windowExpired && !isInternal)"
             />
             
             <button 
               type="submit" 
               class="btn-send" 
               :class="{ 'btn-send-internal': isInternal }"
-              :disabled="sending || isRecording || channelMissing || (!newMessage.trim() && !attachment) || (windowExpired && !isInternal)"
+              :disabled="isRecording || channelMissing || (!newMessage.trim() && !attachment) || (windowExpired && !isInternal)"
               :title="isInternal ? 'حفظ ملاحظة داخلية' : 'إرسال'"
             >
-              <template v-if="!sending">
-                <i class="fas fa-lock" v-if="isInternal"></i>
-                <i class="fas fa-paper-plane" v-else></i>
-              </template>
-              <i class="fas fa-spinner fa-spin" v-else></i>
+              <i class="fas fa-lock" v-if="isInternal"></i>
+              <i class="fas fa-paper-plane" v-else></i>
             </button>
           </form>
         </div>
@@ -706,7 +704,7 @@ const lastInboundTime = computed(() => {
 const isMetaThread = computed(() => selectedThread.value?.channel?.providerType === 'META_CLOUD')
 
 // The number this conversation was created on has been removed (it can be read, but nothing can be sent)
-const channelMissing = computed(() => !!selectedThread.value && !selectedThread.value.channel)
+const channelMissing = computed(() => !!selectedThread.value && selectedThread.value.channel === null)
 
 const deleteThread = async () => {
   const thread = selectedThread.value
@@ -801,7 +799,9 @@ const emojiWrapper = ref(null)
 const loadingThreads = ref(false)
 const creatingTicket = ref(false)
 const loadingMessages = ref(false)
-const sending = ref(false)
+const msgInput = ref(null)
+const focusInput = () => nextTick(() => msgInput.value?.focus())
+let pendingSeq = 0
 const messagesContainer = ref(null)
 
 // Rename state
@@ -1337,10 +1337,10 @@ const toggleRecording = async () => {
   }
 }
 
-const uploadFile = async () => {
-  if (!attachment.value) return null
+const uploadFile = async (file = attachment.value) => {
+  if (!file) return null
   const formData = new FormData()
-  formData.append('file', attachment.value)
+  formData.append('file', file)
   
   try {
     const baseURL = axios.defaults.baseURL || window.location.origin
@@ -1356,61 +1356,69 @@ const uploadFile = async () => {
   }
 }
 
+// The message appears at once (with a clock) and is replaced by the saved one when the server answers, so the
+// agent can keep typing without waiting for WhatsApp; if sending fails the text goes back into the box.
 const sendMessage = async () => {
-  if (!selectedThread.value) return
-  if (!newMessage.value.trim() && !attachment.value) return
+  const thread = selectedThread.value
+  if (!thread) return
+  const text = newMessage.value.trim()
+  const file = attachment.value
+  if (!text && !file) return
 
-  sending.value = true
+  const internal = isInternal.value
+  const mentions = internal ? mentionedKeys(newMessage.value) : []
+  let type = 'TEXT'
+  if (file) {
+    if (file.type.startsWith('image/')) type = 'IMAGE'
+    else if (file.type.startsWith('video/')) type = 'VIDEO'
+    else if (file.type.startsWith('audio/')) type = 'AUDIO'
+    else type = 'DOCUMENT'
+  }
+
+  const tempId = `pending-${++pendingSeq}`
+  const previewUrl = file ? URL.createObjectURL(file) : undefined
+  messages.value.push({
+    id: tempId, threadId: thread.id, direction: 'OUTBOUND', type, content: text, hasMedia: !!file,
+    mediaUrl: previewUrl, mediaMime: file?.type, status: 'SENDING', isInternal: internal, pending: true,
+    createdAt: new Date().toISOString()
+  })
+  newMessage.value = ''
+  attachment.value = null
+  showEmojiPicker.value = false
+  isInternal.value = false
+  if (fileInput.value) fileInput.value.value = ''
+  scrollToBottom()
+  focusInput()
+
   try {
-    let mediaUrl = null
-    let type = 'TEXT'
-    
-    if (attachment.value) {
-      mediaUrl = await uploadFile()
-      if (attachment.value.type.startsWith('image/')) type = 'IMAGE'
-      else if (attachment.value.type.startsWith('video/')) type = 'VIDEO'
-      else if (attachment.value.type.startsWith('audio/')) type = 'AUDIO'
-      else type = 'DOCUMENT'
-    }
-
-    const payload = {
-      content: newMessage.value.trim(),
-      isInternal: isInternal.value,
-      mentions: isInternal.value ? mentionedKeys(newMessage.value) : [],
-      type,
-      hasMedia: !!mediaUrl,
-      mediaUrl,
-      mediaMime: attachment.value?.type
-    }
-
-    const res = await axios.post(`/api/v1/chat/threads/${selectedThread.value.id}/messages`, payload)
+    const mediaUrl = file ? await uploadFile(file) : null
+    const res = await axios.post(`/api/v1/chat/threads/${thread.id}/messages`, {
+      content: text, isInternal: internal, mentions, type, hasMedia: !!mediaUrl, mediaUrl, mediaMime: file?.type
+    })
     const sentMsg = res.data.data
-    const exists = messages.value.find(m => m.id === sentMsg.id)
-    if (!exists) {
-      messages.value.push(sentMsg)
-    } else {
-      const idx = messages.value.findIndex(m => m.id === sentMsg.id)
-      messages.value.splice(idx, 1, sentMsg)
-    }
+    const tempIdx = messages.value.findIndex(m => m.id === tempId)
+    const realIdx = messages.value.findIndex(m => m.id === sentMsg.id)
+    if (tempIdx !== -1 && realIdx === -1) messages.value.splice(tempIdx, 1, sentMsg)   // swap the temporary one
+    else if (tempIdx !== -1) messages.value.splice(tempIdx, 1)                           // the live update already brought it
     // Update thread summary
-    const thread = threads.value.find(t => t.id === selectedThread.value.id)
-    if (thread) {
-      thread.lastMessageAt = res.data.data.createdAt
-      // Re-sort threads
+    const row = threads.value.find(t => t.id === thread.id)
+    if (row) {
+      row.lastMessageAt = sentMsg.createdAt
       threads.value.sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt))
     }
-
-    newMessage.value = ''
-    attachment.value = null
-    showEmojiPicker.value = false
-    isInternal.value = false
-    if (fileInput.value) fileInput.value.value = ''
     scrollToBottom()
   } catch (error) {
     console.error('Error sending message:', error)
-    alert(error.response?.data?.error?.message || 'Failed to send message.')
+    const idx = messages.value.findIndex(m => m.id === tempId)
+    if (idx !== -1) messages.value.splice(idx, 1)
+    // nothing is lost: the text (and file) go back where they were, unless the agent already started something new
+    if (!newMessage.value) newMessage.value = text
+    if (file && !attachment.value) attachment.value = file
+    if (internal) isInternal.value = true
+    alert(error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to send message.')
+    focusInput()
   } finally {
-    sending.value = false
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
   }
 }
 
@@ -1480,7 +1488,16 @@ onMounted(() => {
   socket.value.on('new_chat_message', (msg) => {
     // If the message belongs to the active thread, append it
     if (selectedThread.value && msg.threadId === selectedThread.value.id) {
-      // Check if it's not a duplicate (we might have pushed it optimistically, but we wait for response in this case)
+      // Our own message coming back: it replaces the temporary one shown while it was being sent
+      if (msg.direction === 'OUTBOUND') {
+        const pendingIdx = messages.value.findIndex(m => m.pending && m.content === msg.content && !!m.isInternal === !!msg.isInternal)
+        if (pendingIdx !== -1) {
+          messages.value.splice(pendingIdx, 1, msg)
+          scrollToBottom()
+          return
+        }
+      }
+      // Check if it's not a duplicate
       const exists = messages.value.find(m => m.id === msg.id)
       if (!exists) {
         messages.value.push(msg)

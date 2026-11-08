@@ -5,7 +5,7 @@ exports.sendMessage = async (req, res, next) => {
     const { phone, message, channelId, channel_id } = req.body;
     const tenantId = req.tenant.id;
     const resolvedChannelId = channelId || channel_id;
-    const result = await messageService.sendCustomMessage(tenantId, phone, message, resolvedChannelId);
+    const result = await messageService.sendCustomMessage(tenantId, phone, message, resolvedChannelId, { record: true });
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -53,7 +53,7 @@ exports.sendButtons = async (req, res, next) => {
     const { channelId, channel_id } = req.body;
     const resolvedChannelId = channelId || channel_id;
     const imageBuffer = req.file ? req.file.buffer : undefined;
-    const result = await messageService.sendButtonsMessage(tenantId, phone, text, parsedButtons, imageBuffer, resolvedChannelId);
+    const result = await messageService.sendButtonsMessage(tenantId, phone, text, parsedButtons, imageBuffer, resolvedChannelId, { record: true });
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -74,7 +74,7 @@ exports.sendList = async (req, res, next) => {
     const tenantId = req.tenant.id;
     const { channelId, channel_id } = req.body;
     const resolvedChannelId = channelId || channel_id;
-    const result = await messageService.sendListMessage(tenantId, phone, title, body, buttonText, parsedSections, resolvedChannelId);
+    const result = await messageService.sendListMessage(tenantId, phone, title, body, buttonText, parsedSections, resolvedChannelId, { record: true });
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -95,10 +95,10 @@ exports.sendLocation = async (req, res, next) => {
 
 exports.sendMetaTemplate = async (req, res, next) => {
   try {
-    const { phone, templateName, languageCode, components, channelId, channel_id } = req.body;
+    const { phone, templateName, languageCode, components, channelId, channel_id, previewText } = req.body;
     const tenantId = req.tenant.id;
     const resolvedChannelId = channelId || channel_id;
-    const result = await messageService.sendMetaTemplate(tenantId, phone, templateName, languageCode, components, resolvedChannelId);
+    const result = await messageService.sendMetaTemplate(tenantId, phone, templateName, languageCode, components, resolvedChannelId, { record: true, previewText: typeof previewText === 'string' ? previewText.slice(0, 4000) : undefined });
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -110,7 +110,7 @@ exports.sendFlow = async (req, res, next) => {
     const { phone, flowId, flowCta, flowBody, flowFooter, flowScreen, channelId, channel_id } = req.body;
     const tenantId = req.tenant.id;
     const resolvedChannelId = channelId || channel_id;
-    const result = await messageService.sendFlowMessage(tenantId, phone, flowId, flowCta, flowBody, flowFooter, flowScreen, resolvedChannelId);
+    const result = await messageService.sendFlowMessage(tenantId, phone, flowId, flowCta, flowBody, flowFooter, flowScreen, resolvedChannelId, { record: true });
     res.status(200).json(result);
   } catch (error) {
     next(error);

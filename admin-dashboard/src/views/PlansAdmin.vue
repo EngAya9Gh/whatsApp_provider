@@ -75,11 +75,7 @@
 
           <div class="form-group">
             <label>System Features (Permissions)</label>
-            <div class="features-checklist">
-              <label v-for="feat in availableFeatures" :key="feat">
-                <input type="checkbox" :value="feat" v-model="plan.featureFlags" /> {{ feat }}
-              </label>
-            </div>
+            <FeatureGroups v-model="plan.featureFlags" />
           </div>
 
           <div class="actions">
@@ -96,11 +92,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import FeatureGroups from '../components/FeatureGroups.vue'
 
 const plans = ref([])
 const loading = ref(true)
-
-const availableFeatures = ['META_CAMPAIGN', 'BAILEYS_CAMPAIGN', 'META_SEND_MESSAGE', 'BAILEYS_SEND_MESSAGE', 'META_AUTORESPONDER', 'BAILEYS_AUTORESPONDER', 'META_TEMPLATES', 'TEMPLATES', 'LIVE_CHAT', 'EXCEL_EXPORT', 'API_ACCESS']
 
 const fetchPlans = async () => {
   try {

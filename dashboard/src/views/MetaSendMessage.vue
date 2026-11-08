@@ -84,14 +84,14 @@
             <select v-model="selectedTemplateId" required class="form-input">
               <option value="" disabled>Choose an approved Meta template...</option>
               <option v-for="tpl in metaTemplates" :key="tpl.name + tpl.language" :value="tpl.name + '||' + tpl.language">
-                {{ tpl.name }} ({{ tpl.language }})
+                {{ tpl.name }} ({{ tpl.language }}){{ tpl.supported ? '' : (isAr ? ' — غير مدعوم هنا' : ' — not supported here') }}
               </option>
             </select>
 
             <!-- Variables of the chosen template -->
             <div v-if="selectedMeta" style="margin-top: 1rem;">
               <div v-if="!selectedMeta.supported" class="error-msg">
-                {{ isAr ? 'هذا القالب فيه وسائط أو أزرار (نسخ الكود/OTP) أو متغيرات لا يدعمها هذا النموذج.' : 'This template has media, copy-code/OTP buttons or variables this form cannot send.' }}
+                {{ unsupportedReason(selectedMeta, isAr) }}
               </div>
               <template v-else>
                 <div v-for="(n, i) in selectedMeta.variables" :key="'v' + n" style="margin-bottom: 0.75rem;">
@@ -150,7 +150,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { useMetaChannel } from '../composables/useMetaChannel'
-import { normalizeTemplate, buildPreview, buildComponents, varToken, urlPrefix } from '../utils/metaTemplate'
+import { normalizeTemplate, buildPreview, buildComponents, varToken, urlPrefix, unsupportedReason } from '../utils/metaTemplate'
 import { metaErrorText } from '../utils/metaErrors'
 
 const { locale } = useI18n()
@@ -398,6 +398,7 @@ const handleSend = async () => {
         templateName: selectedMeta.value.name,
         languageCode: selectedMeta.value.language,
         components: buildComponents(selectedMeta.value, metaVarValues.value, metaButtonValues.value),
+        previewText: metaPreview.value,
         channelId: channelId.value
       }, config)
     } else {

@@ -18,8 +18,8 @@ const HINTS = {
     en: 'No template with this name and language exists on the WhatsApp account behind this number. Check the selected channel and that the template is approved.'
   },
   132012: {
-    ar: 'صيغة أحد المتغيرات غير مقبولة (نص طويل أو أسطر جديدة أو مسافات كثيرة).',
-    en: 'A variable has an unacceptable format (too long, new lines, or too many spaces).'
+    ar: 'ما أُرسل لا يطابق صيغة القالب. السبب غالباً: قالب فيه وسائط أو شرائح (Carousel) أو أزرار بمتغيرات لم تُرسل، أو متغير بنص طويل أو أسطر جديدة. جرّب قالباً نصياً بسيطاً.',
+    en: 'What was sent does not match the template\'s format. Usually the template has media, a carousel or buttons with variables that were not sent, or a variable with long text or new lines. Try a plain text template.'
   },
   132015: { ar: 'القالب متوقف مؤقتاً بسبب جودته. استخدم قالباً آخر.', en: 'This template is paused because of its quality. Use another template.' },
   132016: { ar: 'تم تعطيل القالب نهائياً من ميتا. أنشئ قالباً جديداً.', en: 'Meta disabled this template. Create a new one.' },

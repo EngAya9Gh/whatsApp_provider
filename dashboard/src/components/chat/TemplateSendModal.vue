@@ -26,7 +26,7 @@
             :disabled="!tpl.supported"
             @click="choose(tpl)"
             class="w-full text-start border border-slate-200 rounded-xl p-3 bg-white transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 hover:enabled:border-[#FF6600]"
-            :title="tpl.supported ? '' : (isAr ? 'يحتوي وسائط أو أزرار نسخ/رمز تحقق أو متغيرات غير مدعومة هنا — أرسله من صفحة الإرسال' : 'Has media or variables not supported here — use the send page')"
+            :title="tpl.supported ? '' : unsupportedReason(tpl, isAr)"
           >
             <div class="flex items-center gap-2 mb-1">
               <span class="font-bold text-sm text-slate-800" dir="ltr">{{ tpl.name }}</span>
@@ -79,7 +79,7 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
-import { normalizeTemplate as normalize, buildPreview, varToken, urlPrefix } from '../../utils/metaTemplate'
+import { normalizeTemplate as normalize, buildPreview, varToken, urlPrefix, unsupportedReason } from '../../utils/metaTemplate'
 import { metaErrorText } from '../../utils/metaErrors'
 
 const props = defineProps({

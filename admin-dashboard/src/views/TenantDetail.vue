@@ -98,29 +98,24 @@
             </div>
             
             <div class="flex items-center gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <input type="checkbox" v-model="settingsForm.metaEnabled" id="metaToggle" class="w-5 h-5 text-orange-500 bg-white border-slate-300 rounded focus:ring-orange-500 focus:ring-2 accent-orange-500 cursor-pointer" />
-              <label for="metaToggle" class="font-semibold text-slate-700 text-sm cursor-pointer select-none">Enable Meta Cloud Features</label>
-            </div>
-
-            <div class="flex items-center gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
               <input type="checkbox" v-model="settingsForm.deductBalance" id="deductToggle" class="w-5 h-5 text-orange-500 bg-white border-slate-300 rounded focus:ring-orange-500 focus:ring-2 accent-orange-500 cursor-pointer" />
               <label for="deductToggle" class="font-semibold text-slate-700 text-sm cursor-pointer select-none">Deduct Balance (خصم الرصيد) - Enable wallet deduction for campaigns</label>
             </div>
 
             <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <label class="block text-sm font-semibold text-slate-700 mb-3 border-b border-slate-200 pb-2">Custom Feature Overrides</label>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div v-for="feat in availableFeatures" :key="feat" class="flex flex-col gap-1">
-                  <span class="text-xs font-bold text-slate-600">{{ feat }}</span>
-                  <select v-model="settingsForm.customFeatures[feat]" class="bg-white border border-slate-300 text-slate-700 text-xs rounded p-1.5 outline-none">
-                    <option :value="null">Default (From Plan)</option>
-                    <option :value="true">Always Enabled</option>
-                    <option :value="false">Always Disabled</option>
-                  </select>
+              <div class="flex items-start justify-between gap-3 mb-3 pb-3 border-b border-slate-200">
+                <div>
+                  <label class="block text-sm font-semibold text-slate-700">Access &amp; Features</label>
+                  <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Plan: <b>{{ tenant.plan }}</b>. Tick a whole section to turn on everything in it, untick it to turn everything off, or fine-tune single features.
+                    Features that differ from the plan are marked <b>Custom</b> and apply to this tenant only.
+                  </p>
                 </div>
+                <button type="button" @click="resetFeatures" class="shrink-0 text-xs font-semibold text-slate-600 hover:text-orange-600 underline bg-transparent border-none cursor-pointer">Reset to plan</button>
               </div>
+              <FeatureGroups v-model="effectiveFeatures" :plan-default="planFeatures" />
             </div>
-            
+
             <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
               <label class="block text-sm font-semibold text-slate-700 mb-2">Tenant Currency</label>
               <select v-model="settingsForm.currency" class="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 block w-full p-2 outline-none">
@@ -484,6 +479,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import FeatureGroups from '../components/FeatureGroups.vue'
+import { effectiveFeatures as effectiveOf, toOverrides, metaEnabledFor } from '../utils/featureCatalog'
 
 const route = useRoute()
 const tenant = ref(null)
@@ -543,7 +540,21 @@ const loadWalletTx = async (reset = true) => {
   }
 }
 
-const availableFeatures = ['META_CAMPAIGN', 'BAILEYS_CAMPAIGN', 'META_SEND_MESSAGE', 'BAILEYS_SEND_MESSAGE', 'META_AUTORESPONDER', 'BAILEYS_AUTORESPONDER', 'META_TEMPLATES', 'TEMPLATES', 'LIVE_CHAT', 'EXCEL_EXPORT', 'API_ACCESS']
+// What the tenant really has: the plan's features, then this tenant's overrides (the same rule the API applies).
+const planFeatures = computed(() => {
+  const plan = dbPlans.value.find(p => p.planCode === tenant.value?.plan)
+  return Array.isArray(plan?.featureFlags) ? plan.featureFlags : []
+})
+const effectiveFeatures = computed({
+  get: () => effectiveOf(planFeatures.value, settingsForm.value.customFeatures),
+  set(next) {
+    settingsForm.value.customFeatures = toOverrides(next, planFeatures.value, settingsForm.value.customFeatures)
+    settingsForm.value.metaEnabled = metaEnabledFor(next)
+  }
+})
+const resetFeatures = () => {
+  effectiveFeatures.value = [...planFeatures.value]
+}
 
 // Removed old invoice state, using dynamic state below
 
@@ -794,11 +805,6 @@ const fetchTenant = async () => {
     selectedPlan.value = tenant.value.plan
     
     const data = tenant.value
-    const populated = {}
-    const currentFeatures = data.customFeatures || {}
-    availableFeatures.forEach(f => {
-      populated[f] = currentFeatures[f] !== undefined ? currentFeatures[f] : null
-    })
 
     settingsForm.value = {
       monthlyLimit: data.monthlyLimit || 20,
