@@ -33,7 +33,7 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
           <span class="nav-label">{{ locale === 'ar' ? 'ربط Meta الرسمي' : 'Meta Connection' }}</span>
         </router-link>
-        <router-link v-if="!isSubUser || subUserPerms?.can_manage_settings" to="/connect" class="nav-item" active-class="active">
+        <router-link v-if="hasAnyQr && (!isSubUser || subUserPerms?.can_manage_settings)" to="/connect" class="nav-item" active-class="active">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           <span class="nav-label">{{ locale === 'ar' ? 'الربط بالباركود' : 'QR Connection' }}</span>
         </router-link>
@@ -74,7 +74,7 @@
         </router-link>
 
         <!-- STANDARD (QR WEB) -->
-        <template v-if="$hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('SEND_MESSAGE') || $hasFeature('BAILEYS_CAMPAIGN') || $hasFeature('TEMPLATES') || $hasFeature('BAILEYS_AUTORESPONDER')">
+        <template v-if="hasAnyQr">
           <div class="nav-section-title mt-4">{{ $t('sidebar.standard_mode') }}</div>
           <router-link v-if="($hasFeature('BAILEYS_SEND_MESSAGE') || $hasFeature('SEND_MESSAGE')) && (!isSubUser || subUserPerms?.can_send_message)" to="/send-message" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -201,6 +201,7 @@
 
 <script setup>
 import { tenantHasMeta } from './utils/meta-access'
+import { tenantHasQr } from './utils/qr-access'
 import { computed, ref, onMounted } from 'vue'
 import { connectSocket } from './services/realtime'
 import { useRouter, useRoute } from 'vue-router'
@@ -236,6 +237,8 @@ const showSidebar = computed(() => !route.meta.guest && !route.meta.hideSidebar 
 // Any Meta feature (or the admin's "Meta enabled" switch) unlocks the official connection page,
 // matching the backend's requireMetaEnabled and the Meta analytics link.
 const hasAnyMeta = computed(() => tenantHasMeta(tenant.value))
+// Same for the QR connection page and the "Standard (QR)" menu section: any QR feature unlocks them.
+const hasAnyQr = computed(() => tenantHasQr(tenant.value))
 
 // ── Sub-user awareness ────────────────────────────────────
 const isSubUser   = computed(() => !!tenant.value?.isSubUser)

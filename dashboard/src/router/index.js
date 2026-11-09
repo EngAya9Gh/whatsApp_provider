@@ -31,6 +31,8 @@ import MetaSendMessage from '../views/MetaSendMessage.vue'
 import MetaChatbot from '../views/MetaChatbot.vue'
 import MetaBusinessProfile from '../views/MetaBusinessProfile.vue'
 import MetaFlows from '../views/MetaFlows.vue'
+import { tenantHasQr } from '../utils/qr-access'
+import { tenantHasMeta } from '../utils/meta-access'
 
 const routes = [
   { path: '/login', component: Login, meta: { guest: true } },
@@ -103,6 +105,13 @@ router.beforeEach((to, from, next) => {
   if (to.meta.guest && token) {
     return next('/dashboard')
   } 
+
+  // --- Connection pages follow the account's features (the menu hides them too) ---
+  // Typing the address must not open a connection the admin switched off for this account.
+  if (to.meta.requiresAuth && tenant) {
+    if (to.path === '/connect' && !tenantHasQr(tenant)) return next('/dashboard')
+    if (to.path === '/connect-meta' && !tenantHasMeta(tenant)) return next('/dashboard')
+  }
 
   // --- Sub-User Permissions Guard ---
   if (to.meta.requiresAuth && tenant && tenant.isSubUser) {

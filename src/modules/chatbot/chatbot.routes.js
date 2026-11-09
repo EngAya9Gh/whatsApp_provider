@@ -24,7 +24,8 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 router.use(authMiddleware);
-router.use(requireFeature('AUTO_RESPONDER'));
+// The QR auto responder page is unlocked by BAILEYS_AUTORESPONDER (the new key) or the older AUTO_RESPONDER
+router.use(requireFeature.any(['AUTO_RESPONDER', 'BAILEYS_AUTORESPONDER'], 'Auto responder'));
 
 router.get('/', requirePermission('can_view_chatbot'), chatbotController.getRules);
 router.post('/', requirePermission('can_manage_chatbot'), upload.single('media'), chatbotController.createRule);
