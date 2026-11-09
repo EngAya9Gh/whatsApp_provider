@@ -191,22 +191,35 @@
       <div v-if="showCreateModal" class="modal-overlay">
         <div class="modal-lg">
           <div class="modal-header">
-            <h3>✨ إنشاء قالب رسالة Meta</h3>
+            <h3>✨ {{ isAr ? 'إنشاء قالب رسالة Meta' : 'Create a Meta message template' }}</h3>
             <button @click="showCreateModal = false" class="btn-close">&times;</button>
           </div>
 
           <div class="modal-body-split">
             <!-- Left: Instructions -->
             <div class="create-sidebar">
-              <h4>📋 إرشادات إنشاء القالب</h4>
-              <ul>
-                <li><span class="chk">✓</span> <strong>اسم القالب:</strong> أحرف صغيرة وشرطات. مثال: <code>order_confirm</code></li>
-                <li><span class="chk">✓</span> <strong>الفئة:</strong> اختر التسويق، التنبيهات، أو المصادقة.</li>
-                <li><span class="chk">✓</span> <strong>الرأس:</strong> اختياري (نص، صورة، فيديو).</li>
-                <li><span class="chk">✓</span> <strong>المتغيرات:</strong> استخدم <code>{{1}}</code> للنصوص الديناميكية.</li>
-                <li><span class="chk">✓</span> <strong>الأزرار:</strong> رد سريع، رابط، أو اتصال.</li>
-                <li class="warn"><span class="wrn">⚠</span> القالب يُرسل لـ Meta وقد يستغرق 24 ساعة للاعتماد.</li>
-              </ul>
+              <template v-if="isAr">
+                <h4>📋 إرشادات إنشاء القالب</h4>
+                <ul>
+                  <li><span class="chk">✓</span> <strong>اسم القالب:</strong> أحرف صغيرة وشرطات. مثال: <code>order_confirm</code></li>
+                  <li><span class="chk">✓</span> <strong>الفئة:</strong> اختر التسويق، التنبيهات، أو المصادقة.</li>
+                  <li><span class="chk">✓</span> <strong>الرأس:</strong> اختياري (نص، صورة، فيديو).</li>
+                  <li><span class="chk">✓</span> <strong>المتغيرات:</strong> استخدم <code v-pre>{{1}}</code> للنصوص الديناميكية.</li>
+                  <li><span class="chk">✓</span> <strong>الأزرار:</strong> رد سريع، رابط، أو اتصال.</li>
+                  <li class="warn"><span class="wrn">⚠</span> القالب يُرسل لـ Meta وقد يستغرق 24 ساعة للاعتماد.</li>
+                </ul>
+              </template>
+              <template v-else>
+                <h4>📋 Template guidelines</h4>
+                <ul>
+                  <li><span class="chk">✓</span> <strong>Name:</strong> lowercase letters and underscores, e.g. <code>order_confirm</code></li>
+                  <li><span class="chk">✓</span> <strong>Category:</strong> Marketing, Utility or Authentication.</li>
+                  <li><span class="chk">✓</span> <strong>Header:</strong> optional (text, image, video).</li>
+                  <li><span class="chk">✓</span> <strong>Variables:</strong> use <code v-pre>{{1}}</code> for dynamic text.</li>
+                  <li><span class="chk">✓</span> <strong>Buttons:</strong> quick reply, link or call.</li>
+                  <li class="warn"><span class="wrn">⚠</span> The template is sent to Meta for review, which can take up to 24 hours.</li>
+                </ul>
+              </template>
             </div>
 
             <!-- Right: Form -->
