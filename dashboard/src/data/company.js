@@ -12,6 +12,8 @@ export const COMPANY = {
     ar: 'عبدالله المخضوب، حي الوادي، الرياض 13313، المملكة العربية السعودية',
     en: 'Abdullah Al Makhdoub, Al Wadi Dist., Riyadh 13313, Saudi Arabia'
   },
-  // Date of the current version of the privacy policy and terms
-  legalUpdated: '2026-11-02'
+  // Date of the current version of the terms (and of the privacy policy, unless privacyUpdated is set)
+  legalUpdated: '2026-11-02',
+  // The privacy policy changed on its own: hosting providers and public-authority requests
+  privacyUpdated: '2026-11-09'
 }

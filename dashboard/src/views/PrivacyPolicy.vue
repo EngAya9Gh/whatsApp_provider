@@ -42,6 +42,7 @@
           <ul>
             <li><strong>Meta:</strong> تستخدم منصتنا واجهات <strong>WhatsApp Cloud API</strong> الرسمية، فتمر الرسائل الصادرة والواردة عبر خوادم شركة <strong>Meta</strong>، وتخضع لسياسة الخصوصية وشروط الاستخدام الخاصة بها.</li>
             <li><strong>Google (Gemini):</strong> عند استخدامك ميزات الذكاء الاصطناعي (ملخص المحادثة، اقتراح مرحلة العميل، الموظف الذكي) تُرسل نصوص المحادثة المعنية إلى خدمة Gemini من Google لمعالجتها. هذه الميزات اختيارية.</li>
+            <li><strong>مزودو الاستضافة:</strong> خوادم المنصة مستضافة لدى <strong>Hostinger</strong> في ألمانيا، وتُخزّن المحادثات في قاعدة بيانات <strong>MongoDB Atlas</strong> (على Google Cloud في الهند). يعالجون البيانات نيابةً عنا لتشغيل الخدمة فقط.</li>
             <li><strong>التكاملات التي تضبطها بنفسك:</strong> مثل نظام CRM أو روابط Webhook، تُرسل إليها البيانات التي تختارها فقط.</li>
           </ul>
         </section>
@@ -60,8 +61,19 @@
           </ul>
         </section>
 
+        <section id="government-requests">
+          <h2>7. طلبات الجهات الرسمية</h2>
+          <p>إذا طلبت جهة حكومية أو قضائية الاطلاع على بيانات المستخدمين، فإننا:</p>
+          <ul>
+            <li>نراجع الطلب للتأكد من أنه قانوني وصادر عن جهة مختصة.</li>
+            <li>نعترض على الطلب إذا رأينا أنه غير قانوني.</li>
+            <li>نقدّم أقل قدر من البيانات يلزم للرد على الطلب، وبالقدر الذي يسمح به القانون.</li>
+            <li>نوثّق كل طلب نتلقاه وكيف رددنا عليه.</li>
+          </ul>
+        </section>
+
         <section>
-          <h2>7. التواصل معنا</h2>
+          <h2>8. التواصل معنا</h2>
           <p>لأي سؤال عن هذه السياسة أو بياناتك: <a :href="`mailto:${COMPANY.email}`" dir="ltr">{{ COMPANY.email }}</a> أو <a :href="`tel:${COMPANY.phone}`" dir="ltr">{{ COMPANY.phoneDisplay }}</a></p>
         </section>
       </template>
@@ -100,6 +112,7 @@
           <ul>
             <li><strong>Meta:</strong> our platform uses the official <strong>WhatsApp Cloud API</strong>, so sent and received messages pass through <strong>Meta's</strong> servers and are subject to Meta's own privacy policy and terms.</li>
             <li><strong>Google (Gemini):</strong> when you use AI features (conversation summary, customer stage suggestions, the AI agent), the relevant conversation text is sent to Google's Gemini service for processing. These features are optional.</li>
+            <li><strong>Hosting providers:</strong> the platform's servers are hosted by <strong>Hostinger</strong> in Germany, and conversations are stored in <strong>MongoDB Atlas</strong> (on Google Cloud in India). They process data on our behalf only to run the service.</li>
             <li><strong>Integrations you set up:</strong> such as a CRM or webhook URLs receive only the data you choose to send them.</li>
           </ul>
         </section>
@@ -118,14 +131,25 @@
           </ul>
         </section>
 
+        <section id="government-requests">
+          <h2>7. Requests from Public Authorities</h2>
+          <p>If a government or judicial authority asks for access to user data, we:</p>
+          <ul>
+            <li>Review the request to confirm it is lawful and comes from a competent authority.</li>
+            <li>Challenge the request if we believe it is unlawful.</li>
+            <li>Disclose only the minimum data needed to answer the request, as far as the law permits.</li>
+            <li>Keep a record of every request we receive and how we responded.</li>
+          </ul>
+        </section>
+
         <section>
-          <h2>7. Contact Us</h2>
+          <h2>8. Contact Us</h2>
           <p>For any question about this policy or your data: <a :href="`mailto:${COMPANY.email}`">{{ COMPANY.email }}</a> or <a :href="`tel:${COMPANY.phone}`">{{ COMPANY.phoneDisplay }}</a></p>
         </section>
       </template>
 
       <div class="legal-footer">
-        {{ $i18n.locale === 'ar' ? 'آخر تحديث:' : 'Last updated:' }} {{ new Date(COMPANY.legalUpdated).toLocaleDateString($i18n.locale === 'ar' ? 'ar-SA-u-ca-gregory' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }) }}
+        {{ $i18n.locale === 'ar' ? 'آخر تحديث:' : 'Last updated:' }} {{ new Date(COMPANY.privacyUpdated || COMPANY.legalUpdated).toLocaleDateString($i18n.locale === 'ar' ? 'ar-SA-u-ca-gregory' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }) }}
         <div class="legal-entity">{{ $i18n.locale === 'ar' ? COMPANY.legalName.ar : COMPANY.legalName.en }} · {{ $i18n.locale === 'ar' ? 'سجل تجاري' : 'CR' }} {{ COMPANY.crNumber }}</div>
       </div>
     </div>
