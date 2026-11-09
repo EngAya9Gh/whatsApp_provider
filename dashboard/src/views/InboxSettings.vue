@@ -25,6 +25,44 @@
 
     <!-- ══ Tags ══ -->
     <section v-else-if="activeTab === 'tags'">
+      <!-- How tags are used -->
+      <div class="grid sm:grid-cols-3 gap-3 mb-5">
+        <div v-for="way in tagWays" :key="way.icon" class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+          <div class="w-9 h-9 rounded-xl bg-orange-50 text-[#FF6600] flex items-center justify-center mb-2"><i :class="way.icon"></i></div>
+          <div class="font-bold text-slate-800 text-sm">{{ way.title }}</div>
+          <p class="text-xs text-slate-500 mt-1 leading-relaxed">{{ way.desc }}</p>
+        </div>
+      </div>
+
+      <!-- Ready-made tags -->
+      <div v-if="missingSuggestions.length" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+          <div>
+            <h3 class="font-bold text-slate-800">{{ isAr ? 'وسوم جاهزة' : 'Ready-made tags' }}</h3>
+            <p class="text-sm text-slate-500 mt-0.5">{{ isAr ? 'اضغط وسماً لإضافته، أو أضفها كلها ثم عدّل أو احذف ما لا تحتاجه.' : 'Click a tag to add it, or add them all and then edit or delete what you do not need.' }}</p>
+          </div>
+          <button type="button" @click="addSuggestions(missingSuggestions)" :disabled="addingSuggestions" class="text-sm font-semibold text-[#FF6600] hover:text-[#E65C00] whitespace-nowrap bg-transparent border-none cursor-pointer disabled:opacity-50">
+            <i class="fas me-1" :class="addingSuggestions ? 'fa-spinner fa-spin' : 'fa-plus'"></i>{{ isAr ? 'أضف الكل' : 'Add all' }}
+          </button>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <button
+            v-for="s in missingSuggestions"
+            :key="s.en"
+            type="button"
+            :disabled="addingSuggestions"
+            @click="addSuggestions([s])"
+            class="flex items-center gap-3 text-start border border-slate-200 rounded-xl px-3 py-2.5 hover:border-[#FF6600] bg-white cursor-pointer transition-colors disabled:opacity-50"
+          >
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap" :style="chipStyle(s.color)">
+              <span class="w-1.5 h-1.5 rounded-full" :style="{ background: s.color }"></span>{{ isAr ? s.ar : s.en }}
+            </span>
+            <span class="text-xs text-slate-500 flex-1 min-w-0">{{ isAr ? s.whyAr : s.whyEn }}</span>
+            <i class="fas fa-plus text-slate-300"></i>
+          </button>
+        </div>
+      </div>
+
       <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
         <p class="text-sm text-slate-500">
           <i class="fas fa-thumbtack me-1 text-slate-400"></i>
@@ -75,17 +113,55 @@
 
     <!-- ══ Customer Stages ══ -->
     <section v-else>
-      <div class="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-5 flex gap-3 text-sm">
-        <i class="fas fa-circle-info mt-0.5 text-blue-500"></i>
-        <div class="text-blue-900">
-          <strong>{{ isAr ? 'ما الفرق بين المراحل والتذاكر؟' : 'Stages vs. tickets' }}</strong>
-          <p class="mt-1 text-blue-900/75 leading-relaxed">
+      <!-- How stages work -->
+      <details class="explain bg-white rounded-2xl border border-slate-200 shadow-sm mb-5" :open="explainOpen" @toggle="explainOpen = $event.target.open">
+        <summary class="px-5 py-4 cursor-pointer font-bold text-slate-800 flex items-center gap-2">
+          <i class="fas fa-circle-question text-blue-500"></i>
+          {{ isAr ? 'كيف تعمل مراحل العميل؟' : 'How do customer stages work?' }}
+          <i class="fas fa-chevron-down chev ms-auto text-slate-400 text-xs"></i>
+        </summary>
+        <div class="px-5 pb-5">
+          <p class="text-sm text-slate-600 leading-relaxed">
             {{ isAr
-              ? 'التذكرة تتبع طلب دعم واحد (مفتوحة أو مغلقة). المرحلة تتبع علاقتك بالعميل نفسه (مثلاً: جديد ← مهتم ← تم الدفع)، وتبقى معه مهما فتح من تذاكر.'
-              : 'A ticket tracks one support request (open or closed). A stage tracks your relationship with the customer (e.g. New → Interested → Paid) and stays with them across all their tickets.' }}
+              ? 'المرحلة تبيّن أين وصل كل عميل معك، مثل لوحة متابعة للمبيعات.'
+              : 'A stage shows how far each customer has come with you, like a sales board.' }}
+            <strong class="text-slate-800">{{ isAr ? 'لست مضطراً أن تعرف مسبقاً ماذا يريد العميل:' : 'You do not need to know in advance what the customer wants:' }}</strong>
+            {{ isAr
+              ? 'كل عميل جديد يبدأ في المرحلة الأولى، ثم تتغير مرحلته كلما تقدّمت المحادثة.'
+              : 'every new customer starts in the first stage, and their stage changes as the conversation moves on.' }}
+          </p>
+
+          <div class="mt-4 bg-slate-50 rounded-xl p-4">
+            <div class="text-xs font-bold text-slate-500 mb-3">{{ isAr ? 'مثال: رحلة عميل اسمه أحمد (قالب المبيعات)' : 'Example: the journey of a customer called Ahmad (Sales template)' }}</div>
+            <ol class="journey">
+              <li v-for="(step, i) in journey" :key="i" :class="{ lost: step.lost }">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap" :style="chipStyle(step.color)">
+                  <span class="w-1.5 h-1.5 rounded-full" :style="{ background: step.color }"></span>{{ step.stage }}
+                </span>
+                <span class="text-xs text-slate-600 leading-relaxed">{{ step.text }}</span>
+              </li>
+            </ol>
+          </div>
+
+          <div class="text-sm font-bold text-slate-700 mt-4 mb-2">{{ isAr ? 'من ينقل العميل بين المراحل؟' : 'Who moves the customer between stages?' }}</div>
+          <div class="grid sm:grid-cols-2 gap-2">
+            <div v-for="way in stageWays" :key="way.icon" class="flex gap-3 border border-slate-200 rounded-xl p-3">
+              <i :class="way.icon" class="text-[#FF6600] mt-0.5 w-4 text-center"></i>
+              <div>
+                <div class="font-semibold text-sm text-slate-800">{{ way.title }}</div>
+                <div class="text-xs text-slate-500 mt-0.5 leading-relaxed">{{ way.desc }}</div>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-xs text-slate-500 mt-4">
+            <i class="fas fa-circle-info me-1"></i>
+            {{ isAr
+              ? 'المرحلة غير التذكرة: التذكرة طلب دعم واحد يُفتح ويُغلق، أما المرحلة فتبقى مع العميل نفسه مهما فتح من تذاكر.'
+              : 'A stage is not a ticket: a ticket is one support request that opens and closes, while the stage stays with the customer across all their tickets.' }}
           </p>
         </div>
-      </div>
+      </details>
 
       <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5 flex items-center justify-between gap-4">
         <div>
@@ -97,24 +173,43 @@
         </button>
       </div>
 
-      <template v-if="stageForm.enabled">
-        <div class="mb-5">
-          <h3 class="text-sm font-bold text-slate-700 mb-3">{{ isAr ? 'ابدأ من قالب جاهز' : 'Start from a template' }}</h3>
-          <div class="grid sm:grid-cols-3 gap-3">
-            <button
-              v-for="preset in STAGE_PRESETS"
-              :key="preset.key"
-              type="button"
-              @click="applyPreset(preset)"
-              class="text-start bg-white border border-slate-200 rounded-xl p-4 hover:border-[#FF6600] hover:shadow-md transition-all cursor-pointer"
-            >
+      <div class="mb-5">
+        <h3 class="text-sm font-bold text-slate-700">{{ isAr ? 'ابدأ من قالب جاهز — أيّها أختار؟' : 'Start from a template — which one?' }}</h3>
+        <p class="text-xs text-slate-500 mt-0.5 mb-3">
+          {{ isAr
+            ? 'القالب يملأ المراحل لك، ثم تعدّل أسماءها وألوانها كما تريد. لا يُحفظ شيء حتى تضغط «حفظ المراحل».'
+            : 'A template fills in the stages for you; rename or recolor them as you like. Nothing is saved until you press "Save stages".' }}
+        </p>
+        <div class="grid sm:grid-cols-3 gap-3">
+          <button
+            v-for="preset in STAGE_PRESETS"
+            :key="preset.key"
+            type="button"
+            @click="applyPreset(preset)"
+            class="text-start bg-white border border-slate-200 rounded-xl p-4 hover:border-[#FF6600] hover:shadow-md transition-all cursor-pointer flex flex-col"
+          >
+            <div class="flex items-center justify-between gap-2">
               <i :class="preset.icon" class="text-[#FF6600] text-lg"></i>
-              <div class="font-bold text-slate-800 mt-2">{{ isAr ? preset.nameAr : preset.nameEn }}</div>
-              <div class="text-xs text-slate-500 mt-1">{{ isAr ? preset.descAr : preset.descEn }}</div>
-            </button>
-          </div>
+              <span v-if="preset.recommended" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{{ isAr ? 'الأكثر استخداماً' : 'Most used' }}</span>
+            </div>
+            <div class="font-bold text-slate-800 mt-2">{{ isAr ? preset.nameAr : preset.nameEn }}</div>
+            <div class="text-xs text-slate-500 mt-1 leading-relaxed">{{ isAr ? preset.descAr : preset.descEn }}</div>
+            <div class="mt-3 flex flex-wrap items-center gap-1">
+              <template v-for="(s, i) in preset.main" :key="s.en">
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap" :style="chipStyle(s.color)">{{ isAr ? s.ar : s.en }}</span>
+                <i v-if="i < preset.main.length - 1" class="fas text-[9px] text-slate-300" :class="isAr ? 'fa-arrow-left' : 'fa-arrow-right'"></i>
+              </template>
+            </div>
+            <div v-if="preset.lost.length" class="mt-1.5 flex flex-wrap items-center gap-1">
+              <span class="text-[10px] text-slate-400">{{ isAr ? 'إن لم يكمل:' : 'If they drop off:' }}</span>
+              <span v-for="s in preset.lost" :key="s.en" class="px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap opacity-75" :style="chipStyle(s.color)">{{ isAr ? s.ar : s.en }}</span>
+            </div>
+            <span class="mt-auto pt-3 text-xs font-bold text-[#FF6600]">{{ isAr ? 'استخدم هذا القالب' : 'Use this template' }}</span>
+          </button>
         </div>
+      </div>
 
+      <template v-if="stageForm.enabled">
         <div class="grid md:grid-cols-2 gap-4 mb-5">
           <div v-for="path in paths" :key="path.group" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
             <div class="flex items-start justify-between gap-3 mb-4">
@@ -282,7 +377,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import Swal from 'sweetalert2'
-import { LABEL_COLORS, STAGE_PRESETS } from '../data/chatLabels'
+import { LABEL_COLORS, STAGE_PRESETS, TAG_SUGGESTIONS } from '../data/chatLabels'
 
 const { locale } = useI18n()
 const isAr = computed(() => locale.value === 'ar')
@@ -311,6 +406,46 @@ const tags = ref([])
 const showTagModal = ref(false)
 const savingTag = ref(false)
 const tagForm = ref({ id: null, name: '', color: LABEL_COLORS[0], isPinned: false })
+
+const tagWays = computed(() => [
+  {
+    icon: 'fas fa-user-pen',
+    title: isAr.value ? 'فريقك يضعها' : 'Your team adds them',
+    desc: isAr.value ? 'من زر الوسوم أعلى أي محادثة في المحادثات المباشرة.' : 'With the tags button at the top of any conversation in Live Chat.'
+  },
+  {
+    icon: 'fas fa-diagram-project',
+    title: isAr.value ? 'السير يضعها تلقائياً' : 'Flows add them for you',
+    desc: isAr.value ? 'بخطوة «وسم» في سير الواتساب، مثلاً عندما يضغط العميل زر «شكوى».' : 'With a "Tag" step in a chat flow, e.g. when the customer taps "Complaint".'
+  },
+  {
+    icon: 'fas fa-filter',
+    title: isAr.value ? 'تفلتر بها المحادثات' : 'Filter conversations',
+    desc: isAr.value ? 'اختر وسماً أعلى قائمة المحادثات. الوسم المثبّت يظهر هناك كزر سريع.' : 'Pick a tag above the conversation list. Pinned tags show there as quick buttons.'
+  }
+])
+
+const norm = (s) => String(s || '').trim().toLowerCase()
+const missingSuggestions = computed(() => TAG_SUGGESTIONS.filter(s => !tags.value.some(t => [norm(s.ar), norm(s.en)].includes(norm(t.name)))))
+const addingSuggestions = ref(false)
+
+const addSuggestions = async (list) => {
+  addingSuggestions.value = true
+  try {
+    for (const s of list) {
+      try {
+        await axios.post('/api/v1/chat/tags', { name: isAr.value ? s.ar : s.en, color: s.color, isPinned: !!s.pinned })
+      } catch (err) {
+        if (err.response?.status !== 409) throw err // 409: a tag with this name already exists
+      }
+    }
+    await fetchTags()
+  } catch (err) {
+    Swal.fire({ icon: 'error', title: isAr.value ? 'تعذّر الحفظ' : 'Could not save', text: errorMessage(err), confirmButtonColor: '#FF6600' })
+  } finally {
+    addingSuggestions.value = false
+  }
+}
 
 const fetchTags = async () => {
   const res = await axios.get('/api/v1/chat/tags')
@@ -375,6 +510,43 @@ let keySeq = 0
 const toLocalStage = (stage) => ({ key: `s${keySeq++}`, id: stage.id || null, name: stage.name, color: stage.color, group: stage.group })
 
 const stageForm = ref({ enabled: false, autoAssignEntry: true, channelIds: [], stages: [] })
+const explainOpen = ref(true)
+
+// Example journey, from the Sales template
+const journey = computed(() => {
+  const [fresh, interested, paid] = STAGE_PRESETS[0].main
+  const cold = STAGE_PRESETS[0].lost[0]
+  const name = (s) => (isAr.value ? s.ar : s.en)
+  return [
+    { stage: name(fresh), color: fresh.color, text: isAr.value ? 'راسلك أحمد لأول مرة، فدخل المرحلة الأولى تلقائياً.' : 'Ahmad writes to you for the first time and enters the first stage automatically.' },
+    { stage: name(interested), color: interested.color, text: isAr.value ? 'سأل عن الأسعار وطلب التفاصيل، فنقلته أنت لهذه المرحلة (أو اقترحها الذكاء الاصطناعي).' : 'He asks about prices and details, so you move him here (or the AI suggests it).' },
+    { stage: name(paid), color: paid.color, text: isAr.value ? 'أكمل الطلب ودفع. هذه مرحلة النجاح.' : 'He orders and pays. This is the success stage.' },
+    { stage: name(cold), color: cold.color, lost: true, text: isAr.value ? 'ولو توقف عن الرد، تنقله لمسار الخسارة وترجع له بعرض لاحقاً.' : 'Had he stopped replying, you would move him to the loss path and follow up with an offer later.' }
+  ]
+})
+
+const stageWays = computed(() => [
+  {
+    icon: 'fas fa-bolt',
+    title: isAr.value ? 'تلقائياً عند أول رسالة' : 'Automatically on the first message',
+    desc: isAr.value ? 'كل عميل جديد يدخل المرحلة الأولى (الخيار في أسفل الصفحة).' : 'Every new customer enters the first stage (option at the bottom of the page).'
+  },
+  {
+    icon: 'fas fa-hand-pointer',
+    title: isAr.value ? 'أنت أو فريقك' : 'You or your team',
+    desc: isAr.value ? 'من قائمة المرحلة أعلى المحادثة في المحادثات المباشرة.' : 'With the stage menu at the top of the conversation in Live Chat.'
+  },
+  {
+    icon: 'fas fa-robot',
+    title: isAr.value ? 'اقتراح الذكاء الاصطناعي' : 'AI suggestion',
+    desc: isAr.value ? 'بطاقة «اقتراح مرحلة» فوق رسائل المحادثة، تقبلها أو ترفضها. تحتاج مفتاح Gemini.' : 'A "Suggested stage" card above the messages that you accept or reject. Needs a Gemini key.'
+  },
+  {
+    icon: 'fas fa-diagram-project',
+    title: isAr.value ? 'سير الواتساب' : 'Chat flows',
+    desc: isAr.value ? 'خطوة «مرحلة العميل»، مثلاً عندما يضغط العميل «أريد الشراء».' : 'A "Customer stage" step, e.g. when the customer taps "I want to buy".'
+  }
+])
 const channelMode = ref('all')
 const savingStages = ref(false)
 
@@ -414,6 +586,8 @@ const fetchStages = async () => {
     stages: (data.stages || []).map(toLocalStage)
   }
   channelMode.value = stageForm.value.channelIds.length > 0 ? 'selected' : 'all'
+  // Open the explanation for owners who have not set up stages yet
+  explainOpen.value = !(data.enabled && (data.stages || []).length > 0)
 }
 
 const addStage = (group) => {
@@ -461,10 +635,17 @@ const applyPreset = async (preset) => {
     if (!confirm.isConfirmed) return
   }
   const name = (s) => (isAr.value ? s.ar : s.en)
+  stageForm.value.enabled = true
   stageForm.value.stages = [
     ...preset.main.map(s => toLocalStage({ name: name(s), color: s.color, group: 'MAIN' })),
     ...preset.lost.map(s => toLocalStage({ name: name(s), color: s.color, group: 'LOST' }))
   ]
+  Swal.fire({
+    icon: 'success',
+    title: isAr.value ? 'جهّزنا المراحل' : 'Stages ready',
+    text: isAr.value ? 'راجع الأسماء والألوان، ثم اضغط «حفظ المراحل» في أسفل الصفحة.' : 'Check the names and colors, then press "Save stages" at the bottom of the page.',
+    confirmButtonColor: '#FF6600'
+  })
 }
 
 const saveStages = async () => {
@@ -525,3 +706,14 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.explain summary { list-style: none; }
+.explain summary::-webkit-details-marker { display: none; }
+.explain[open] .chev { transform: rotate(180deg); }
+.chev { transition: transform 0.15s; }
+.journey { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.journey li { display: flex; align-items: flex-start; gap: 10px; position: relative; }
+.journey li > span:first-child { min-width: 92px; justify-content: center; }
+.journey li.lost { padding-top: 10px; border-top: 1px dashed #cbd5e1; }
+</style>

@@ -15,6 +15,7 @@
           : `First message, or after ${data.inactivityHours || 24}h of silence` }}
       </template>
       <template v-else-if="type === 'message'">
+        <span v-if="data.sample" class="sample"><i class="fas fa-pen"></i> {{ ctx.isAr.value ? 'مثال — عدّله' : 'Example — edit it' }}</span>
         <div class="clamp">{{ data.text || placeholder }}</div>
       </template>
       <template v-else-if="type === 'question'">
@@ -144,6 +145,8 @@ const conditionSummary = computed(() => {
 .fnode-error { color: #d03b3b; }
 .fnode-body { padding: 9px 12px; line-height: 1.55; white-space: pre-line; }
 .fnode-body strong { color: #0f172a; }
+.sample { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 4px; padding: 1px 7px; border-radius: 999px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.sample i { font-size: 9px; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .mb { margin-bottom: 2px; }
 .fnode-branches { border-top: 1px solid #f1f5f9; padding: 4px 0; }

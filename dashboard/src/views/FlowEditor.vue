@@ -14,6 +14,9 @@
         <template v-else-if="saveState === 'saved'"><i class="fas fa-check"></i> {{ isAr ? 'حُفظت المسودة' : 'Draft saved' }}</template>
         <template v-else-if="saveState === 'error'"><i class="fas fa-triangle-exclamation"></i> {{ isAr ? 'تعذّر الحفظ' : 'Could not save' }}</template>
       </span>
+      <button v-if="!loading && !loadError" type="button" class="templates-btn" @click="showTemplates = true">
+        <i class="fas fa-shapes"></i><span>{{ isAr ? 'نماذج جاهزة' : 'Templates' }}</span>
+      </button>
       <label class="active-toggle" :class="{ disabled: !publishedVersion }" :title="!publishedVersion ? (isAr ? 'انشر السير أولاً' : 'Publish first') : ''">
         <span class="text-sm font-semibold" :class="isActive ? 'text-emerald-600' : 'text-slate-500'">
           {{ isActive ? (isAr ? 'السير مفعّل' : 'Flow is on') : (isAr ? 'السير متوقف' : 'Flow is off') }}
@@ -54,6 +57,7 @@
           :min-zoom="0.3"
           :max-zoom="1.5"
           fit-view-on-init
+          @pane-ready="(instance) => (flowInstance = instance)"
           @connect="onConnect"
           @node-click="({ node }) => (selectedId = node.id)"
           @pane-click="selectedId = null"
@@ -80,6 +84,15 @@
           @option-removed="(optId) => removeEdgesFrom(selectedNode.id, `opt-${optId}`)"
         />
         <div v-else class="palette">
+          <button type="button" class="templates-card" @click="showTemplates = true">
+            <span class="palette-icon" style="background: #FF6600"><i class="fas fa-shapes"></i></span>
+            <span class="flex-1 text-start">
+              <span class="block font-bold text-slate-800 text-sm">{{ isAr ? 'لا تعرف من أين تبدأ؟' : 'Not sure where to start?' }}</span>
+              <span class="block text-xs text-slate-500">{{ isAr ? 'اختر نموذجاً جاهزاً مشروحاً، ثم عدّل نصوصه.' : 'Pick an explained ready-made flow, then edit its texts.' }}</span>
+            </span>
+            <i class="fas text-[#FF6600]" :class="isAr ? 'fa-chevron-left' : 'fa-chevron-right'"></i>
+          </button>
+
           <h3 class="font-bold text-slate-800">{{ isAr ? 'الخطوات' : 'Steps' }}</h3>
           <p class="text-xs text-slate-500 mt-1 mb-4">
             {{ isAr ? 'انقر خطوة لإضافتها أسفل الخطوة المحددة. اسحب من النقاط الصغيرة لتوصيل الخطوات.' : 'Click a step to add it below the selected one. Drag from the small dots to connect steps.' }}
@@ -104,6 +117,16 @@
         </div>
       </aside>
     </div>
+
+    <FlowTemplates
+      v-if="showTemplates"
+      :is-ar="isAr"
+      :ai-ready="aiReady"
+      :stages-enabled="stagesEnabled"
+      :busy="applyingTemplate"
+      @close="showTemplates = false"
+      @use="useTemplate"
+    />
   </div>
 </template>
 
@@ -121,7 +144,9 @@ import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
 import FlowNode from '../components/flows/FlowNode.vue'
 import NodeSettings from '../components/flows/NodeSettings.vue'
+import FlowTemplates from '../components/flows/FlowTemplates.vue'
 import { FLOW_NODE_TYPES, outputHandles } from '../data/flowNodes'
+import { findTag, pickInterestedStage } from '../data/flowTemplates'
 
 const { locale } = useI18n()
 const isAr = computed(() => locale.value === 'ar')
@@ -146,6 +171,12 @@ const tags = ref([])
 const stages = ref([])
 const agents = ref([])
 const teamName = ref('')
+const stagesEnabled = ref(false)
+const aiReady = ref(null) // Gemini key + business info; null when unknown
+
+const showTemplates = ref(false)
+const applyingTemplate = ref(false)
+let flowInstance = null
 
 const nodeTypes = Object.fromEntries(Object.keys(FLOW_NODE_TYPES).map(t => [t, markRaw(FlowNode)]))
 const addableTypes = Object.fromEntries(Object.entries(FLOW_NODE_TYPES).filter(([, m]) => m.addable !== false))
@@ -244,6 +275,70 @@ const onNodesChange = (changes) => {
   if (changes.some(c => c.type === 'remove' && c.id === selectedId.value)) selectedId.value = null
 }
 
+// ─── Ready-made flows ─────────────────────────────────────────
+// Only the start step and the default welcome message, never published
+const isPristine = computed(() => !publishedVersion.value && nodes.value.filter(n => n.type !== 'trigger').length <= 1)
+
+/** Tags the template needs: reuse ones with the same name, create (and pin) the missing ones */
+const resolveTags = async (tpl) => {
+  const ids = {}
+  for (const need of tpl.tags || []) {
+    let tag = findTag(tags.value, need)
+    if (!tag) {
+      try {
+        const res = await axios.post('/api/v1/chat/tags', { name: isAr.value ? need.ar : need.en, color: need.color, isPinned: true })
+        tag = res.data.data
+        tags.value = [...tags.value, tag]
+      } catch (err) {
+        console.error('Could not create template tag', err)
+      }
+    }
+    ids[need.key] = tag?.id || ''
+  }
+  return ids
+}
+
+const useTemplate = async (tpl) => {
+  if (!isPristine.value) {
+    const answer = await Swal.fire({
+      icon: 'question',
+      title: isAr.value ? 'استبدال الخطوات الحالية؟' : 'Replace the current steps?',
+      text: isAr.value
+        ? 'ستحل خطوات النموذج محل خطوات المسودة. ما يراه العملاء الآن لا يتغير حتى تنشر.'
+        : 'The template replaces the steps in your draft. What customers see now does not change until you publish.',
+      showCancelButton: true,
+      confirmButtonColor: '#FF6600',
+      confirmButtonText: isAr.value ? 'استبدال' : 'Replace',
+      cancelButtonText: isAr.value ? 'إلغاء' : 'Cancel'
+    })
+    if (!answer.isConfirmed) return
+  }
+  applyingTemplate.value = true
+  try {
+    const tagIds = await resolveTags(tpl)
+    const stageId = tpl.usesStage && stagesEnabled.value ? pickInterestedStage(stages.value)?.id || '' : ''
+    const inactivityHours = nodes.value.find(n => n.type === 'trigger')?.data?.inactivityHours || 24
+    const g = tpl.build({ isAr: isAr.value, inactivityHours, tagIds, stageId })
+    nodes.value = g.nodes.map(n => ({ ...n, deletable: n.type !== 'trigger' }))
+    edges.value = g.edges
+    problems.value = []
+    selectedId.value = null
+    showTemplates.value = false
+    await nextTick()
+    setTimeout(() => flowInstance?.fitView({ padding: 0.15 }), 60)
+    Swal.fire({
+      icon: 'success',
+      title: isAr.value ? 'تم تجهيز السير' : 'Flow ready',
+      text: isAr.value
+        ? 'اضغط أي خطوة لتعديلها. الرسائل المعلّمة بـ«مثال» اكتب فيها معلوماتك، ثم انشر.'
+        : 'Click any step to edit it. Write your own details in messages marked "Example", then publish.',
+      confirmButtonColor: '#FF6600'
+    })
+  } finally {
+    applyingTemplate.value = false
+  }
+}
+
 // ─── Draft autosave ───────────────────────────────────────────
 const clean = () => ({
   nodes: nodes.value.map(n => ({ id: n.id, type: n.type, position: { x: Math.round(n.position.x), y: Math.round(n.position.y) }, data: n.data })),
@@ -291,6 +386,26 @@ const applyFlow = async (flow) => {
 
 // ─── Publish / discard / on-off ───────────────────────────────
 const publish = async () => {
+  // Template example texts (prices, opening times) should not reach customers by accident
+  const samples = nodes.value.filter(n => n.type === 'message' && n.data?.sample)
+  if (samples.length) {
+    const answer = await Swal.fire({
+      icon: 'warning',
+      title: isAr.value ? 'رسائل ما زالت بنص المثال' : 'Some messages still have example text',
+      text: isAr.value
+        ? `${samples.length === 1 ? 'رسالة واحدة' : `${samples.length} رسائل`} من النموذج فيها معلومات مثال (مثل الأسعار أو الأوقات). عدّلها قبل أن يراها العملاء.`
+        : `${samples.length} template message(s) still have example details (like prices or opening times). Edit them before customers see them.`,
+      showCancelButton: true,
+      confirmButtonColor: '#FF6600',
+      confirmButtonText: isAr.value ? 'عدّلها الآن' : 'Edit now',
+      cancelButtonText: isAr.value ? 'انشر كما هي' : 'Publish as is'
+    })
+    if (answer.isConfirmed) {
+      selectedId.value = samples[0].id
+      return
+    }
+    if (answer.dismiss !== Swal.DismissReason.cancel) return
+  }
   publishing.value = true
   try {
     await saveDraft()
@@ -371,9 +486,18 @@ onMounted(async () => {
     channel.value = flow.channel
     tags.value = tagsRes.data.data || []
     stages.value = stagesRes.data.data?.stages || []
+    stagesEnabled.value = !!stagesRes.data.data?.enabled && stages.value.length > 0
     agents.value = (teamRes.data.data || []).filter(a => a.isActive !== false)
     teamName.value = (teamsRes.data.data || []).find(t => t.channelIds.includes(channelId))?.name || ''
     await applyFlow(flow)
+    // First visit: offer the ready-made flows straight away
+    if (isPristine.value && !flow.hasDraftChanges) showTemplates.value = true
+    axios.get('/api/v1/ai/agent')
+      .then(res => {
+        const agent = res.data.data || {}
+        aiReady.value = !!agent.aiConfigured && (agent.knowledge || []).some(k => String(k.content || '').trim())
+      })
+      .catch(() => { aiReady.value = null })
   } catch (err) {
     loadError.value = err.response?.status === 403
       ? (isAr.value ? 'سير الواتساب غير متاح في اشتراكك أو صلاحياتك.' : 'Chat flows are not available on your plan or permissions.')
@@ -411,11 +535,18 @@ onBeforeUnmount(() => {
 .canvas { flex: 1; min-width: 0; background: #fafbfc; }
 .panel { width: 340px; border-inline-start: 1px solid #f1f5f9; background: white; overflow-y: auto; }
 .palette { padding: 16px; }
+.templates-btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 10px; border: 1px solid #fed7aa; background: #fff7ed; color: #c2410c; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.templates-btn:hover { background: #ffedd5; }
+.templates-card { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px; margin-bottom: 16px; border: 1.5px dashed #fdba74; border-radius: 12px; background: #fffaf5; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.templates-card:hover { border-color: #FF6600; background: #fff7ed; }
 .palette-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
 .palette-item:hover { border-color: #FF6600; box-shadow: 0 2px 8px rgba(255, 102, 0, 0.08); }
 .palette-icon { width: 32px; height: 32px; border-radius: 10px; color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
 .problems { margin-top: 18px; padding: 12px; border-radius: 12px; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
 .problem { display: block; width: 100%; text-align: start; background: none; border: none; color: #b91c1c; font-size: 12px; padding: 4px 0; cursor: pointer; text-decoration: underline; text-decoration-color: #fecaca; }
+@media (max-width: 640px) {
+  .templates-btn span { display: none; }
+}
 @media (max-width: 900px) {
   .workspace { flex-direction: column; }
   .panel { width: 100%; height: 45%; border-inline-start: none; border-top: 1px solid #f1f5f9; }

@@ -16,6 +16,11 @@
     </div>
 
     <div class="settings-body">
+      <div v-if="meta.helpAr" class="help">
+        <i class="fas fa-lightbulb"></i>
+        <span>{{ isAr ? meta.helpAr : meta.helpEn }}</span>
+      </div>
+
       <!-- Start -->
       <template v-if="node.type === 'trigger'">
         <label class="lbl">{{ isAr ? 'يبدأ السير عندما يراسلك العميل لأول مرة، أو بعد مدة صمت:' : 'Starts on the first message, or after a silence of:' }}</label>
@@ -29,7 +34,11 @@
       <!-- Message -->
       <template v-else-if="node.type === 'message'">
         <label class="lbl">{{ isAr ? 'نص الرسالة' : 'Message text' }}</label>
-        <textarea v-model="node.data.text" rows="5" maxlength="4096" class="inp"></textarea>
+        <div v-if="node.data.sample" class="sample-note">
+          <i class="fas fa-pen"></i>
+          {{ isAr ? 'هذا نص مثال من النموذج — اكتب فيه معلوماتك الحقيقية.' : 'This is example text from the template — write your real details.' }}
+        </div>
+        <textarea v-model="node.data.text" rows="5" maxlength="4096" class="inp" @input="clearSample"></textarea>
         <div class="counter">{{ (node.data.text || '').length }} / 4096</div>
       </template>
 
@@ -200,6 +209,11 @@ const options = computed(() => props.node.data.options || [])
 // Meta limits: button title 20 chars, list row title 24
 const titleLimit = computed(() => (options.value.length <= 3 ? 20 : 24))
 
+// Editing a template's example text makes it the owner's own
+const clearSample = () => {
+  if (props.node.data.sample) delete props.node.data.sample
+}
+
 const addOption = () => {
   props.node.data.options = [...options.value, { id: newOptionId(), title: '' }]
 }
@@ -216,6 +230,9 @@ const removeOption = (optionId) => {
 .head-icon { width: 32px; height: 32px; border-radius: 10px; color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
 .errors { margin: 12px 16px 0; padding: 10px 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; color: #b91c1c; font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
 .settings-body { padding: 16px; overflow-y: auto; flex: 1; }
+.help { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 14px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 12px; line-height: 1.65; color: #475569; }
+.help i { color: #f59e0b; margin-top: 3px; }
+.sample-note { margin-bottom: 6px; padding: 6px 9px; border-radius: 8px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 11.5px; }
 .lbl { display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 6px; }
 .inp { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 13px; outline: none; background: white; resize: vertical; }
 .inp:focus { border-color: #FF6600; box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.12); }

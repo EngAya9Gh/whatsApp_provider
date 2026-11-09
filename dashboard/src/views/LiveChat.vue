@@ -67,9 +67,7 @@
                 <button @click.stop="quickAssign(thread)" class="btn-icon small text-slate-400 hover:text-[#FF6600]" title="إسناد المحادثة" style="background:transparent; border:none; padding:2px;">
                   <i class="fas fa-user-plus"></i>
                 </button>
-                <span class="channel-tag" v-if="thread.channel?.displayPhoneNumber || thread.channel?.phoneNumber">
-                  {{ thread.channel.displayPhoneNumber || thread.channel.phoneNumber }}
-                </span>
+                <span class="channel-tag" v-if="channelTag(thread)">{{ channelTag(thread) }}</span>
                 <span class="unread-badge" v-if="thread.unreadCount > 0">{{ thread.unreadCount }}</span>
               </div>
               <div class="thread-labels" v-if="threadStage(thread) || threadTags(thread).length > 0">
@@ -493,6 +491,11 @@ const messages = ref([])
 const selectedThread = ref(null)
 const searchQuery = ref('')
 const channels = ref([])
+// Which number a conversation came in on: only useful with several numbers and no number filter
+const channelTag = (thread) => {
+  if (channels.value.length < 2 || selectedChannel.value || !thread.channel) return ''
+  return thread.channel.name || thread.channel.displayPhoneNumber || thread.channel.phoneNumber || ''
+}
 const selectedChannel = ref('')
 const newMessage = ref('')
 const quickReplies = ref([])
