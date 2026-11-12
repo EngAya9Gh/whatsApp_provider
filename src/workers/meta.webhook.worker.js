@@ -25,6 +25,13 @@ const worker = new Worker('meta-webhook-queue', async (job) => {
     await processIncomingMessage(channelId, tenantId, payload);
   } else if (type === 'STATUS_UPDATE') {
     await processStatusUpdate(channelId, tenantId, payload);
+  } else if (type === 'COEX_EVENT') {
+    // WhatsApp Business app numbers: messages sent from the app, old chats, the app's contacts
+    await require('../modules/meta/meta.coexistence').processEvent(channelId, payload);
+  } else if (type === 'COEX_SYNC') {
+    await require('../modules/meta/meta.coexistence').runSyncJob(channelId);
+  } else if (type === 'ACCOUNT_UPDATE') {
+    await require('../modules/meta/meta.coexistence').processAccountUpdate(payload);
   }
 }, { connection: redisConfig, concurrency: 10 });
 

@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
 const { metaErrorText } = require('./meta.errors');
+const coexistence = require('./meta.coexistence');
 
 const META_FB_APP_ID = process.env.META_FB_APP_ID;
 const META_APP_SECRET = process.env.META_APP_SECRET;
@@ -55,12 +56,14 @@ const metaError = (err) => err.response?.data?.error?.message || err.message;
  */
 exports.exchangeCode = async (req, res, next) => {
   try {
-    const { code, phone_number_id, waba_id, signup_event } = req.body;
+    const { code, waba_id, signup_event, history_months } = req.body;
+    let { phone_number_id } = req.body;
     const tenantId = req.tenant.id;
-    const isCoexistence = signup_event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING';
+    const isCoexistence = signup_event === coexistence.COEX_EVENT;
     const warnings = [];
 
-    if (!code || !phone_number_id || !waba_id) {
+    // A Coexistence finish (WhatsApp Business app number) carries only the account ID: the number is looked up below
+    if (!code || !waba_id || (!phone_number_id && !isCoexistence)) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: code, phone_number_id, waba_id'
@@ -87,6 +90,20 @@ exports.exchangeCode = async (req, res, next) => {
         message: 'Failed to exchange code for access token. The code may have expired (30s TTL).',
         detail: err.response?.data
       });
+    }
+
+    if (!phone_number_id) {
+      try {
+        phone_number_id = await coexistence.findAppNumber(waba_id, accessToken);
+      } catch (err) {
+        logger.error(`[EmbeddedSignup] Could not list the numbers of WABA ${waba_id}: ${metaErrorText(err)}`);
+      }
+      if (!phone_number_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Connected to Meta, but the WhatsApp Business app number could not be found in the account. Press "Check connection" in a minute or connect again.'
+        });
+      }
     }
 
     // Step 2: Phone number details
@@ -117,10 +134,15 @@ exports.exchangeCode = async (req, res, next) => {
       where: { tenantId, metaPhoneNumberId: phone_number_id }
     });
 
+    // Each Coexistence connection opens a new 24h window for the one-time contact / history syncs
+    const coexData = isCoexistence
+      ? { isCoexistence: true, coexOnboardedAt: new Date(), coexHistoryMonths: coexistence.normalizeHistoryMonths(history_months), coexSync: coexistence.initialCoexSync() }
+      : { isCoexistence: false };
+
     const channel = existing
       ? await prisma.whatsAppChannel.update({
           where: { id: existing.id },
-          data: { metaAccessToken: accessToken, metaWabaId: waba_id, status: 'ACTIVE' }
+          data: { metaAccessToken: accessToken, metaWabaId: waba_id, status: 'ACTIVE', ...coexData }
         })
       : await prisma.whatsAppChannel.create({
           data: {
@@ -130,7 +152,8 @@ exports.exchangeCode = async (req, res, next) => {
             metaPhoneNumberId: phone_number_id,
             metaWabaId: waba_id,
             metaAccessToken: accessToken,
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            ...coexData
           }
         });
 
@@ -159,6 +182,16 @@ exports.exchangeCode = async (req, res, next) => {
         // e.g. already registered with a different two-step PIN: reset it in WhatsApp Manager
         logger.error(`[EmbeddedSignup] ⚠️ Failed to register ${phone_number_id}: ${metaError(regErr)}`);
         warnings.push(`Number registration failed: ${metaError(regErr)}`);
+      }
+    }
+
+    // Step 6 (Coexistence): ask now for the app's contacts and chat history. Meta allows this once, within
+    // 24 hours; what it does not accept yet is retried in the background.
+    if (isCoexistence) {
+      const sync = await coexistence.requestSync(channel.id);
+      if (sync.retryable) {
+        coexistence.scheduleSyncRetry(channel.id);
+        warnings.push('Meta did not accept the contacts / chat history request yet; it is retried automatically in the next minutes.');
       }
     }
 

@@ -11,6 +11,33 @@ const chatService = require('../chat/chat.service');
 const webhookService = require('../webhook/webhook.service');
 // Queue-based processing — protects against data loss on server crashes
 const { metaWebhookQueue } = require('../../workers/meta.webhook.worker');
+const { COEX_FIELDS } = require('./meta.coexistence');
+const crypto = require('crypto');
+
+/**
+ * Checks Meta's x-hub-signature-256 header against the raw body. Channels added manually carry the secret
+ * of the customer's own Meta app; channels connected through Embedded Signup belong to the platform's app
+ * (META_APP_SECRET). Unverifiable → rejected.
+ */
+function hasValidSignature(req, channel) {
+  const appSecret = channel.metaAppSecret || META_APP_SECRET;
+  if (!appSecret || !req.rawBody) {
+    logger.error(`[MetaWebhook] ❌ Rejected webhook for channel ${channel.id}: no app secret to verify it (set META_APP_SECRET)`);
+    return false;
+  }
+  const signature = req.headers['x-hub-signature-256'];
+  if (!signature) {
+    logger.error(`[MetaWebhook] Missing signature for channel ${channel.id}`);
+    return false;
+  }
+  const expected = Buffer.from('sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody).digest('hex'));
+  const given = Buffer.from(signature);
+  if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
+    logger.error(`[MetaWebhook] ❌ Invalid signature for channel ${channel.id}`);
+    return false;
+  }
+  return true;
+}
 
 class MetaController {
 
@@ -55,6 +82,21 @@ class MetaController {
     for (const entry of body.entry) {
       for (const change of entry.changes) {
         if (!change.value) continue;
+        const field = change.field || 'messages';
+
+        // account_update carries no phone number: find our numbers by their WhatsApp account
+        if (field === 'account_update') {
+          const wabaId = change.value.waba_info?.waba_id || entry.id;
+          const channel = await prisma.whatsAppChannel.findFirst({ where: { metaWabaId: String(wabaId), providerType: 'META_CLOUD' } }).catch(() => null);
+          if (!channel) continue;
+          if (!hasValidSignature(req, channel)) return;
+          logger.info(`[MetaWebhook] 🏷️ account_update ${change.value.event} for WABA ${wabaId}`);
+          await metaWebhookQueue.add('account-update', {
+            type: 'ACCOUNT_UPDATE', channelId: channel.id, tenantId: channel.tenantId,
+            payload: { wabaId: String(wabaId), value: change.value }
+          }).catch(e => logger.error(`[MetaWebhook] Failed to queue account_update: ${e.message}`));
+          continue;
+        }
 
         const metadata = change.value.metadata;
         const metaPhoneNumberId = metadata?.phone_number_id;
@@ -73,39 +115,27 @@ class MetaController {
         }
         logger.info(`[MetaWebhook] ✅ Found channel: ${channel.id} for phone_number_id: ${metaPhoneNumberId}`);
 
-        // --- HMAC Signature Verification (Per-Channel) ---
-        // Channels added manually carry the secret of the customer's own Meta app; channels connected
-        // through Embedded Signup belong to the platform's app (META_APP_SECRET). Unverifiable → rejected.
-        const appSecret = channel.metaAppSecret || META_APP_SECRET;
-        if (!appSecret || !req.rawBody) {
-          logger.error(`[MetaWebhook] ❌ Rejected webhook for channel ${channel.id}: no app secret to verify it (set META_APP_SECRET)`);
-          return;
-        }
-        const signature = req.headers['x-hub-signature-256'];
-        if (!signature) {
-          logger.error(`[MetaWebhook] Missing signature for channel ${channel.id}`);
-          return; // Stop processing this invalid request
-        }
-
-        const crypto = require('crypto');
-        const expectedSignature = 'sha256=' + crypto
-          .createHmac('sha256', appSecret)
-          .update(req.rawBody)
-          .digest('hex');
-
-        const sigBuffer = Buffer.from(signature);
-        const expectedBuffer = Buffer.from(expectedSignature);
-
-        if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
-          logger.error(`[MetaWebhook] ❌ Invalid signature for channel ${channel.id}`);
-          return; // Stop processing
-        }
+        // --- HMAC Signature Verification (Per-Channel) --- an unverifiable request stops here
+        if (!hasValidSignature(req, channel)) return;
 
         // ─────────────────────────────────────────────────────────────
         // 🔒 Queue-based processing — events are stored in Redis (BullMQ)
         //    and retried up to 5 times with exponential backoff on failure.
         //    This guarantees ZERO data loss even if the server crashes.
         // ─────────────────────────────────────────────────────────────
+
+        // Coexistence numbers (also on the WhatsApp Business app): app-sent messages, old chats, app contacts
+        if (COEX_FIELDS.includes(field)) {
+          logger.info(`[MetaWebhook] 📱 Queueing ${field} for channel ${channel.id}`);
+          await metaWebhookQueue.add('coex-event', {
+            type: 'COEX_EVENT', channelId: channel.id, tenantId: channel.tenantId,
+            payload: { field, value: change.value }
+          }).catch(e => logger.error(`[MetaWebhook] Failed to queue ${field}: ${e.message}`));
+          continue;
+        }
+        // Only the "messages" field carries customer messages and delivery statuses. (Old media from a
+        // history sync also arrives as value.messages, under the "history" field handled above.)
+        if (field !== 'messages') continue;
 
         // 1. INCOMING MESSAGES → Queue
         if (change.value.messages) {
@@ -244,6 +274,7 @@ class MetaController {
           metaWabaId: true,
           status: true,
           autoCreateTickets: true,
+          isCoexistence: true,
           createdAt: true
         }
       });

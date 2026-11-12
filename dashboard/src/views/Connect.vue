@@ -171,6 +171,39 @@
                 </label>
               </div>
 
+              <!-- Coexistence: connect the number of the WhatsApp Business app and keep using the app -->
+              <div class="coex-box" :dir="isAr ? 'rtl' : 'ltr'">
+                <div class="coex-head">
+                  <i class="fas fa-mobile-screen-button"></i>
+                  <div>
+                    <strong>{{ isAr ? 'رقمك يعمل على تطبيق WhatsApp Business؟ اربطه واحتفظ بالتطبيق' : 'Your number is on the WhatsApp Business app? Connect it and keep the app' }}</strong>
+                    <p>{{ isAr
+                      ? 'يبقى الرقم على جوالك وتصل محادثاته إلى المنصة أيضاً. الرسائل التي ترسلها من التطبيق تظهر في المحادثات، وتبقى مجانية.'
+                      : 'The number stays on your phone and its chats also reach the platform. Messages you send from the app appear in Live Chat and stay free.' }}</p>
+                  </div>
+                </div>
+                <div class="coex-row">
+                  <label class="coex-history">
+                    <span>{{ isAr ? 'استيراد المحادثات القديمة' : 'Import old chats' }}</span>
+                    <select v-model.number="coexHistoryMonths">
+                      <option :value="6">{{ isAr ? 'آخر 6 أشهر' : 'Last 6 months' }}</option>
+                      <option :value="3">{{ isAr ? 'آخر 3 أشهر' : 'Last 3 months' }}</option>
+                      <option :value="1">{{ isAr ? 'آخر شهر' : 'Last month' }}</option>
+                      <option :value="0">{{ isAr ? 'بدون استيراد' : "Don't import" }}</option>
+                    </select>
+                  </label>
+                  <button @click="launchCoexSignup" class="btn-coex">
+                    <i class="fab fa-whatsapp"></i>
+                    {{ isAr ? 'ربط رقم تطبيق WhatsApp Business' : 'Connect my WhatsApp Business app number' }}
+                  </button>
+                </div>
+                <ul class="coex-notes">
+                  <li>{{ isAr ? 'حدّث التطبيق (الإصدار 2.24.17 أو أحدث)، وأبقِه مفتوحاً أثناء الربط: ستمسح رمز QR من داخله.' : 'Update the app (version 2.24.17 or newer) and keep it open while connecting: you will scan a QR code from inside it.' }}</li>
+                  <li>{{ isAr ? 'افتح التطبيق مرة كل أسبوعين على الأقل، وإلا تفصل Meta الربط.' : 'Open the app at least once every two weeks, or Meta disconnects the number.' }}</li>
+                  <li>{{ isAr ? 'المجموعات وقوائم البث والرسائل المؤقتة لا تعمل بعد الربط. يُستورد ما تختاره من المحادثات الفردية فقط، ولا يمكن تغيير اختيارك لاحقاً إلا بإعادة الربط.' : 'Groups, broadcast lists and disappearing messages stop working. Only the 1:1 chats of the period you pick are imported, and the choice can only change by connecting again.' }}</li>
+                </ul>
+              </div>
+
               <!-- Status Feedback -->
               <div v-if="embeddedSignupStatus" :class="['fb-status', embeddedSignupStatus]">
                 <div v-if="embeddedSignupStatus === 'loading'" class="fb-spinner"></div>
@@ -186,7 +219,9 @@
               <div class="channel-item">
                 <div class="ci-left">
                   <strong class="ci-phone">{{ plusPhone(channel.phoneNumber) }}</strong>
-                  <span class="ci-status"><span class="ci-dot"></span>{{ channel.status }}</span>
+                  <span class="ci-status"><span class="ci-dot"></span>{{ channel.status }}
+                    <span v-if="channel.isCoexistence" class="coex-badge">{{ isAr ? 'تطبيق + API' : 'App + API' }}</span>
+                  </span>
                   <label class="flex items-center gap-2 mt-2 cursor-pointer">
                     <input type="checkbox" v-model="channel.autoCreateTickets" @change="toggleAutoCreate(channel)" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500">
                     <span class="text-xs text-slate-600 font-semibold">{{ isAr ? 'استقبال الدعم الفني (فتح تذاكر آلياً)' : 'Support Line (Auto-create tickets)' }}</span>
@@ -212,6 +247,9 @@
                 </div>
                 <button v-if="health[channel.id].canSubscribe" @click="subscribeWebhook(channel)" class="btn-check btn-fix" :disabled="health[channel.id].subscribing">
                   {{ health[channel.id].subscribing ? (isAr ? 'جارٍ الاشتراك…' : 'Subscribing…') : (isAr ? 'اشتراك Webhook الآن' : 'Subscribe webhook now') }}
+                </button>
+                <button v-if="health[channel.id].canRetryCoex" @click="retryCoexSync(channel)" class="btn-check btn-fix" :disabled="health[channel.id].syncing">
+                  {{ health[channel.id].syncing ? (isAr ? 'جارٍ الطلب…' : 'Requesting…') : (isAr ? 'طلب جهات الاتصال والمحادثات من جديد' : 'Request contacts and chats again') }}
                 </button>
               </div>
               </div>
@@ -305,6 +343,9 @@ const metaChannels = ref([])
 const embeddedSignupStatus = ref('') // '', 'loading', 'success', 'error'
 const numberConfirmed = ref(false)
 const embeddedSignupMessage = ref('')
+// Coexistence (number of the WhatsApp Business app): how many months of old chats to keep (0 = none)
+const coexHistoryMonths = ref(6)
+const COEX_EVENT = 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'
 
 // ─── Facebook SDK ─────────────────────────────────────────────
 const loadFbSdk = () => {
@@ -385,8 +426,10 @@ const fbLoginCallback = (response) => {
       const phone_number_id = signupData.phone_number_id
       const waba_id = signupData.waba_id || signupData.waba_ids?.[0]
       const signup_event = signupData.event
+      // A WhatsApp Business app number (Coexistence) comes back with the account only; the server finds the number
+      const isCoex = signup_event === COEX_EVENT
 
-      if (!phone_number_id || !waba_id) {
+      if (!waba_id || (!phone_number_id && !isCoex)) {
         embeddedSignupStatus.value = 'error'
         // Finished with a WhatsApp account but without adding a number (e.g. an account that has none yet)
         embeddedSignupMessage.value = waba_id && !phone_number_id
@@ -405,13 +448,17 @@ const fbLoginCallback = (response) => {
       try {
         const token = localStorage.getItem('token')
         const res = await axios.post('/api/v1/meta/embedded-signup/exchange', {
-          code, phone_number_id, waba_id, signup_event
+          code, phone_number_id, waba_id, signup_event,
+          ...(isCoex ? { history_months: coexHistoryMonths.value } : {})
         }, {
           headers: { Authorization: `Bearer ${token}` }
         })
 
         embeddedSignupStatus.value = 'success'
         embeddedSignupMessage.value = `✅ ${isAr.value ? 'تم الربط' : 'Connected'}! ${isAr.value ? 'الرقم' : 'Phone'}: ${plusPhone(res.data.channel.phoneNumber)}` +
+          (isCoex ? (isAr.value
+            ? ' — الرقم باقٍ على تطبيق WhatsApp Business. أبقِ التطبيق مفتوحاً: جهات الاتصال والمحادثات تصل خلال دقائق.'
+            : ' — the number stays on the WhatsApp Business app. Keep the app open: contacts and chats arrive within minutes.') : '') +
           (res.data.warnings?.length ? ` — ⚠️ ${res.data.warnings.join(' | ')}` : '')
         await fetchMetaChannels()
         delete window._embeddedSignupData
@@ -429,7 +476,12 @@ const fbLoginCallback = (response) => {
 }
 
 // ─── Launch the Embedded Signup Popup ─────────────────────────
-const launchEmbeddedSignup = () => {
+// coex = true lets the customer connect the number they use in the WhatsApp Business app (Coexistence);
+// the regular button keeps the plain Cloud API flow.
+const launchEmbeddedSignup = () => openEmbeddedSignup(false)
+const launchCoexSignup = () => openEmbeddedSignup(true)
+
+const openEmbeddedSignup = (coex) => {
   if (!window.FB) {
     embeddedSignupStatus.value = 'error'
     embeddedSignupMessage.value = 'Facebook SDK not loaded yet. Please wait a moment and try again.'
@@ -449,8 +501,11 @@ const launchEmbeddedSignup = () => {
     override_default_response_type: true,
     display: 'popup',
     // Embedded Signup v4: the version and products come from the Facebook Login for Business
-    // configuration (VITE_FB_CONFIG_ID); sessionInfoVersion is ignored on v4.
-    extras: { setup: {} }
+    // configuration (VITE_FB_CONFIG_ID). featureType adds Meta's "connect your WhatsApp Business app" path
+    // (Meta: embedded-signup/onboarding-business-app-users).
+    extras: coex
+      ? { setup: {}, featureType: 'whatsapp_business_app_onboarding', sessionInfoVersion: '3' }
+      : { setup: {} }
   })
 
   // Update UI after calling FB.login
@@ -467,7 +522,7 @@ const checkChannel = async (channel) => {
     const token = localStorage.getItem('token')
     const res = await axios.get(`/api/v1/meta/channel/${channel.id}/health`, { headers: { Authorization: `Bearer ${token}` } })
     const h = res.data.data
-    health.value = { ...health.value, [channel.id]: { lines: describeHealth(h), canSubscribe: h.webhook.ok && !h.webhook.subscribed } }
+    health.value = { ...health.value, [channel.id]: { lines: describeHealth(h), canSubscribe: h.webhook.ok && !h.webhook.subscribed, canRetryCoex: !!h.coex?.canRetrySync } }
   } catch (err) {
     health.value = { ...health.value, [channel.id]: { failed: metaErrorText(err, isAr.value) || 'Check failed' } }
   }
@@ -483,6 +538,78 @@ const subscribeWebhook = async (channel) => {
   } catch (err) {
     health.value = { ...health.value, [channel.id]: { ...health.value[channel.id], subscribing: false, failed: metaErrorText(err, isAr.value) || 'Subscription failed' } }
   }
+}
+
+// WhatsApp Business app numbers: asks Meta again for what was not accepted after connecting (24h, once each)
+const retryCoexSync = async (channel) => {
+  health.value = { ...health.value, [channel.id]: { ...health.value[channel.id], syncing: true } }
+  try {
+    const token = localStorage.getItem('token')
+    await axios.post(`/api/v1/meta/channel/${channel.id}/coex-sync`, {}, { headers: { Authorization: `Bearer ${token}` } })
+  } catch (err) {
+    alert(err.response?.data?.message || metaErrorText(err, isAr.value) || 'Request failed')
+  }
+  await checkChannel(channel)
+}
+
+// Why a WhatsApp Business app connection ended (account_update from Meta)
+const coexReasonText = (reason, ar) => {
+  const t = (a, e) => (ar ? a : e)
+  const map = {
+    PRIMARY_INACTIVITY: t('لم يُفتح تطبيق WhatsApp Business على الجوال نحو 14 يوماً.', 'The WhatsApp Business app was not opened on the phone for about 14 days.'),
+    COMPANION_INACTIVITY: t('جهاز مرتبط لم يُستخدم نحو 30 يوماً.', 'A linked device was not used for about 30 days.'),
+    ACCOUNT_DISCONNECTED: t('فُصل الرقم من التطبيق (الإعدادات ← الحساب ← Business Platform).', 'The number was disconnected in the app (Settings › Account › Business Platform).'),
+    CHANGE_NUMBER: t('غُيّر رقم التطبيق.', 'The app\'s number was changed.'),
+    USER_RE_REGISTERED: t('أُعيد تسجيل الرقم على واتساب.', 'The number was registered on WhatsApp again.'),
+    BUSINESS_DOWNGRADE: t('تحوّل الحساب من WhatsApp Business إلى واتساب العادي.', 'The account moved from WhatsApp Business to regular WhatsApp.'),
+    ACCOUNT_OFFBOARDED: t('تغيّر الجوال أو أُعيد تسجيل الرقم؛ تعيد Meta الربط تلقائياً خلال دقائق عادةً.', 'The phone changed or the number was re-registered; Meta usually reconnects it within minutes.')
+  }
+  return map[reason] || reason || ''
+}
+
+// The extra lines for a number that also stays on the WhatsApp Business app
+const describeCoex = (c, ar) => {
+  const t = (a, e) => (ar ? a : e)
+  const lines = []
+  const ended = c.state === 'DISCONNECTED'
+  lines.push({
+    ok: !ended && c.state !== 'OFFBOARDED' && c.onBizApp !== false,
+    title: t('تطبيق WhatsApp Business', 'WhatsApp Business app'),
+    text: ended ? t('انتهى ربط الرقم بالمنصة.', 'The number is no longer connected to the platform.')
+      : c.state === 'OFFBOARDED' ? t('الرقم خارج الواجهة الرسمية مؤقتاً.', 'The number is temporarily off the Cloud API.')
+      : c.statusError ? c.statusError
+      : c.onBizApp ? t('الرقم يعمل على التطبيق وعلى المنصة معاً.', 'The number works on both the app and the platform.')
+      : t('Meta لا تُظهر الرقم على التطبيق.', 'Meta does not show the number on the app.'),
+    hint: ended ? `${coexReasonText(c.stateReason, ar)} ${t('لإعادته اضغط «ربط رقم تطبيق WhatsApp Business» من جديد.', 'To bring it back, press "Connect my WhatsApp Business app number" again.')}`
+      : c.state === 'OFFBOARDED' ? coexReasonText('ACCOUNT_OFFBOARDED', ar) : ''
+  })
+
+  const until = c.windowEndsAt ? new Date(c.windowEndsAt).toLocaleString() : ''
+  const notYet = (err) => `${err || t('لم تقبل Meta الطلب بعد.', 'Meta has not accepted the request yet.')}`
+  const lateHint = c.canRetrySync
+    ? t(`يمكن طلبها حتى ${until}.`, `Can be requested until ${until}.`)
+    : t('مرّت 24 ساعة على الربط: لا تسمح Meta بالطلب إلا بعد فصل الرقم من التطبيق وربطه من جديد.', '24 hours have passed since connecting: Meta only allows the request after disconnecting the number in the app and connecting again.')
+
+  lines.push(c.contacts.requestId
+    ? { ok: true, title: t('جهات الاتصال', 'Contacts'), text: t('طُلبت من Meta وتُضاف إلى جهات الاتصال تلقائياً.', 'Requested from Meta; they are added to Contacts automatically.') }
+    : { ok: false, title: t('جهات الاتصال', 'Contacts'), text: notYet(c.contacts.error), hint: lateHint })
+
+  const historyTitle = t('المحادثات القديمة', 'Old chats')
+  if (c.historyMonths === 0) {
+    lines.push({ ok: true, title: historyTitle, text: t('اخترت عدم استيرادها.', 'You chose not to import them.') })
+  } else if (c.history.declined) {
+    lines.push({ ok: false, title: historyTitle, text: t('رفض صاحب الرقم مشاركة المحادثات من التطبيق، فتظهر الرسائل الجديدة فقط.', 'Chat sharing was declined in the app, so only new messages appear.') })
+  } else if (c.history.requestId) {
+    const period = c.historyMonths === 1 ? t('آخر شهر', 'last month') : t(`آخر ${c.historyMonths} أشهر`, `last ${c.historyMonths} months`)
+    lines.push({
+      ok: true, title: historyTitle,
+      text: `${period} · ${t('وصل', 'received')} ${c.history.progress || 0}% · ${c.importedMessages ?? 0} ${t('رسالة', 'messages')}`,
+      hint: c.history.completedAt ? '' : t('تصل على دفعات خلال دقائق، وأبقِ التطبيق مفتوحاً.', 'They arrive in batches over a few minutes; keep the app open.')
+    })
+  } else {
+    lines.push({ ok: false, title: historyTitle, text: notYet(c.history.error), hint: lateHint })
+  }
+  return lines
 }
 
 // Turns the server's three checks into plain sentences (with what to do when one fails)
@@ -532,6 +659,9 @@ const describeHealth = (h) => {
   } else {
     lines.push({ ok: false, title: 'Webhook', text: h.webhook.error.message, hint: metaHint(h.webhook.error.code, h.webhook.error.subcode, ar) })
   }
+
+  // 4. numbers that also stay on the WhatsApp Business app
+  if (h.coex) lines.push(...describeCoex(h.coex, ar))
   return lines
 }
 
@@ -769,6 +899,17 @@ const disconnect = async () => {
 .nw-confirm { display: flex; gap: 8px; align-items: center; font-weight: 600; cursor: pointer; }
 .nw-confirm input { width: 16px; height: 16px; accent-color: #FF6600; }
 .btn-fb:disabled { opacity: 0.5; cursor: not-allowed; }
+.coex-box { margin-top: 1rem; background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem; color: #14532d; }
+.coex-head { display: flex; gap: 10px; align-items: flex-start; line-height: 1.7; }
+.coex-head i { color: #16a34a; font-size: 1.2rem; margin-top: 3px; }
+.coex-head p { margin: 2px 0 0; color: #166534; }
+.coex-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; justify-content: space-between; }
+.coex-history { display: flex; flex-direction: column; gap: 4px; font-weight: 700; }
+.coex-history select { border: 1px solid #86efac; border-radius: 8px; padding: 6px 10px; background: white; font-family: inherit; color: #14532d; }
+.btn-coex { display: flex; align-items: center; gap: 8px; background: #16a34a; color: white; padding: 0.65rem 1.1rem; border-radius: 12px; font-weight: 800; border: none; cursor: pointer; font-family: inherit; }
+.btn-coex:hover { background: #15803d; }
+.coex-notes { margin: 0; padding-inline-start: 1.1rem; display: flex; flex-direction: column; gap: 4px; color: #166534; font-size: 0.8rem; line-height: 1.6; }
+.coex-badge { background: #dcfce7; color: #15803d; border-radius: 6px; padding: 1px 6px; font-size: 0.65rem; margin-inline-start: 6px; text-transform: none; }
 .groups-section { margin-top: 2rem; background: white; padding: 1.5rem; border-radius: 16px; border: 1px solid #E2E8F0; text-align: left; }
 .groups-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .groups-header h3 { margin: 0; font-size: 1.1rem; color: #0F172A; font-weight: 800; }

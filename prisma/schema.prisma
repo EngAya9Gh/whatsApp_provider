@@ -75,6 +75,12 @@ model WhatsAppChannel {
   displayPhoneNumber String? @map("display_phone_number") // from Meta Business Manager
   autoCreateTickets  Boolean @default(false) @map("auto_create_tickets") // Automatically create tickets for incoming messages
 
+  // Coexistence: the number was connected from the customer's WhatsApp Business app and keeps working there
+  isCoexistence     Boolean   @default(false) @map("is_coexistence")
+  coexOnboardedAt   DateTime? @map("coex_onboarded_at") // start of Meta's 24h window for the one-time syncs
+  coexHistoryMonths Int?      @map("coex_history_months") // old chats to keep: 0 (none), 1, 3 or 6 months
+  coexSync          Json?     @map("coex_sync") // { state, stateReason, contacts: {...}, history: {...} }
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

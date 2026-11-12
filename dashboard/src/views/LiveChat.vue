@@ -270,6 +270,13 @@
               
               <div class="message-meta">
                 <span class="message-time">{{ formatTime(msg.createdAt) }}</span>
+                <!-- Numbers that stay on the WhatsApp Business app: sent from the phone / imported old chat -->
+                <span v-if="msg.source === 'BUSINESS_APP'" class="source-badge" :title="isAr ? 'أُرسلت من تطبيق WhatsApp Business على الجوال' : 'Sent from the WhatsApp Business app on the phone'">
+                  <i class="fas fa-mobile-screen-button"></i> {{ isAr ? 'من التطبيق' : 'From the app' }}
+                </span>
+                <span v-else-if="msg.source === 'HISTORY'" class="source-badge" :title="isAr ? 'رسالة قديمة استُوردت من التطبيق' : 'Old message imported from the app'">
+                  <i class="fas fa-clock-rotate-left"></i> {{ isAr ? 'مستوردة' : 'Imported' }}
+                </span>
                 <span v-if="msg.type === 'TEMPLATE'" class="template-badge">
                   <i class="fas fa-file-lines"></i> {{ isAr ? 'قالب' : 'Template' }}
                 </span>
@@ -2064,6 +2071,14 @@ onUnmounted(() => {
   font-size: 0.72rem;
   color: #b45309;
   margin-bottom: 6px;
+}
+
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  opacity: 0.8;
 }
 
 .template-badge {

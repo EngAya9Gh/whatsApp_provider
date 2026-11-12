@@ -2,6 +2,7 @@ const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { metaErrorInfo, metaErrorText } = require('./meta.errors');
+const coexistence = require('./meta.coexistence');
 
 const GRAPH = `https://graph.facebook.com/${process.env.GRAPH_API_VERSION || 'v21.0'}`;
 
@@ -68,12 +69,15 @@ exports.getChannelHealth = async (req, res, next) => {
       token = failed(tokenR.reason);
     }
 
+    // Numbers that also stay on the WhatsApp Business app: still on the app? contacts / old chats synced?
+    const coex = channel.isCoexistence ? await coexistence.coexHealth(channel) : null;
+
     res.json({
       success: true,
       data: {
         platformAppId: appId,
         channel: { phoneNumberId: channel.metaPhoneNumberId, wabaId: channel.metaWabaId },
-        phone, webhook, token
+        phone, webhook, token, coex
       }
     });
   } catch (err) {
@@ -106,6 +110,30 @@ exports.subscribeWebhook = async (req, res, next) => {
       return res.status(400).json({ success: false, message: metaErrorText(e), metaCode: info.code, metaSubcode: info.subcode });
     }
     res.json({ success: true, message: 'Webhook subscription is active.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/v1/meta/channel/:id/coex-sync
+ *
+ * WhatsApp Business app numbers: asks Meta again for the contacts / chat history that were not accepted
+ * right after connecting. Meta allows each request once, within 24 hours of connecting.
+ */
+exports.retryCoexSync = async (req, res, next) => {
+  try {
+    const channel = await prisma.whatsAppChannel.findFirst({
+      where: { id: req.params.id, tenantId: req.tenant.id, providerType: 'META_CLOUD' }
+    });
+    if (!channel) return res.status(404).json({ success: false, message: 'Channel not found' });
+    if (!channel.isCoexistence) return res.status(400).json({ success: false, message: 'This number was not connected from the WhatsApp Business app.' });
+    const result = await coexistence.requestSync(channel.id);
+    if (!result.windowOpen && !result.ok) {
+      return res.status(400).json({ success: false, message: 'More than 24 hours passed since connecting. Meta only allows this request again after the number is disconnected in the WhatsApp Business app and connected again.' });
+    }
+    if (result.retryable) coexistence.scheduleSyncRetry(channel.id);
+    res.json({ success: result.ok, data: result.results, message: result.ok ? 'Requested.' : 'Meta did not accept the request yet; it is retried automatically.' });
   } catch (err) {
     next(err);
   }

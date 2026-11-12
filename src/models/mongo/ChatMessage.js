@@ -16,6 +16,9 @@ const ChatMessageSchema = new mongoose.Schema({
   senderId: { type: String, default: null },
   // Sent by the system (away reply, rating thanks) — excluded from response-time stats
   isAutomated: { type: Boolean, default: false },
+  // Where a message came from when it was not exchanged through the platform (Coexistence numbers):
+  // 'BUSINESS_APP' = sent from the customer's WhatsApp Business app, 'HISTORY' = imported old chat
+  source: { type: String, default: null },
   // Internal notes: team members mentioned with @ (member keys: 'owner' or sub-user id)
   mentions: { type: [String], default: [] }
 }, {

@@ -97,6 +97,7 @@ router.delete('/channel/:id', canSettings, metaController.deleteChannel.bind(met
 router.get('/channel/:id/templates', canReadTemplates, metaController.getTemplates.bind(metaController));
 router.get('/channel/:id/health', canSettings, require('./meta.health.controller').getChannelHealth);
 router.post('/channel/:id/subscribe-webhook', canSettings, require('./meta.health.controller').subscribeWebhook);
+router.post('/channel/:id/coex-sync', canSettings, require('./meta.health.controller').retryCoexSync);
 
 // ────────────────────────────────────────────────────────────────────────────
 // Meta Template Management — Create / Read / Delete templates via Meta API
