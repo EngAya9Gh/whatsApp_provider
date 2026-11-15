@@ -6,13 +6,9 @@ const messageService = require('../modules/message/message.service');
 const fs = require('fs');
 const logger = require('../utils/logger');
 
-// Setup Redis Connection
-const redisOptions = {
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: process.env.REDIS_PORT || 6379,
-  maxRetriesPerRequest: null,
-};
-const connection = new Redis(redisOptions);
+// Setup Redis Connection (same settings as the rest of the app, password included)
+const { bullConnection } = require('../config/redis');
+const connection = new Redis(bullConnection);
 
 // Initialize Queue
 const campaignQueue = new Queue('campaign-queue', { connection });

@@ -2,10 +2,10 @@ const { Queue, Worker } = require('bullmq');
 const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
 const logger = require('../utils/logger');
-const redisConfig = require('../config/redis');
+const { bullConnection } = require('../config/redis');
 
 const prisma = new PrismaClient();
-const metaCampaignQueue = new Queue('meta-campaign-queue', { connection: redisConfig });
+const metaCampaignQueue = new Queue('meta-campaign-queue', { connection: bullConnection });
 const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || 'v21.0';
 
 /**
@@ -120,7 +120,7 @@ const worker = new Worker('meta-campaign-queue', async (job) => {
 
     throw error;
   }
-}, { connection: redisConfig, concurrency: 5 });
+}, { connection: bullConnection, concurrency: 5 });
 
 worker.on('failed', (job, err) => {
   logger.error(`[MetaCampaign] Job ${job.id} failed: ${err.message}`);

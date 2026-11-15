@@ -2,121 +2,114 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
 const webhookService = require('../webhook/webhook.service');
+const { withLock } = require('../../utils/keyLock');
+
+const ACTIVE_STATUSES = ['OPEN', 'PENDING'];
+const CLOSED_STATUSES = ['CLOSED', 'RESOLVED'];
+const PRIORITIES = ['LOW', 'NORMAL', 'HIGH', 'URGENT'];
+const HOUR_MS = 60 * 60 * 1000;
+// A customer who writes again within this time after a close (without rating) reopens the same ticket
+const REOPEN_WINDOW_HOURS = 24;
+// Meta only lets a business send free-form messages within 24h of the customer's last message
+const CUSTOMER_WINDOW_MS = 24 * HOUR_MS;
+// Rating request and thanks: not part of the conversation a ticket is about
+const RATING_TEXT = /تقييم|شكراً لتقييمك/;
+
+const formatNumber = (n) => `#TK-${String(n).padStart(4, '0')}`;
+const fail = (status, message) => ({ status, message });
+const actorName = (actor) => actor?.name || 'النظام';
+const threadLock = (threadId) => `ticket-thread:${threadId}`;
+
+const models = () => ({
+  ChatThread: require('../../models/mongo/ChatThread'),
+  ChatMessage: require('../../models/mongo/ChatMessage')
+});
+
+function emit(tenantId, event, data) {
+  try {
+    require('../../services/socket.service').emitToTenant(tenantId, event, data);
+  } catch (e) { /* the socket is optional */ }
+}
+
+const ticketEvent = (ticket) => ({
+  ticketId: ticket.id,
+  threadId: ticket.threadId,
+  status: ticket.status,
+  assignedToId: ticket.assignedToId || null,
+  categoryId: ticket.categoryId || null
+});
 
 class TicketsService {
-  /**
-   * Find an active ticket for a thread
-   */
   async getActiveTicket(tenantId, threadId) {
     return prisma.ticket.findFirst({
-      where: {
-        tenantId,
-        threadId,
-        status: { in: ['OPEN', 'PENDING'] }
-      },
+      where: { tenantId, threadId, status: { in: ACTIVE_STATUSES } },
       orderBy: { createdAt: 'desc' }
     });
   }
 
   async getRecentClosedUnratedTicket(tenantId, threadId) {
-    // A ticket closed within the last 24 hours that doesn't have a rating
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     return prisma.ticket.findFirst({
-      where: {
-        tenantId,
-        threadId,
-        status: 'CLOSED',
-        rating: null,
-        resolvedAt: { gte: oneDayAgo }
-      },
+      where: { tenantId, threadId, status: 'CLOSED', rating: null, resolvedAt: { gte: new Date(Date.now() - 24 * HOUR_MS) } },
       orderBy: { resolvedAt: 'desc' }
     });
   }
 
   async saveTicketRating(tenantId, ticketId, ratingValue) {
-    // Save to DB
     const updated = await prisma.ticket.update({
       where: { id: ticketId, tenantId },
       data: { rating: ratingValue }
     });
 
-    // Notify CRM
     try {
-      const webhookService = require('../webhook/webhook.service');
-
-      // 1. Send dedicated ticket.rated event
-      await webhookService.sendTicketRated(tenantId, {
-        ticket_id: updated.id,
-        thread_id: updated.threadId,
-        rating: ratingValue
-      });
-
-      // 2. Also sync ticket.sync for backward compatibility
-      const ChatThread = require('../../models/mongo/ChatThread');
-      const thread = await ChatThread.findById(updated.threadId);
-      await webhookService.syncCrmTicket(tenantId, {
-        ticket_id: updated.id,
-        ticket_number: updated.ticketNumber,
-        thread_id: updated.threadId,
-        phone: thread ? thread.contactPhone : '',
-        name: thread ? thread.contactName : '',
-        status: 'closed',
-        rating: ratingValue
-      });
+      await webhookService.sendTicketRated(tenantId, { ticket_id: updated.id, thread_id: updated.threadId, rating: ratingValue });
+      await this._crmSync(tenantId, updated, { status: 'closed', rating: ratingValue });
       logger.info(`[TicketsService] Sent rating ${ratingValue} to CRM for ticket ${updated.id}`);
     } catch (err) {
       logger.error(`[TicketsService] Failed to sync rating to CRM: ${err.message}`);
     }
+    emit(tenantId, 'ticket_updated', ticketEvent(updated));
     return updated;
   }
 
+  // ─── Creating & reopening ───────────────────────────────────────────
+
   /**
-   * Auto-create a ticket if channel settings allow it and no active ticket exists
+   * Customer message: returns the conversation's active ticket, reopens one closed less than 24h ago
+   * (and not rated yet), or opens a new one. Off when the tenant turned automatic tickets off.
    */
   async autoCreateTicketIfNeeded(tenantId, channelId, threadId, crmClientId, firstMessageText = '', options = {}) {
     try {
-      const channel = await prisma.whatsAppChannel.findUnique({
-        where: { id: channelId },
-        select: { autoCreateTickets: true }
-      });
+      const [channel, tenant] = await Promise.all([
+        prisma.whatsAppChannel.findUnique({ where: { id: channelId }, select: { id: true } }),
+        prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } })
+      ]);
+      if (!channel) return null;
+      const features = tenant?.customFeatures && typeof tenant.customFeatures === 'object' ? tenant.customFeatures : {};
+      // Settings → Tickets "open tickets automatically" is the master switch
+      if (features.ticketSettings?.autoCreateTickets === false) return null;
 
-      const tenantData = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } });
-      const customFeatures = typeof tenantData?.customFeatures === 'object' ? tenantData.customFeatures : {};
-      const tenantAutoCreate = customFeatures?.ticketSettings?.autoCreateTickets !== false;
+      return await withLock(threadLock(threadId), async () => {
+        const active = await this.getActiveTicket(tenantId, threadId);
+        if (active) return active;
 
-      const isEnabled = channel?.autoCreateTickets || tenantAutoCreate;
-      if (!isEnabled) {
-        return null; // Not enabled
-      }
-
-
-      // Check if there is already an active ticket
-      const activeTicket = await this.getActiveTicket(tenantId, threadId);
-      if (activeTicket) {
-        return activeTicket;
-      }
-
-      // Check if there is a recently closed ticket (less than 24h)
-      // Note: If the closed ticket is already rated, do NOT reopen it! It was completed and rated.
-      const lastClosedTicket = await prisma.ticket.findFirst({
-        where: { tenantId, threadId, status: 'CLOSED' },
-        orderBy: { resolvedAt: 'desc' }
-      });
-
-      if (lastClosedTicket && lastClosedTicket.resolvedAt && !lastClosedTicket.rating) {
-        const diffHours = (new Date() - new Date(lastClosedTicket.resolvedAt)) / (1000 * 60 * 60);
-        if (diffHours < 24) {
-          logger.info(`[TicketsService] Auto-reopening ticket ${lastClosedTicket.id} for thread ${threadId}`);
-          return this.reopenTicket(tenantId, lastClosedTicket.id);
+        const lastClosed = await prisma.ticket.findFirst({
+          where: { tenantId, threadId, status: 'CLOSED' },
+          orderBy: { resolvedAt: 'desc' }
+        });
+        if (lastClosed?.resolvedAt && !lastClosed.rating && Date.now() - new Date(lastClosed.resolvedAt).getTime() < REOPEN_WINDOW_HOURS * HOUR_MS) {
+          logger.info(`[TicketsService] Customer wrote again: reopening ticket ${lastClosed.id}`);
+          return this._reopen(tenantId, lastClosed, { byCustomer: true, skipRouting: options.skipRouting });
         }
-      }
 
-      logger.info(`[TicketsService] Auto-creating ticket for thread ${threadId} on channel ${channelId}`);
-
-      
-      const subject = firstMessageText ? firstMessageText.substring(0, 100) : 'محادثة دعم فني';
-      return this.createTicket(tenantId, channelId, threadId, crmClientId, subject, null, options);
-
+        logger.info(`[TicketsService] Auto-creating ticket for thread ${threadId} on channel ${channelId}`);
+        return this._create(tenantId, {
+          channelId,
+          threadId,
+          crmClientId,
+          subject: firstMessageText ? firstMessageText.substring(0, 100) : 'محادثة دعم فني',
+          skipRouting: options.skipRouting
+        });
+      });
     } catch (error) {
       logger.error(`[TicketsService] Error auto-creating ticket: ${error.message}`);
       return null;
@@ -124,426 +117,388 @@ class TicketsService {
   }
 
   /**
-   * Create a new ticket (manually or automatically)
+   * Opens a ticket (by hand or from a flow). When the conversation already has an active ticket,
+   * returns it with `alreadyOpen: true` instead of opening a second one.
+   * options: { assignedToId (a person; null = nobody), skipRouting, actor, manual }
    */
-  async createTicket(tenantId, channelId, threadId, crmClientId, subject = 'محادثة واتساب', categoryId = null, { skipRouting = false } = {}) {
-    try {
-      // 1. Generate local ticket number
-      const count = await prisma.ticket.count({ where: { tenantId } });
-      const ticketNumber = `#TK-${String(count + 1).padStart(4, '0')}`;
+  async createTicket(tenantId, channelId, threadId, crmClientId, subject = 'محادثة واتساب', categoryId = null, options = {}) {
+    return withLock(threadLock(threadId), async () => {
+      const active = await this.getActiveTicket(tenantId, threadId);
+      if (active) return { ...active, alreadyOpen: true };
+      return this._create(tenantId, { channelId, threadId, crmClientId, subject, categoryId, ...options });
+    });
+  }
 
-      // 2. Fetch thread and category
-      const ChatThread = require('../../models/mongo/ChatThread');
-      const thread = await ChatThread.findById(threadId);
-      
-      let categoryName = "عام";
-      if (categoryId) {
-        const cat = await prisma.ticketCategory.findUnique({ where: { id: categoryId } });
-        if (cat) categoryName = cat.name;
-      }
+  async _nextNumber(tenantId) {
+    const [count, latest] = await Promise.all([
+      prisma.ticket.count({ where: { tenantId } }),
+      prisma.ticket.findFirst({ where: { tenantId }, orderBy: { createdAt: 'desc' }, select: { ticketNumber: true } })
+    ]);
+    const last = parseInt(String(latest?.ticketNumber || '').replace(/\D/g, ''), 10) || 0;
+    return Math.max(count, last) + 1;
+  }
 
-      // 3. Create ticket in Provider DB
-      const ticket = await prisma.ticket.create({
-        data: {
-          tenantId,
-          channelId,
-          threadId,
-          ticketNumber,
-          status: 'OPEN',
-          subject,
-          crmClientId,
-          categoryId: categoryId || undefined
-        }
-      });
+  /** Caller holds the conversation's lock */
+  async _create(tenantId, { channelId, threadId, crmClientId = null, subject, categoryId = null, skipRouting = false, assignedToId, actor = null, manual = false }) {
+    const { ChatThread, ChatMessage } = models();
+    const thread = await ChatThread.findById(threadId).catch(() => null);
 
-      // 3.0 Route to an agent of the team that owns this channel (on shift, by the team's rule)
-      // (skipped while a WhatsApp flow is handling the conversation — the flow hands off itself)
-      if (!skipRouting) {
-        const routingService = require('../workforce/routing.service');
-        const assignedToId = await routingService.autoAssignTicket(tenantId, ticket);
-        if (assignedToId) ticket.assignedToId = assignedToId;
-      }
-
-      // 3.1 Backfill ticketId on messages that belong to this new ticket
-      if (thread) {
-        const ChatMessage = require('../../models/mongo/ChatMessage');
-        
-        // Find previous closed ticket for this thread
-        const lastClosedTicket = await prisma.ticket.findFirst({
-          where: { tenantId, threadId, status: 'CLOSED' },
-          orderBy: { resolvedAt: 'desc' }
-        });
-
-        const query = {
-          threadId: thread._id,
-          content: { $not: /تقييم|شكراً لتقييمك/ }
-        };
-
-        if (lastClosedTicket && lastClosedTicket.resolvedAt) {
-          // Assign all messages sent after the previous ticket resolved
-          query.createdAt = { $gt: lastClosedTicket.resolvedAt };
-        } else {
-          query.$or = [{ ticketId: null }, { ticketId: { $exists: false } }];
-        }
-
-        await ChatMessage.updateMany(query, { $set: { ticketId: ticket.id } });
-      }
-
-      // 4. Sync ticket to CRM
-      const crmResponse = await webhookService.syncCrmTicket(tenantId, {
-        ticket_id: ticket.id,
-        ticket_number: ticketNumber,
-        phone: thread ? thread.contactPhone : '',
-        name: thread ? thread.contactName : '',
-        thread_id: threadId,
-        category_name: categoryName,
-        status: 'open',
+    // Number and insert under one tenant-wide lock, so two tickets never share a number
+    const ticket = await withLock(`ticket-number:${tenantId}`, async () => prisma.ticket.create({
+      data: {
+        tenantId,
+        channelId,
+        threadId,
+        ticketNumber: formatNumber(await this._nextNumber(tenantId)),
+        status: 'OPEN',
         subject: subject || 'محادثة واتساب',
-        description: subject || 'محادثة دعم فني جديدة'
-      });
-
-      if (crmResponse && crmResponse.ticket_id) {
-        await prisma.ticket.update({
-          where: { id: ticket.id },
-          data: { crmTicketId: String(crmResponse.ticket_id) }
-        });
-        ticket.crmTicketId = String(crmResponse.ticket_id);
+        crmClientId: crmClientId || null,
+        ...(categoryId && { categoryId }),
+        ...(assignedToId && { assignedToId })
       }
+    }), { ttlMs: 10000 });
 
-      // Real-time broadcast
-      try {
-        const socketService = require('../../services/socket.service');
-        socketService.emitToTenant(tenantId, 'ticket_updated', {
-          ticketId: ticket.id,
-          threadId: threadId,
-          status: 'OPEN'
-        });
-      } catch (sockErr) {}
-
-      return ticket;
-    } catch (error) {
-      logger.error(`[TicketsService] Error creating ticket: ${error.message}`);
-      throw error;
+    // Nobody chosen → the team that owns the number (skipped while a flow is talking; null = leave unassigned)
+    if (!ticket.assignedToId && !skipRouting && assignedToId !== null) {
+      const routingService = require('../workforce/routing.service');
+      const routed = await routingService.autoAssignTicket(tenantId, ticket);
+      if (routed) ticket.assignedToId = routed;
     }
+
+    // Messages since the previous ticket closed belong to this one
+    if (thread) {
+      const previous = await prisma.ticket.findFirst({
+        where: { tenantId, threadId, status: 'CLOSED', id: { not: ticket.id } },
+        orderBy: { resolvedAt: 'desc' }
+      });
+      const query = { threadId: thread._id, content: { $not: RATING_TEXT } };
+      if (previous?.resolvedAt) query.createdAt = { $gt: previous.resolvedAt };
+      else query.$or = [{ ticketId: null }, { ticketId: { $exists: false } }];
+      await ChatMessage.updateMany(query, { $set: { ticketId: ticket.id } });
+    }
+
+    if (manual) {
+      const assignee = await this._memberName(tenantId, ticket.assignedToId);
+      await this._note(tenantId, ticket, `🎫 فتح ${actorName(actor)} التذكرة ${ticket.ticketNumber}` +
+        (assignee ? `، وأُسندت إلى ${assignee}` : '، وهي غير مسندة لأحد بعد'));
+    }
+
+    const crm = await this._crmSync(tenantId, ticket, {
+      status: 'open',
+      categoryId,
+      description: subject || 'محادثة دعم فني جديدة',
+      thread
+    });
+    if (crm?.ticket_id) {
+      ticket.crmTicketId = String(crm.ticket_id);
+      await prisma.ticket.update({ where: { id: ticket.id }, data: { crmTicketId: ticket.crmTicketId } }).catch(() => {});
+    }
+
+    emit(tenantId, 'ticket_updated', ticketEvent(ticket));
+    return ticket;
   }
 
+  async reopenTicket(tenantId, ticketId, { actor = null } = {}) {
+    const found = await prisma.ticket.findFirst({ where: { id: ticketId, tenantId }, select: { threadId: true } });
+    if (!found) throw fail(404, 'Ticket not found');
 
-  /**
-   * Reopen a ticket
-   */
-  async reopenTicket(tenantId, ticketId) {
-    try {
-      const ticket = await prisma.ticket.findUnique({
-        where: { id: ticketId, tenantId },
-        include: { channel: true }
-      });
+    return withLock(threadLock(found.threadId), async () => {
+      const ticket = await prisma.ticket.findFirst({ where: { id: ticketId, tenantId } });
+      if (!CLOSED_STATUSES.includes(ticket.status)) throw fail(409, 'Only closed tickets can be reopened');
+      const other = await this.getActiveTicket(tenantId, ticket.threadId);
+      if (other) throw fail(409, `Ticket ${other.ticketNumber} is already open for this conversation`);
+      return this._reopen(tenantId, ticket, { actor });
+    });
+  }
 
-      if (!ticket) throw new Error('Ticket not found');
-      if (ticket.status !== 'CLOSED' && ticket.status !== 'RESOLVED') {
-        throw new Error('Only closed tickets can be reopened');
-      }
+  /** Caller holds the conversation's lock */
+  async _reopen(tenantId, ticket, { actor = null, byCustomer = false, skipRouting = false } = {}) {
+    // Keep the agent who handled it, unless they were deactivated meanwhile
+    let assignedToId = ticket.assignedToId;
+    if (assignedToId) {
+      const agent = await prisma.subUser.findFirst({ where: { id: assignedToId, tenantId }, select: { isActive: true } });
+      if (!agent?.isActive) assignedToId = null;
+    }
+    const updated = await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { status: 'OPEN', resolvedAt: null, assignedToId }
+    });
+    if (!updated.assignedToId && !skipRouting) {
+      const routingService = require('../workforce/routing.service');
+      const routed = await routingService.autoAssignTicket(tenantId, updated);
+      if (routed) updated.assignedToId = routed;
+    }
 
-      const previousResolvedAt = ticket.resolvedAt;
-
-      // Update in local DB
-      const updated = await prisma.ticket.update({
-        where: { id: ticketId },
-        data: {
-          status: 'OPEN',
-          resolvedAt: null
-        }
-      });
-
-      // Fetch thread
-      const ChatThread = require('../../models/mongo/ChatThread');
-      const ChatMessage = require('../../models/mongo/ChatMessage');
-      const mongoose = require('mongoose');
-      const thread = await ChatThread.findById(ticket.threadId);
-      const threadObjId = thread ? thread._id : (mongoose.Types.ObjectId.isValid(ticket.threadId) ? new mongoose.Types.ObjectId(ticket.threadId) : ticket.threadId);
-
-      // Backfill any unassigned or follow-up messages in this thread on ticket reopen
-      const updateQuery = {
+    // Follow-up messages since the close belong to this ticket again
+    const { ChatMessage } = models();
+    const mongoose = require('mongoose');
+    const threadObjId = mongoose.Types.ObjectId.isValid(ticket.threadId) ? new mongoose.Types.ObjectId(ticket.threadId) : ticket.threadId;
+    const unlinked = [{ ticketId: null }, { ticketId: { $exists: false } }, { ticketId: '' }];
+    await ChatMessage.updateMany(
+      {
         threadId: threadObjId,
-        content: { $not: /تقييم|شكراً لتقييمك/ }
-      };
+        content: { $not: RATING_TEXT },
+        $or: ticket.resolvedAt ? [{ createdAt: { $gte: ticket.resolvedAt } }, ...unlinked] : unlinked
+      },
+      { $set: { ticketId: ticket.id } }
+    );
 
-      if (previousResolvedAt) {
-        updateQuery.$or = [
-          { createdAt: { $gte: previousResolvedAt } },
-          { ticketId: null },
-          { ticketId: { $exists: false } },
-          { ticketId: "" }
-        ];
-      } else {
-        updateQuery.$or = [
-          { ticketId: null },
-          { ticketId: { $exists: false } },
-          { ticketId: "" }
-        ];
-      }
+    await this._note(tenantId, updated, byCustomer
+      ? `↩️ أُعيد فتح التذكرة ${updated.ticketNumber} لأن العميل راسل من جديد`
+      : `↩️ أعاد ${actorName(actor)} فتح التذكرة ${updated.ticketNumber}`);
 
-      await ChatMessage.updateMany(updateQuery, { $set: { ticketId: ticket.id } });
-
-      // Sync to CRM
-      let categoryName = "عام";
-      if (ticket.categoryId) {
-        const cat = await prisma.ticketCategory.findUnique({ where: { id: ticket.categoryId } });
-        if (cat) categoryName = cat.name;
-      }
-      
-      await webhookService.syncCrmTicket(tenantId, {
-        ticket_id: ticket.id,
-        ticket_number: ticket.ticketNumber,
-        phone: thread ? thread.contactPhone : '',
-        name: thread ? thread.contactName : '',
-        thread_id: ticket.threadId,
-        category_name: categoryName,
-        status: 'open',
-        subject: ticket.subject || 'إعادة فتح تذكرة',
-        description: 'تمت إعادة فتح التذكرة'
-      });
-
-      // Real-time broadcast
-      try {
-        const socketService = require('../../services/socket.service');
-        socketService.emitToTenant(tenantId, 'ticket_updated', {
-          ticketId: ticket.id,
-          threadId: ticket.threadId,
-          status: 'OPEN'
-        });
-      } catch (sockErr) {}
-
-      return updated;
-    } catch (error) {
-      logger.error('Error in reopenTicket service:', error);
-      throw error;
-    }
+    await this._crmSync(tenantId, updated, { status: 'open', description: 'تمت إعادة فتح التذكرة' });
+    emit(tenantId, 'ticket_updated', ticketEvent(updated));
+    return updated;
   }
 
-  /**
-   * Close a ticket
-   */
-  async closeTicket(tenantId, ticketId, description = 'تم حل المشكلة', categoryId = null) {
-    try {
-      const ticket = await prisma.ticket.findUnique({
-        where: { id: ticketId, tenantId },
-        include: { channel: true }
-      });
+  // ─── Assigning & editing ────────────────────────────────────────────
 
-      if (!ticket) throw new Error('Ticket not found');
+  /** Assigns an active ticket to a team member of the tenant (null = nobody) */
+  async assignTicket(tenantId, ticketId, assignedToId, { actor = null } = {}) {
+    const ticket = await prisma.ticket.findFirst({ where: { id: ticketId, tenantId } });
+    if (!ticket) throw fail(404, 'Ticket not found');
+    if (!ACTIVE_STATUSES.includes(ticket.status)) throw fail(409, 'Reopen the ticket before assigning it');
 
-      // Update in local DB
-      const updated = await prisma.ticket.update({
-        where: { id: ticketId },
-        data: {
-          status: 'CLOSED',
-          resolvedAt: new Date(),
-          ...(categoryId ? { categoryId } : {})
-        }
-      });
+    const targetId = assignedToId || null;
+    let assignee = null;
+    if (targetId) {
+      assignee = await prisma.subUser.findFirst({ where: { id: targetId, tenantId }, select: { id: true, name: true, isActive: true } });
+      if (!assignee) throw fail(400, 'Team member not found');
+      if (!assignee.isActive) throw fail(400, 'This team member is deactivated');
+    }
+    if ((ticket.assignedToId || null) === targetId) return ticket;
 
-      // Generate AI Summary
-      const aiService = require('../ai/ai.service');
-      const summaryText = await aiService.summarizeTicket(tenantId, ticket.threadId);
-      if (summaryText) {
-        await prisma.ticket.update({
-          where: { id: ticketId },
-          data: { summary: summaryText }
-        });
-      }
+    const updated = await prisma.ticket.update({ where: { id: ticket.id }, data: { assignedToId: targetId } });
+    await this._note(tenantId, updated, assignee
+      ? (actor?.key === assignee.id ? `👤 استلم ${assignee.name} التذكرة ${updated.ticketNumber}` : `👤 أسند ${actorName(actor)} التذكرة ${updated.ticketNumber} إلى ${assignee.name}`)
+      : `👤 أزال ${actorName(actor)} الإسناد عن التذكرة ${updated.ticketNumber}`);
 
-      // Close in CRM
-      const ChatThread = require('../../models/mongo/ChatThread');
-      const thread = await ChatThread.findById(ticket.threadId);
-      
-      await webhookService.syncCrmTicket(tenantId, {
-        ticket_id: ticket.id,
-        ticket_number: ticket.ticketNumber,
-        phone: thread ? thread.contactPhone : '',
-        name: thread ? thread.contactName : '',
-        thread_id: ticket.threadId,
-        category_name: categoryId ? (await prisma.ticketCategory.findUnique({ where: { id: categoryId } }))?.name || "عام" : "عام",
-        status: 'closed',
-        subject: ticket.subject || 'بدون عنوان',
-        description: description,
-        summary: summaryText || ticket.summary || ''
-      });
-
-      // Send Rating Message
+    // The new owner hears about it in team chat (unless they took it themselves)
+    if (assignee && actor?.key && actor.key !== assignee.id) {
       try {
-        const ChatThread = require('../../models/mongo/ChatThread');
-        const chatService = require('../chat/chat.service');
-        const thread = await ChatThread.findById(ticket.threadId);
-        
-        if (thread && ticket.channel) {
-          const tenantData = await prisma.tenant.findUnique({ where: { id: tenantId } });
-          const customFeatures = typeof tenantData.customFeatures === 'object' ? tenantData.customFeatures : {};
-          const ratingText = customFeatures?.ticketSettings?.ratingMessageText || "تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).";
-          const ratingType = customFeatures?.ticketSettings?.ratingType || 'LIST_5_STARS';
-          
-          if (ticket.channel.providerType === 'META_CLOUD') {
-            const metaService = require('../meta/meta.service');
-            let metaRes;
-
-            if (ratingType === 'BUTTONS_3') {
-              // 3 Quick-Reply Buttons (WhatsApp Meta limit: max 3 buttons)
-              metaRes = await metaService.sendButtons(
-                ticket.channel,
-                thread.contactPhone,
-                ratingText,
-                [
-                  { id: `RATE_${ticket.id}_1`, text: "1 ⭐" },
-                  { id: `RATE_${ticket.id}_3`, text: "3 ⭐" },
-                  { id: `RATE_${ticket.id}_5`, text: "5 ⭐" }
-                ]
-              );
-            } else if (ratingType === 'TEXT') {
-              // Text message
-              metaRes = await metaService.sendText(
-                ticket.channel,
-                thread.contactPhone,
-                ratingText + "\n\nللتقييم، يرجى الرد برقم من 1 إلى 5 (مثال: 5)."
-              );
-            } else {
-              // Default: Interactive 5-Star List (allows all 5 stars 1 to 5!)
-              metaRes = await metaService.sendList(
-                ticket.channel,
-                thread.contactPhone,
-                "تقييم الخدمة",
-                ratingText,
-                "تقييم الخدمة ⭐",
-                [
-                  {
-                    title: "اختر مستوى رضاك",
-                    rows: [
-                      { id: `RATE_${ticket.id}_5`, title: "⭐⭐⭐⭐⭐ ممتاز", description: "خدمة ممتازة وسريعة" },
-                      { id: `RATE_${ticket.id}_4`, title: "⭐⭐⭐⭐ جيد جداً", description: "خدمة جيدة جداً" },
-                      { id: `RATE_${ticket.id}_3`, title: "⭐⭐⭐ جيد", description: "خدمة مقبولة" },
-                      { id: `RATE_${ticket.id}_2`, title: "⭐⭐ غير راضٍ", description: "بحاجة لتحسين" },
-                      { id: `RATE_${ticket.id}_1`, title: "⭐ سيء جداً", description: "تجربة غير مرضية" }
-                    ]
-                  }
-                ]
-              );
-            }
-            // Save to DB so it shows in Dashboard
-            const ChatMessage = require('../../models/mongo/ChatMessage');
-            await ChatMessage.create({
-              threadId: ticket.threadId,
-              tenantId: tenantId,
-              direction: 'OUTBOUND',
-              type: 'text',
-              content: '[تم إرسال رسالة التقييم للعميل]\n' + ratingText,
-              messageId: metaRes?.messages?.[0]?.id || 'local_' + Date.now(),
-              status: 'sent',
-              createdAt: new Date()
-            });
-          } else {
-            // Text message for Baileys
-            await chatService.sendMessage(tenantId, ticket.threadId, {
-              content: ratingText + "\nللتقييم، أرسل رقم التقييم كرسالة (مثال: 5).",
-              type: 'text'
-            });
-          }
-        }
+        const teamChatService = require('../team-chat/team-chat.service');
+        await teamChatService.notifyMentions(tenantId, actor.key, [assignee.id], {
+          threadId: updated.threadId,
+          text: `أسندتُ إليك التذكرة ${updated.ticketNumber}`
+        });
       } catch (err) {
-        logger.error(`[TicketsService] Error sending rating message: ${err.message}`);
+        logger.warn(`[TicketsService] Could not notify the assignee: ${err.message}`);
+      }
+    }
+
+    emit(tenantId, 'ticket_updated', ticketEvent(updated));
+    return updated;
+  }
+
+  /** Category / priority / subject of a ticket */
+  async updateTicket(tenantId, ticketId, { categoryId, priority, subject } = {}) {
+    const ticket = await prisma.ticket.findFirst({ where: { id: ticketId, tenantId } });
+    if (!ticket) throw fail(404, 'Ticket not found');
+
+    const data = {};
+    if (categoryId !== undefined) {
+      if (categoryId && !(await prisma.ticketCategory.findFirst({ where: { id: categoryId, tenantId }, select: { id: true } }))) {
+        throw fail(400, 'Category not found');
+      }
+      data.categoryId = categoryId || null;
+    }
+    if (priority !== undefined) {
+      if (!PRIORITIES.includes(priority)) throw fail(400, 'Unknown priority');
+      data.priority = priority;
+    }
+    if (subject !== undefined) {
+      const clean = String(subject || '').trim().slice(0, 200);
+      if (!clean) throw fail(400, 'The subject cannot be empty');
+      data.subject = clean;
+    }
+    if (Object.keys(data).length === 0) return ticket;
+
+    const updated = await prisma.ticket.update({ where: { id: ticket.id }, data });
+    emit(tenantId, 'ticket_updated', ticketEvent(updated));
+    return updated;
+  }
+
+  // ─── Closing ────────────────────────────────────────────────────────
+
+  /**
+   * Closes an active ticket: optional category, a note with the resolution for the team, and the
+   * rating request to the customer (only while Meta's 24h window is open). The AI summary and the
+   * CRM update run afterwards, so closing stays instant.
+   * options: { description, categoryId, sendRating (default true), actor, auto }
+   */
+  async closeTicket(tenantId, ticketId, { description = '', categoryId = null, sendRating = true, actor = null, auto = false } = {}) {
+    const found = await prisma.ticket.findFirst({ where: { id: ticketId, tenantId }, select: { threadId: true } });
+    if (!found) throw fail(404, 'Ticket not found');
+
+    return withLock(threadLock(found.threadId), async () => {
+      const ticket = await prisma.ticket.findFirst({ where: { id: ticketId, tenantId }, include: { channel: true } });
+      if (CLOSED_STATUSES.includes(ticket.status)) throw fail(409, 'This ticket is already closed');
+      if (categoryId && !(await prisma.ticketCategory.findFirst({ where: { id: categoryId, tenantId }, select: { id: true } }))) {
+        throw fail(400, 'Category not found');
       }
 
-      // Real-time broadcast
-      try {
-        const socketService = require('../../services/socket.service');
-        socketService.emitToTenant(tenantId, 'ticket_updated', {
-          ticketId: ticket.id,
-          threadId: ticket.threadId,
-          status: 'CLOSED'
-        });
-      } catch (sockErr) {}
+      const updated = await prisma.ticket.update({
+        where: { id: ticket.id },
+        data: { status: 'CLOSED', resolvedAt: new Date(), ...(categoryId && { categoryId }) }
+      });
 
-      return updated;
-    } catch (error) {
-      logger.error(`[TicketsService] Error closing ticket: ${error.message}`);
-      throw error;
+      const rating = sendRating ? await this._sendRatingRequest(tenantId, ticket) : 'OFF';
+      const categoryName = await this._categoryName(tenantId, updated.categoryId);
+      const resolution = String(description || '').trim();
+      const ratingLine = {
+        SENT: 'أُرسل للعميل طلب تقييم الخدمة.',
+        WINDOW_CLOSED: 'لم يُرسل طلب التقييم: مرّ أكثر من 24 ساعة على آخر رسالة من العميل (سياسة Meta).',
+        FAILED: 'تعذّر إرسال طلب التقييم للعميل.'
+      }[rating];
+      await this._note(tenantId, updated, [
+        auto ? `✅ أُغلقت التذكرة ${updated.ticketNumber} تلقائياً` : `✅ أغلق ${actorName(actor)} التذكرة ${updated.ticketNumber}`,
+        updated.categoryId && `التصنيف: ${categoryName}`,
+        resolution && `${auto ? 'السبب' : 'الحل'}: ${resolution}`,
+        ratingLine
+      ].filter(Boolean).join('\n'));
+
+      emit(tenantId, 'ticket_updated', ticketEvent(updated));
+      this._afterClose(tenantId, updated, { description: resolution || 'تم حل المشكلة' });
+      return { ...updated, ratingRequest: rating };
+    });
+  }
+
+  /** AI summary, then the CRM update (which carries the summary) — in the background */
+  _afterClose(tenantId, ticket, { description }) {
+    setImmediate(async () => {
+      try {
+        const aiService = require('../ai/ai.service');
+        const summary = await aiService.summarizeTicket(tenantId, ticket.threadId);
+        if (summary) await prisma.ticket.update({ where: { id: ticket.id }, data: { summary } });
+        await this._crmSync(tenantId, ticket, { status: 'closed', description, summary: summary || ticket.summary || '' });
+      } catch (err) {
+        logger.error(`[TicketsService] After-close work failed for ${ticket.id}: ${err.message}`);
+      }
+    });
+  }
+
+  /** Returns 'SENT', 'WINDOW_CLOSED', 'FAILED' or 'SKIPPED' */
+  async _sendRatingRequest(tenantId, ticket) {
+    try {
+      const { ChatThread, ChatMessage } = models();
+      const thread = await ChatThread.findById(ticket.threadId).catch(() => null);
+      if (!thread || !ticket.channel) return 'SKIPPED';
+
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } });
+      const settings = (tenant?.customFeatures && typeof tenant.customFeatures === 'object' ? tenant.customFeatures : {}).ticketSettings || {};
+      const ratingText = settings.ratingMessageText || 'تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).';
+      const ratingType = settings.ratingType || 'LIST_5_STARS';
+
+      if (ticket.channel.providerType !== 'META_CLOUD') {
+        const chatService = require('../chat/chat.service');
+        await chatService.sendMessage(tenantId, ticket.threadId, {
+          content: `${ratingText}\nللتقييم، أرسل رقم التقييم كرسالة (مثال: 5).`,
+          type: 'text',
+          ticketId: ticket.id,
+          isAutomated: true
+        });
+        return 'SENT';
+      }
+
+      // Meta refuses free-form messages more than 24h after the customer's last message
+      const lastInboundAt = thread.lastInboundAt || (await ChatMessage.findOne({ threadId: thread._id, direction: 'INBOUND' })
+        .sort({ createdAt: -1 }).select('createdAt').lean())?.createdAt;
+      if (!lastInboundAt || Date.now() - new Date(lastInboundAt).getTime() > CUSTOMER_WINDOW_MS) return 'WINDOW_CLOSED';
+
+      const metaService = require('../meta/meta.service');
+      let metaRes;
+      if (ratingType === 'BUTTONS_3') {
+        metaRes = await metaService.sendButtons(ticket.channel, thread.contactPhone, ratingText, [
+          { id: `RATE_${ticket.id}_1`, text: '1 ⭐' },
+          { id: `RATE_${ticket.id}_3`, text: '3 ⭐' },
+          { id: `RATE_${ticket.id}_5`, text: '5 ⭐' }
+        ]);
+      } else if (ratingType === 'TEXT') {
+        metaRes = await metaService.sendText(ticket.channel, thread.contactPhone, `${ratingText}\n\nللتقييم، يرجى الرد برقم من 1 إلى 5 (مثال: 5).`);
+      } else {
+        metaRes = await metaService.sendList(ticket.channel, thread.contactPhone, 'تقييم الخدمة', ratingText, 'تقييم الخدمة ⭐', [{
+          title: 'اختر مستوى رضاك',
+          rows: [
+            { id: `RATE_${ticket.id}_5`, title: '⭐⭐⭐⭐⭐ ممتاز', description: 'خدمة ممتازة وسريعة' },
+            { id: `RATE_${ticket.id}_4`, title: '⭐⭐⭐⭐ جيد جداً', description: 'خدمة جيدة جداً' },
+            { id: `RATE_${ticket.id}_3`, title: '⭐⭐⭐ جيد', description: 'خدمة مقبولة' },
+            { id: `RATE_${ticket.id}_2`, title: '⭐⭐ غير راضٍ', description: 'بحاجة لتحسين' },
+            { id: `RATE_${ticket.id}_1`, title: '⭐ سيء جداً', description: 'تجربة غير مرضية' }
+          ]
+        }]);
+      }
+
+      const message = await ChatMessage.create({
+        threadId: thread._id,
+        direction: 'OUTBOUND',
+        type: 'TEXT',
+        content: `[تم إرسال رسالة التقييم للعميل]\n${ratingText}`,
+        metaMessageId: metaRes?.messages?.[0]?.id || null,
+        status: 'SENT',
+        ticketId: ticket.id,
+        isAutomated: true
+      });
+      const data = message.toObject();
+      data.id = data._id.toString();
+      emit(tenantId, 'new_chat_message', data);
+      return 'SENT';
+    } catch (err) {
+      logger.error(`[TicketsService] Error sending rating message: ${err.message}`);
+      return 'FAILED';
     }
   }
 
   /**
-   * Process and auto-close inactive tickets across all tenants
+   * Closes tickets where the team answered last and the customer stayed silent for the tenant's
+   * auto-close period (default 24h). Team notes do not count as an answer.
    */
   async autoCloseInactiveTickets() {
     try {
       const openTickets = await prisma.ticket.findMany({
-        where: {
-          status: { in: ['OPEN', 'PENDING'] }
-        },
-        include: {
-          channel: true,
-          tenant: {
-            select: { id: true, customFeatures: true }
-          }
-        }
+        where: { status: { in: ACTIVE_STATUSES } },
+        include: { tenant: { select: { id: true, customFeatures: true } } }
       });
-
       if (!openTickets.length) return { processed: 0, closed: 0 };
 
       logger.info(`[AutoClose] Checking ${openTickets.length} active tickets for inactivity...`);
-
-      const ChatMessage = require('../../models/mongo/ChatMessage');
-      const ChatThread = require('../../models/mongo/ChatThread');
+      const { ChatMessage } = models();
       const mongoose = require('mongoose');
-
       let closedCount = 0;
 
       for (const ticket of openTickets) {
         try {
-          const customFeatures = typeof ticket.tenant?.customFeatures === 'object' ? ticket.tenant.customFeatures : {};
-          const ticketSettings = customFeatures?.ticketSettings || {};
+          const features = ticket.tenant?.customFeatures && typeof ticket.tenant.customFeatures === 'object' ? ticket.tenant.customFeatures : {};
+          const settings = features.ticketSettings || {};
+          if (settings.autoCloseEnabled === false) continue;
+          const timeoutHours = Number(settings.autoCloseHours) || 24;
 
-          // Default: auto-close is enabled unless explicitly false
-          const isEnabled = ticketSettings.autoCloseEnabled !== false;
-          if (!isEnabled) continue;
-
-          // Inactivity timeout in hours (default 24h)
-          const timeoutHours = Number(ticketSettings.autoCloseHours) || 24;
-
-          const thread = await ChatThread.findById(ticket.threadId).catch(() => null);
-          const threadObjId = thread ? thread._id : (mongoose.Types.ObjectId.isValid(ticket.threadId) ? new mongoose.Types.ObjectId(ticket.threadId) : ticket.threadId);
-
-          // Find the last non-evaluation message in this thread
+          if (!mongoose.Types.ObjectId.isValid(ticket.threadId)) continue;
           const lastMsg = await ChatMessage.findOne({
-            threadId: threadObjId,
-            content: { $not: /تقييم|شكراً لتقييمك/ }
-          }).sort({ createdAt: -1 });
+            threadId: new mongoose.Types.ObjectId(ticket.threadId),
+            isInternal: { $ne: true },
+            content: { $not: RATING_TEXT }
+          }).sort({ createdAt: -1 }).select('direction createdAt').lean();
 
-          let shouldClose = false;
-          let reason = '';
-
+          let reason = null;
           if (lastMsg) {
-            // ONLY auto-close if the last message was OUTBOUND (sent by agent or system to client).
-            // If the client spoke last (INBOUND), the client is waiting for support - DO NOT close!
-            if (lastMsg.direction === 'OUTBOUND') {
-              const diffHours = (Date.now() - new Date(lastMsg.createdAt).getTime()) / (1000 * 60 * 60);
-              if (diffHours >= timeoutHours) {
-                shouldClose = true;
-                reason = `تم الإغلاق تلقائياً لعدم استجابة العميل بعد ${diffHours.toFixed(0)} ساعة`;
-              }
+            // The customer wrote last → they are waiting for us, never close
+            const hours = (Date.now() - new Date(lastMsg.createdAt).getTime()) / HOUR_MS;
+            if (lastMsg.direction === 'OUTBOUND' && hours >= timeoutHours) {
+              reason = `لم يرد العميل منذ ${Math.floor(hours)} ساعة`;
             }
           } else {
-            // If ticket has no messages at all, check ticket creation time
-            const diffHours = (Date.now() - new Date(ticket.createdAt).getTime()) / (1000 * 60 * 60);
-            if (diffHours >= timeoutHours) {
-              shouldClose = true;
-              reason = `تم الإغلاق تلقائياً لعدم وجود نشاط بعد ${diffHours.toFixed(0)} ساعة`;
-            }
+            const hours = (Date.now() - new Date(ticket.createdAt).getTime()) / HOUR_MS;
+            if (hours >= timeoutHours) reason = `لا يوجد نشاط منذ ${Math.floor(hours)} ساعة`;
           }
 
-          if (shouldClose) {
-            logger.info(`[AutoClose] Auto-closing ticket ${ticket.ticketNumber} (${ticket.id}) for tenant ${ticket.tenantId}. Reason: ${reason}`);
-            await this.closeTicket(ticket.tenantId, ticket.id, reason);
+          if (reason) {
+            logger.info(`[AutoClose] Closing ticket ${ticket.ticketNumber} (${ticket.id}) of tenant ${ticket.tenantId}: ${reason}`);
+            await this.closeTicket(ticket.tenantId, ticket.id, { description: reason, auto: true });
             closedCount++;
           }
         } catch (ticketErr) {
-          logger.error(`[AutoClose] Error evaluating ticket ${ticket.id}: ${ticketErr.message}`);
+          if (ticketErr?.status !== 409) logger.error(`[AutoClose] Error evaluating ticket ${ticket.id}: ${ticketErr.message}`);
         }
       }
 
@@ -554,6 +509,70 @@ class TicketsService {
       return { error: err.message };
     }
   }
+
+  // ─── Helpers ────────────────────────────────────────────────────────
+
+  async _memberName(tenantId, subUserId) {
+    if (!subUserId) return null;
+    const member = await prisma.subUser.findFirst({ where: { id: subUserId, tenantId }, select: { name: true } });
+    return member?.name || null;
+  }
+
+  async _categoryName(tenantId, categoryId) {
+    if (!categoryId) return 'عام';
+    const category = await prisma.ticketCategory.findFirst({ where: { id: categoryId, tenantId }, select: { name: true } });
+    return category?.name || 'عام';
+  }
+
+  /** Activity line in the conversation, for the team only (who opened, assigned, closed…) */
+  async _note(tenantId, ticket, text) {
+    try {
+      const { ChatMessage } = models();
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(ticket.threadId)) return;
+      const message = await ChatMessage.create({
+        threadId: ticket.threadId,
+        direction: 'OUTBOUND',
+        type: 'INTERNAL_NOTE',
+        content: text,
+        status: 'READ',
+        isInternal: true,
+        isAutomated: true,
+        ticketId: ticket.id
+      });
+      const data = message.toObject();
+      data.id = data._id.toString();
+      emit(tenantId, 'new_chat_message', data);
+    } catch (err) {
+      logger.warn(`[TicketsService] Could not add the ticket note: ${err.message}`);
+    }
+  }
+
+  /** ticket.sync to the tenant's CRM webhook; never throws */
+  async _crmSync(tenantId, ticket, { status, description, summary, rating, categoryId, thread } = {}) {
+    try {
+      const { ChatThread } = models();
+      const conversation = thread !== undefined ? thread : await ChatThread.findById(ticket.threadId).catch(() => null);
+      return await webhookService.syncCrmTicket(tenantId, {
+        ticket_id: ticket.id,
+        ticket_number: ticket.ticketNumber,
+        thread_id: ticket.threadId,
+        phone: conversation ? conversation.contactPhone : '',
+        name: conversation ? conversation.contactName : '',
+        category_name: await this._categoryName(tenantId, categoryId || ticket.categoryId),
+        status,
+        subject: ticket.subject || 'محادثة واتساب',
+        ...(description !== undefined && { description }),
+        ...(summary !== undefined && { summary }),
+        ...(rating !== undefined && { rating })
+      });
+    } catch (err) {
+      logger.error(`[TicketsService] CRM sync failed for ticket ${ticket.id}: ${err.message}`);
+      return null;
+    }
+  }
 }
 
 module.exports = new TicketsService();
+module.exports.ACTIVE_STATUSES = ACTIVE_STATUSES;
+module.exports.PRIORITIES = PRIORITIES;

@@ -22,6 +22,16 @@ redisClient.on('ready', () => {
   logger.info('Redis client connected and ready');
 });
 
+// BullMQ queues and workers open their own connections from these settings (workers need
+// maxRetriesPerRequest: null for their blocking reads)
+const bullConnection = {
+  host: config.redis.host,
+  port: config.redis.port,
+  ...(config.redis.password && { password: config.redis.password }),
+  maxRetriesPerRequest: null
+};
+
 module.exports = {
-  redisClient
+  redisClient,
+  bullConnection
 };

@@ -5,6 +5,7 @@ const { metaErrorInfo, metaErrorText } = require('../meta/meta.errors');
 const socketService = require('../../services/socket.service');
 const billingService = require('../billing/billing.service');
 const logger = require('../../utils/logger');
+const { withLock } = require('../../utils/keyLock');
 const ChatThread = require('../../models/mongo/ChatThread');
 const ChatMessage = require('../../models/mongo/ChatMessage');
 
@@ -246,19 +247,15 @@ class ChatService {
 
     const ticketsService = require('../tickets/tickets.service');
     
-    // Auto-assign ticket if unassigned and a sub-user replies to the customer (writing a team note is not taking the chat)
+    // A team member who replies to the customer takes an unassigned ticket (a team note does not)
     if (payload.senderId && !payload.isInternal) {
       try {
         const activeTicket = await ticketsService.getActiveTicket(tenantId, threadId);
         if (activeTicket && !activeTicket.assignedToId) {
-
-          await prisma.ticket.update({
-            where: { id: activeTicket.id },
-            data: { assignedToId: payload.senderId }
-          });
-          logger.info(`[ChatService] Auto-assigned ticket ${activeTicket.id} to user ${payload.senderId}`);
+          await ticketsService.assignTicket(tenantId, activeTicket.id, payload.senderId, { actor: { key: payload.senderId } });
+          logger.info(`[ChatService] Ticket ${activeTicket.id} taken by ${payload.senderId} (first reply)`);
         }
-      } catch(err) {
+      } catch (err) {
         logger.error('[ChatService] Error auto-assigning ticket: ' + err.message);
       }
     }
@@ -353,7 +350,21 @@ class ChatService {
     }
   }
 
+  /**
+   * One customer message. Messages of the same customer are handled one at a time and in order
+   * (the webhook queue runs several jobs at once), and a message Meta delivers twice is handled once.
+   */
   async handleIncomingMessage(tenantId, channelId, contactPhone, contactName, msg) {
+    return withLock(`inbound:${channelId}:${contactPhone}`, async () => {
+      if (msg?.id && await ChatMessage.exists({ metaMessageId: msg.id })) {
+        logger.info(`[ChatService] Message ${msg.id} was already handled, skipping the duplicate`);
+        return { flowHandled: false, duplicate: true };
+      }
+      return this._handleIncomingMessage(tenantId, channelId, contactPhone, contactName, msg);
+    }, { ttlMs: 90000, waitMs: 60000 });
+  }
+
+  async _handleIncomingMessage(tenantId, channelId, contactPhone, contactName, msg) {
     let type = 'TEXT';
     let content = '';
     let hasMedia = false;

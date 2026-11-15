@@ -285,15 +285,22 @@ class FlowEngine {
       // Team hand-off with no team on this number: nothing to route to, leave the conversation as is
       if (d.mode !== 'AGENT' && !(await Team.exists({ tenantId: ctx.tenantId, channelIds: ctx.channelId }))) return;
       const thread = await ChatThread.findById(ctx.threadId).select('crmClientId').lean();
-      ticket = await ticketsService.createTicket(ctx.tenantId, ctx.channelId, ctx.threadId, thread?.crmClientId || null, 'محادثة واتساب');
+      // "One agent" goes straight to that person; the team's routing would pick someone else first
+      ticket = await ticketsService.createTicket(ctx.tenantId, ctx.channelId, ctx.threadId, thread?.crmClientId || null, 'محادثة واتساب', null,
+        d.mode === 'AGENT' && d.agentId ? { assignedToId: d.agentId, skipRouting: true } : {});
     }
     if (ticket.assignedToId) return;
 
+    let assigned = false;
     if (d.mode === 'AGENT' && d.agentId) {
-      await prisma.ticket.update({ where: { id: ticket.id }, data: { assignedToId: d.agentId } });
-    } else {
-      await routingService.autoAssignTicket(ctx.tenantId, ticket);
+      try {
+        await ticketsService.assignTicket(ctx.tenantId, ticket.id, d.agentId);
+        assigned = true;
+      } catch (err) {
+        logger.warn(`[FlowEngine] Could not hand to agent ${d.agentId} (${err.message}), using the team's routing`);
+      }
     }
+    if (!assigned) await routingService.autoAssignTicket(ctx.tenantId, ticket);
     try {
       const socketService = require('../../services/socket.service');
       socketService.emitToTenant(ctx.tenantId, 'ticket_updated', { ticketId: ticket.id, threadId: ctx.threadId, status: 'OPEN' });

@@ -18,8 +18,14 @@ router.get('/categories', requireAnyPermission('can_view_live_chat', 'can_manage
 router.post('/categories', settings, ticketsController.createCategory);
 router.delete('/categories/:id', settings, ticketsController.deleteCategory);
 
+// Team members for the assign picker (shift + current load)
+router.get('/assignees', liveChat, ticketsController.getAssignees);
+
 // Get a single ticket
 router.get('/:id', ticketAccess, ticketsController.getTicket);
+
+// Category / priority / subject
+router.patch('/:id', ticketAccess, ticketsController.updateTicket);
 
 // Create a ticket manually
 router.post('/', liveChat, accessService.bodyThreadGuard(), ticketsController.createTicket);

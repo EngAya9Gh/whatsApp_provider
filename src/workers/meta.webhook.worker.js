@@ -1,7 +1,7 @@
 const { Queue, Worker } = require('bullmq');
 const { PrismaClient } = require('@prisma/client');
 const logger = require('../utils/logger');
-const redisConfig = require('../config/redis');
+const { bullConnection } = require('../config/redis');
 
 const prisma = new PrismaClient();
 
@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
  * All incoming META webhook payloads are queued here with automatic retries.
  */
 const metaWebhookQueue = new Queue('meta-webhook-queue', {
-  connection: redisConfig,
+  connection: bullConnection,
   defaultJobOptions: {
     attempts: 5,
     backoff: { type: 'exponential', delay: 2000 },
@@ -36,7 +36,7 @@ const worker = new Worker('meta-webhook-queue', async (job) => {
     // Meta Business Agent: read-only copies of the conversations it answers, and its handovers to the team
     await require('../modules/meta/meta.agent.inbox').processAgentEvent(channelId, payload);
   }
-}, { connection: redisConfig, concurrency: 10 });
+}, { connection: bullConnection, concurrency: 10 });
 
 async function processIncomingMessage(channelId, tenantId, payload) {
   const { msg, contacts } = payload;

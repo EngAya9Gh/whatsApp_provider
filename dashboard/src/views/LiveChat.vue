@@ -111,60 +111,70 @@
             </button>
             <button type="button" class="ticket-btn share-btn" @click="showShareModal = true" :title="isAr ? 'مشاركة مع زميل' : 'Share with a colleague'">
               <i class="fas fa-share"></i>
-              <span>{{ isAr ? 'مشاركة' : 'Share' }}</span>
+              <span class="btn-label">{{ isAr ? 'مشاركة' : 'Share' }}</span>
             </button>
-            <!-- Case 1: Active Ticket is OPEN -->
-            <template v-if="activeTicket && activeTicket.status === 'OPEN'">
-              <span class="ticket-badge-open">
-                <i class="fas fa-ticket-alt"></i>
-                <span>{{ activeTicket.ticketNumber || ('#' + activeTicket.id.slice(0, 8)) }}</span>
-              </span>
-              <button 
-                type="button" 
-                @click="promptAssign(activeTicket)" 
-                class="ticket-btn ticket-btn-assign"
-                :title="isAr ? 'إسناد التذكرة لموظف' : 'Assign to Team Member'"
-              >
-                <i class="fas fa-user-tag"></i>
-                <span>{{ getAssignedUserName(activeTicket.assignedToId) || (isAr ? 'إسناد' : 'Assign') }}</span>
-              </button>
-              <button 
-                type="button" 
-                @click="closeActiveTicket" 
-                class="ticket-btn ticket-btn-close" 
-                :disabled="creatingTicket"
-                title="إغلاق التذكرة الحالية"
-              >
-                <i class="fas fa-times-circle"></i>
-                <span>{{ isAr ? 'إغلاق التذكرة' : 'Close Ticket' }}</span>
-              </button>
-            </template>
 
-            <!-- Case 2: No ticket is currently open -->
-            <template v-else>
-              <!-- Option to reopen previous closed ticket -->
-              <button 
-                v-if="hasReopenableTicket" 
-                type="button" 
-                @click="reopenActiveTicket" 
-                class="ticket-btn ticket-btn-reopen" 
+            <!-- Active ticket: number, who has it, category, close -->
+            <div v-if="activeTicket && isActiveStatus(activeTicket.status)" class="ticket-group">
+              <span class="ticket-badge-open" :title="activeTicket.subject || ''">
+                <i class="fas fa-ticket-alt"></i>
+                <span dir="ltr">{{ activeTicket.ticketNumber || ('#' + activeTicket.id.slice(0, 8)) }}</span>
+              </span>
+              <button
+                type="button"
+                @click="promptAssign(activeTicket)"
+                class="ticket-btn ticket-btn-assign"
+                :class="{ unassigned: !activeTicket.assignedToId }"
+                :title="activeTicket.assignedToId ? (isAr ? 'مسندة إلى ' : 'Assigned to ') + (getAssignedUserName(activeTicket.assignedToId) || '') : (isAr ? 'إسناد التذكرة لموظف' : 'Assign to a team member')"
+              >
+                <span v-if="activeTicket.assignedToId" class="mini-avatar" :style="{ background: categoryColor(getAssignedUserName(activeTicket.assignedToId) || '') }">{{ initials(getAssignedUserName(activeTicket.assignedToId) || '?') }}</span>
+                <i v-else class="fas fa-user-plus"></i>
+                <span class="btn-label">{{ activeTicket.assignedToId ? (getAssignedUserName(activeTicket.assignedToId) || (isAr ? 'مسندة' : 'Assigned')) : (isAr ? 'إسناد' : 'Assign') }}</span>
+              </button>
+              <button
+                type="button"
+                @click="showCategoryModal = true"
+                class="ticket-btn ticket-btn-category"
+                :style="activeCategory ? chipStyle(categoryColor(activeCategory.name)) : null"
+                :title="isAr ? 'تصنيف التذكرة' : 'Ticket category'"
+              >
+                <i class="fas fa-tag"></i>
+                <span class="btn-label">{{ activeCategory ? activeCategory.name : (isAr ? 'تصنيف' : 'Category') }}</span>
+              </button>
+              <button
+                type="button"
+                @click="closeActiveTicket"
+                class="ticket-btn ticket-btn-close"
                 :disabled="creatingTicket"
-                :title="isAr ? 'إعادة فتح التذكرة السابقة' : 'Reopen Previous Ticket'"
+                :title="isAr ? 'إغلاق التذكرة' : 'Close ticket'"
+              >
+                <i class="fas fa-circle-check"></i>
+                <span class="btn-label">{{ isAr ? 'إغلاق' : 'Close' }}</span>
+              </button>
+            </div>
+
+            <!-- No active ticket -->
+            <template v-else>
+              <button
+                v-if="hasReopenableTicket"
+                type="button"
+                @click="reopenActiveTicket"
+                class="ticket-btn ticket-btn-reopen"
+                :disabled="creatingTicket"
+                :title="isAr ? `إعادة فتح ${activeTicket?.ticketNumber || ''}` : `Reopen ${activeTicket?.ticketNumber || ''}`"
               >
                 <i class="fas fa-redo"></i>
-                <span>{{ isAr ? ('إعادة الفتح ' + (activeTicket?.ticketNumber ? `(${activeTicket.ticketNumber})` : '')) : 'Reopen Ticket' }}</span>
+                <span class="btn-label">{{ isAr ? 'إعادة الفتح' : 'Reopen' }} <span dir="ltr">{{ activeTicket?.ticketNumber || '' }}</span></span>
               </button>
-
-              <!-- Option to open a new ticket -->
-              <button 
-                type="button" 
-                @click="createManualTicket" 
-                class="ticket-btn ticket-btn-new" 
+              <button
+                type="button"
+                @click="createManualTicket"
+                class="ticket-btn ticket-btn-new"
                 :disabled="creatingTicket"
-                :title="isAr ? 'فتح تذكرة جديدة' : 'Open Ticket'"
+                :title="isAr ? 'فتح تذكرة جديدة وإسنادها لك' : 'Open a new ticket assigned to you'"
               >
-                <i class="fas fa-plus"></i>
-                <span>{{ creatingTicket ? (isAr ? 'جاري الفتح...' : 'Opening...') : (hasReopenableTicket ? (isAr ? 'فتح تذكرة جديدة' : 'New Ticket') : (isAr ? 'فتح تذكرة' : 'Open Ticket')) }}</span>
+                <i class="fas" :class="creatingTicket ? 'fa-spinner fa-spin' : 'fa-plus'"></i>
+                <span class="btn-label">{{ isAr ? (hasReopenableTicket ? 'تذكرة جديدة' : 'فتح تذكرة') : (hasReopenableTicket ? 'New ticket' : 'Open ticket') }}</span>
               </button>
             </template>
           </div>
@@ -261,7 +271,7 @@
               </div>
               
               <!-- Text Content -->
-              <p v-if="msg.content" :class="{ 'internal-note-text': msg.isInternal || msg.type === 'INTERNAL_NOTE' }">{{ msg.content }}</p>
+              <p v-if="msg.content" dir="auto" :class="{ 'internal-note-text': msg.isInternal || msg.type === 'INTERNAL_NOTE' }">{{ msg.content }}</p>
               <div v-if="msg.mentions && msg.mentions.length" class="note-mentions">
                 <span v-for="key in msg.mentions" :key="key" class="mention-chip" :class="{ me: key === myMemberKey }">
                   @{{ key === myMemberKey ? (isAr ? 'أنت' : 'you') : memberDisplayName(key) }}
@@ -447,6 +457,34 @@
         <p>Select a conversation from the sidebar to start messaging.</p>
       </div>
 
+      <AssignTicketModal
+        v-if="assignModalTicket"
+        :ticket="assignModalTicket"
+        :is-ar="isAr"
+        :subtitle="assignModalSubtitle"
+        @close="assignModalTicket = null"
+        @assigned="onTicketChanged"
+      />
+      <CloseTicketModal
+        v-if="showCloseModal && activeTicket"
+        :ticket="activeTicket"
+        :is-ar="isAr"
+        :categories="ticketCategories"
+        :can-manage-categories="canManageLabels"
+        :window-open="isMetaThread ? !windowExpired : null"
+        :subtitle="threadLabel(selectedThread)"
+        @close="showCloseModal = false"
+        @closed="onTicketChanged"
+      />
+      <TicketCategoryModal
+        v-if="showCategoryModal && activeTicket"
+        :ticket="activeTicket"
+        :is-ar="isAr"
+        :categories="ticketCategories"
+        :can-manage-categories="canManageLabels"
+        @close="showCategoryModal = false"
+        @updated="onTicketChanged"
+      />
       <ShareToTeamModal
         v-if="showShareModal && selectedThread"
         :thread="selectedThread"
@@ -500,6 +538,10 @@ import StagePicker from '../components/chat/StagePicker.vue'
 import TagPicker from '../components/chat/TagPicker.vue'
 import TemplateSendModal from '../components/chat/TemplateSendModal.vue'
 import ShareToTeamModal from '../components/chat/ShareToTeamModal.vue'
+import AssignTicketModal from '../components/tickets/AssignTicketModal.vue'
+import CloseTicketModal from '../components/tickets/CloseTicketModal.vue'
+import TicketCategoryModal from '../components/tickets/TicketCategoryModal.vue'
+import { isActiveStatus, categoryColor, initials, ticketErrorText } from '../utils/tickets'
 import { useRoute } from 'vue-router'
 import EmojiPicker from 'vue3-emoji-picker'
 import 'vue3-emoji-picker/css'
@@ -831,6 +873,22 @@ const emojiWrapper = ref(null)
 
 const loadingThreads = ref(false)
 const creatingTicket = ref(false)
+const assignModalTicket = ref(null)
+const assignModalSubtitle = ref('')
+const showCloseModal = ref(false)
+const showCategoryModal = ref(false)
+const activeCategory = computed(() => (activeTicket.value?.categoryId ? ticketCategories.value.find(c => c.id === activeTicket.value.categoryId) || null : null))
+const threadLabel = (thread) => (thread ? (thread.contactName && thread.contactName !== thread.contactPhone ? `${thread.contactName} · ${thread.contactPhone}` : thread.contactPhone || '') : '')
+
+// A modal changed the ticket: show it at once (the socket event also refreshes other screens)
+const onTicketChanged = (ticket) => {
+  assignModalTicket.value = null
+  showCloseModal.value = false
+  showCategoryModal.value = false
+  if (ticket && selectedThread.value && ticket.threadId === selectedThread.value.id) {
+    activeTicket.value = { ...(activeTicket.value || {}), ...ticket }
+  }
+}
 const loadingMessages = ref(false)
 const msgInput = ref(null)
 const focusInput = () => nextTick(() => msgInput.value?.focus())
@@ -952,7 +1010,7 @@ const onSearch = () => {
 const fetchActiveTicket = async (threadId) => {
   try {
     // 1. Prioritize finding an open ticket first
-    const openRes = await axios.get('/api/v1/tickets?threadId=' + threadId + '&status=OPEN&limit=1');
+    const openRes = await axios.get('/api/v1/tickets?threadId=' + threadId + '&status=ACTIVE&limit=1');
     const openTickets = Array.isArray(openRes.data?.data) ? openRes.data.data : [];
     if (openTickets.length > 0) {
       activeTicket.value = openTickets[0];
@@ -978,288 +1036,107 @@ const selectThread = async (thread) => {
     fetchActiveTicket(thread.id)
   ])
   loadSuggestion(thread)
-
-  // Automatically open ticket if no active ticket is open and there are messages from the client
-  if (!activeTicket.value || (activeTicket.value.status !== 'OPEN' && activeTicket.value.status !== 'PENDING')) {
-    const clientMessages = (messages.value || []).filter(m => m.direction === 'INBOUND' && !m.content?.startsWith('RATE_'));
-    if (clientMessages.length > 0) {
-      try {
-        creatingTicket.value = true;
-        // If there is a recently closed unrated ticket, reopen it; otherwise create a new ticket
-        if (activeTicket.value && (activeTicket.value.status === 'CLOSED' || activeTicket.value.status === 'RESOLVED') && !activeTicket.value.rating) {
-          const res = await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/reopen');
-          if (res.data?.data) activeTicket.value = res.data.data;
-        } else {
-          const lastMsg = clientMessages[clientMessages.length - 1];
-          const res = await axios.post('/api/v1/tickets', {
-            channelId: thread.channelId,
-            threadId: thread.id,
-            crmClientId: thread.crmClientId,
-            subject: lastMsg?.content ? lastMsg.content.substring(0, 100) : 'محادثة واتساب'
-          });
-          if (res.data?.data) activeTicket.value = res.data.data;
-        }
-      } catch (err) {
-        console.error('Error auto-opening ticket on selectThread:', err);
-      } finally {
-        creatingTicket.value = false;
-      }
-    }
-  }
+  // Viewing a conversation never opens or reopens a ticket: customer messages do that on the server,
+  // and the team uses the buttons in the header
 }
 
 
+// Assign icon in the conversation list
 const quickAssign = async (thread) => {
   try {
-    // 1. Check if thread has an active ticket
-    const res = await axios.get('/api/v1/tickets?threadId=' + thread.id + '&limit=1');
-    const rawList = res.data?.data;
-    const tickets = Array.isArray(rawList) ? rawList : (rawList?.tickets || []);
-    const ticket = tickets[0] || null;
-    
-    if (!ticket || ticket.status !== 'OPEN') {
+    const res = await axios.get('/api/v1/tickets?threadId=' + thread.id + '&status=ACTIVE&limit=1')
+    let ticket = res.data?.data?.[0] || null
+    if (!ticket) {
       const confirm = await Swal.fire({
-        title: isAr.value ? 'فتح تذكرة؟' : 'Open Ticket?',
-        text: isAr.value ? 'هذه المحادثة ليس لها تذكرة نشطة حالياً. هل تريد فتح تذكرة جديدة لإسنادها؟' : 'This thread has no active ticket. Do you want to open one to assign it?',
+        title: isAr.value ? 'فتح تذكرة؟' : 'Open a ticket?',
+        text: isAr.value ? 'لا توجد تذكرة مفتوحة لهذه المحادثة. افتح واحدة ثم اختر من يتولاها.' : 'This conversation has no open ticket. Open one, then choose who takes it.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#FF6600',
-        confirmButtonText: isAr.value ? 'نعم، افتح تذكرة' : 'Yes, Open Ticket'
-      });
-      if (confirm.isConfirmed) {
-        // Since we are not in the chat view necessarily, we call the API
-        const createRes = await axios.post('/api/v1/tickets', {
-          channelId: thread.channelId,
-          threadId: thread.id,
-          subject: 'تذكرة جديدة'
-        });
-        const newTicket = createRes.data.data;
-        promptAssign(newTicket);
-      }
-      return;
-    }
-    
-    promptAssign(ticket);
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-const promptAssign = async (ticket) => {
-  if (teamMembers.value.length === 0) {
-    await fetchTeamMembers();
-  }
-  if (teamMembers.value.length === 0) {
-    Swal.fire({
-      icon: 'info',
-      title: isAr.value ? 'لا يوجد أعضاء' : 'No Team Members',
-      text: isAr.value ? 'الرجاء إضافة موظفين فرعيين أولاً من شاشة (المستخدمون) لتتمكن من الإسناد.' : 'Please add sub-users from the Sub Users screen first to assign tickets.',
-      confirmButtonColor: '#FF6600'
-    });
-    return;
-  }
-
-  let onShift = new Set()
-  try {
-    const res = await axios.get('/api/v1/workforce/shifts/on-shift')
-    onShift = new Set(res.data?.data?.userIds || [])
-  } catch (e) {
-    console.error('Error fetching on-shift members:', e)
-  }
-  const shiftNote = (id) => (onShift.has(id) ? (isAr.value ? ' 🟢 في الدوام' : ' 🟢 on shift') : '')
-
-  const { value: selectedUserId } = await Swal.fire({
-    title: isAr.value ? 'إسناد التذكرة' : 'Assign Ticket',
-    html: '<select id="swal-assign" class="swal2-select" style="display:flex; width:100%;">' +
-          '<option value="">' + (isAr.value ? 'غير مسندة' : 'Unassigned') + '</option>' +
-          teamMembers.value.map(u => '<option value="' + u.id + '" ' + (ticket.assignedToId === u.id ? 'selected' : '') + '>' + u.name + shiftNote(u.id) + '</option>').join('') +
-          '</select>',
-    focusConfirm: false,
-    showCancelButton: true,
-    confirmButtonColor: '#FF6600',
-    confirmButtonText: isAr.value ? 'إسناد' : 'Assign',
-    preConfirm: () => document.getElementById('swal-assign').value
-  });
-  
-  if (selectedUserId !== undefined) {
-    try {
-      await axios.put('/api/v1/tickets/' + ticket.id + '/assign', { assignedToId: selectedUserId || null });
-      Swal.fire({ icon: 'success', title: isAr.value ? 'تم الإسناد!' : 'Assigned!', timer: 1500, showConfirmButton: false });
-      if (activeTicket.value && activeTicket.value.id === ticket.id) {
-        activeTicket.value.assignedToId = selectedUserId || null;
-      }
-    } catch (e) {
-      console.error(e);
-      Swal.fire({ icon: 'error', title: 'Error', text: e.message });
-    }
-  }
-}
-
-const closeActiveTicket = async () => {
-  if (!activeTicket.value) return;
-  
-  const { value: formValues } = await Swal.fire({
-    title: isAr.value ? 'إغلاق التذكرة' : 'Close Ticket',
-    html:
-      '<textarea id="swal-desc" class="swal2-textarea" placeholder="' + (isAr.value ? 'وصف أو سبب الإغلاق' : 'Resolution description') + '" style="margin-bottom: 10px;"></textarea>' +
-      '<select id="swal-cat" class="swal2-select" style="display: flex; width: 100%;">' +
-      '<option value="" disabled selected>' + (isAr.value ? 'تحديث التصنيف (اختياري)' : 'Update Category (Optional)') + '</option>' +
-      (ticketCategories.value || []).map(c => '<option value="' + c.id + '" ' + (activeTicket.value.categoryId === c.id ? 'selected' : '') + '>' + c.name + '</option>').join('') +
-      '</select>',
-    focusConfirm: false,
-    showCancelButton: true,
-    confirmButtonText: isAr.value ? 'إغلاق التذكرة' : 'Close Ticket',
-    confirmButtonColor: '#FF6600',
-    cancelButtonText: isAr.value ? 'إلغاء' : 'Cancel',
-    preConfirm: () => {
-      return { 
-        description: document.getElementById('swal-desc').value,
-        categoryId: document.getElementById('swal-cat').value
-      }
-    }
-  });
-
-  if (!formValues) return;
-  
-  try {
-    creatingTicket.value = true;
-    const res = await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/close', {
-      description: formValues.description || 'تم حل المشكلة',
-      categoryId: formValues.categoryId || undefined
-    });
-    // Immediately set activeTicket to the closed ticket so reopen is ready instantly
-    if (res.data?.data) {
-      activeTicket.value = res.data.data;
-    } else if (selectedThread.value) {
-      await fetchActiveTicket(selectedThread.value.id);
-    }
-    Swal.fire({ icon: 'success', title: isAr.value ? 'تم إغلاق التذكرة بنجاح!' : 'Ticket Closed!', timer: 1500, showConfirmButton: false });
-  } catch (err) {
-    console.error(err);
-    Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', text: err.response?.data?.error || err.message });
-  } finally {
-    creatingTicket.value = false;
-  }
-}
-
-
-
-
-const assignThreadTicket = async (thread) => {
-  try {
-    // Check if open ticket exists
-    const res = await axios.get('/api/v1/tickets?threadId=' + thread.id + '&limit=1');
-    let ticket = res.data.data[0];
-    
-    if (!ticket || ticket.status !== 'OPEN') {
-      const confirm = await Swal.fire({
-        title: isAr.value ? 'فتح تذكرة؟' : 'Open Ticket?',
-        text: isAr.value ? 'لا توجد تذكرة مفتوحة لهذه المحادثة. هل تريد فتح تذكرة جديدة لإسنادها؟' : 'No open ticket for this chat. Create one to assign?',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: isAr.value ? 'نعم، افتح تذكرة' : 'Yes, open ticket',
+        confirmButtonText: isAr.value ? 'فتح تذكرة' : 'Open ticket',
         cancelButtonText: isAr.value ? 'إلغاء' : 'Cancel'
-      });
-      if (!confirm.isConfirmed) return;
-      
-      const createRes = await axios.post('/api/v1/tickets', {
-        channelId: thread.channelId,
-        threadId: thread.id,
-        crmClientId: thread.crmClientId,
-        subject: 'محادثة واتساب'
-      });
-      ticket = createRes.data.data;
-      if (selectedThread.value && selectedThread.value.id === thread.id) {
-        await fetchActiveTicket(thread.id);
-      }
+      })
+      if (!confirm.isConfirmed) return
+      ticket = await openTicket(thread, { assignedToId: null })
+      if (!ticket) return
     }
-
-    const { value: assignedToId } = await Swal.fire({
-      title: isAr.value ? 'إسناد التذكرة' : 'Assign Ticket',
-      html:
-        '<select id="swal-assign" class="swal2-select" style="display: flex; width: 100%;">' +
-        '<option value="">' + (isAr.value ? 'غير مسندة' : 'Unassigned') + '</option>' +
-        teamMembers.value.map(u => '<option value="' + u.id + '" ' + (ticket.assignedToId === u.id ? 'selected' : '') + '>' + u.name + '</option>').join('') +
-        '</select>',
-      focusConfirm: false,
-      showCancelButton: true,
-      confirmButtonText: isAr.value ? 'حفظ' : 'Save',
-      cancelButtonText: isAr.value ? 'إلغاء' : 'Cancel',
-      preConfirm: () => document.getElementById('swal-assign').value
-    });
-
-    if (assignedToId === undefined) return; // cancelled
-    
-    const finalAssignId = assignedToId === '' ? null : assignedToId;
-    await axios.post('/api/v1/tickets/' + ticket.id + '/assign', { assignedToId: finalAssignId });
-    
-    if (selectedThread.value && selectedThread.value.id === thread.id && activeTicket.value) {
-      activeTicket.value.assignedToId = finalAssignId;
-    }
-    
-    Swal.fire({ icon: 'success', title: isAr.value ? 'تم إسناد التذكرة' : 'Assigned', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
-  } catch(e) {
-    console.error(e);
-    Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', text: e.message });
+    promptAssign(ticket, thread)
+  } catch (err) {
+    Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', text: ticketErrorText(err, isAr.value), confirmButtonColor: '#FF6600' })
   }
 }
 
-const assignTicket = async (userId) => {
-  if (!activeTicket.value) return;
-  try {
-    await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/assign', { assignedToId: userId });
-    activeTicket.value.assignedToId = userId;
-    Swal.fire({ icon: 'success', title: isAr.value ? 'تم إسناد التذكرة' : 'Ticket Assigned', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
-  } catch(e) {
-    console.error(e);
-    Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
-  }
+const promptAssign = (ticket, thread = selectedThread.value) => {
+  assignModalSubtitle.value = threadLabel(thread)
+  assignModalTicket.value = ticket
+}
+
+const closeActiveTicket = () => {
+  if (activeTicket.value) showCloseModal.value = true
 }
 
 const reopenActiveTicket = async () => {
-  if (!activeTicket.value) return;
+  if (!activeTicket.value) return
+  creatingTicket.value = true
   try {
-    creatingTicket.value = true;
-    const res = await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/reopen');
-    if (res.data?.data) {
-      activeTicket.value = res.data.data;
-    } else if (selectedThread.value) {
-      await fetchActiveTicket(selectedThread.value.id);
-    }
-    Swal.fire({ icon: 'success', title: isAr.value ? 'تم إعادة فتح التذكرة!' : 'Ticket Reopened!', timer: 1500, showConfirmButton: false });
+    const res = await axios.post('/api/v1/tickets/' + activeTicket.value.id + '/reopen')
+    activeTicket.value = res.data.data
+    Swal.fire({ icon: 'success', title: isAr.value ? `أُعيد فتح التذكرة ${res.data.data.ticketNumber}` : `Ticket ${res.data.data.ticketNumber} reopened`, toast: true, position: 'top-end', showConfirmButton: false, timer: 2500 })
   } catch (err) {
-    console.error(err);
-    Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', text: err.response?.data?.error || err.message });
+    Swal.fire({ icon: 'error', title: isAr.value ? 'تعذّرت إعادة الفتح' : 'Could not reopen', text: ticketErrorText(err, isAr.value), confirmButtonColor: '#FF6600' })
+    if (selectedThread.value) fetchActiveTicket(selectedThread.value.id)
   } finally {
-    creatingTicket.value = false;
+    creatingTicket.value = false
+  }
+}
+
+/**
+ * Opens a ticket for a conversation. By default it goes to the person opening it (the server decides:
+ * a team member gets it, the account owner's tickets follow the team's routing).
+ */
+const openTicket = async (thread, extra = {}) => {
+  const lastCustomerMessage = selectedThread.value?.id === thread.id
+    ? [...messages.value].reverse().find(m => m.direction === 'INBOUND' && m.content && !m.content.startsWith('['))
+    : null
+  try {
+    const res = await axios.post('/api/v1/tickets', {
+      channelId: thread.channelId,
+      threadId: thread.id,
+      crmClientId: thread.crmClientId,
+      subject: lastCustomerMessage?.content?.substring(0, 100) || 'محادثة واتساب',
+      ...extra
+    })
+    return res.data.data
+  } catch (err) {
+    // Someone (or a customer message) opened one meanwhile: use it
+    if (err.response?.status === 409 && err.response.data?.data) return err.response.data.data
+    Swal.fire({ icon: 'error', title: isAr.value ? 'تعذّر فتح التذكرة' : 'Could not open the ticket', text: ticketErrorText(err, isAr.value), confirmButtonColor: '#FF6600' })
+    return null
   }
 }
 
 const createManualTicket = async () => {
-  if (!selectedThread.value) return;
-  
+  if (!selectedThread.value) return
+  creatingTicket.value = true
   try {
-    creatingTicket.value = true;
-    const res = await axios.post('/api/v1/tickets', {
-      channelId: selectedThread.value.channelId,
-      threadId: selectedThread.value.id,
-      crmClientId: selectedThread.value.crmClientId,
-      subject: 'محادثة واتساب'
-    });
-    if (res.data?.data) {
-      activeTicket.value = res.data.data;
-    } else if (selectedThread.value) {
-      await fetchActiveTicket(selectedThread.value.id);
-    }
-    Swal.fire({ icon: 'success', title: isAr.value ? 'تم فتح التذكرة بنجاح!' : 'Ticket Opened!', timer: 1500, showConfirmButton: false });
-  } catch (err) {
-    console.error(err);
-    Swal.fire({ icon: 'error', title: isAr.value ? 'حدث خطأ' : 'Error', text: err.response?.data?.error || err.message });
+    const ticket = await openTicket(selectedThread.value)
+    if (!ticket) return
+    activeTicket.value = ticket
+    const owner = getAssignedUserName(ticket.assignedToId)
+    Swal.fire({
+      icon: 'success',
+      title: isAr.value ? `فُتحت التذكرة ${ticket.ticketNumber}` : `Ticket ${ticket.ticketNumber} opened`,
+      text: ticket.assignedToId
+        ? (ticket.assignedToId === storedTenant.subUser?.id
+          ? (isAr.value ? 'وأُسندت لك.' : 'It is assigned to you.')
+          : (isAr.value ? `وأُسندت إلى ${owner || 'أحد أعضاء الفريق'}.` : `Assigned to ${owner || 'a team member'}.`))
+        : (isAr.value ? 'وهي غير مسندة بعد، اختر من يتولاها.' : 'Nobody has it yet; choose who takes it.'),
+      toast: true, position: 'top-end', showConfirmButton: false, timer: 3000
+    })
   } finally {
-    creatingTicket.value = false;
+    creatingTicket.value = false
   }
 }
-;
 
 const fetchMessages = async (threadId, { silent = false } = {}) => {
   if (!silent) {
@@ -1721,9 +1598,12 @@ onUnmounted(() => {
 /* Main Chat */
 .chat-main {
   flex: 1;
+  /* Without this a long link or the header buttons push the chat past the screen edge */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   background: #f0f2f5;
+  container-type: inline-size;
 }
 
 .chat-main.empty-state {
@@ -1741,18 +1621,21 @@ onUnmounted(() => {
 }
 
 .chat-header {
-  padding: 12px 25px;
+  padding: 12px 20px;
   background: white;
   border-bottom: 1px solid #f1f5f9;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 10px 1rem;
 }
 
 .chat-header-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
   margin-inline-start: auto;
 }
@@ -1761,6 +1644,47 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 15px;
+  min-width: 0;
+}
+
+.chat-header-info h3 {
+  overflow-wrap: anywhere;
+}
+
+/* Ticket number, owner, category and close, kept together */
+.ticket-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.mini-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  color: white;
+  font-size: 9px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Narrow chat: icons only (each button keeps its tooltip) */
+@container (max-width: 760px) {
+  .chat-header-actions .btn-label { display: none; }
+  .chat-header-actions .ticket-btn { padding: 6px 9px; }
 }
 
 .chat-header-info h3 {
@@ -1864,6 +1788,8 @@ onUnmounted(() => {
 .message-content p {
   margin: 0 0 5px 0;
   line-height: 1.4;
+  /* Long links and numbers wrap instead of widening the chat */
+  overflow-wrap: anywhere;
 }
 
 .message-media {
@@ -2047,6 +1973,7 @@ onUnmounted(() => {
 .window-banner {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   margin: 0 0 10px;
   padding: 10px 14px;
@@ -2077,6 +2004,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 2px;
   flex: 1;
+  min-width: 0;
 }
 
 .window-banner-text span {
@@ -2692,14 +2620,14 @@ onUnmounted(() => {
 }
 
 .ticket-btn-close {
-  background: #fff1f2;
-  color: #e11d48;
-  border-color: #fecdd3;
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
 }
 .ticket-btn-close:hover:not(:disabled) {
-  background: #ffe4e6;
-  color: #be123c;
-  border-color: #fda4af;
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #6ee7b7;
 }
 
 .ticket-btn-reopen {
@@ -2726,9 +2654,23 @@ onUnmounted(() => {
 }
 
 .ticket-btn-assign {
-  background: #f8fafc;
+  background: white;
   color: #334155;
   border-color: #cbd5e1;
+}
+.ticket-btn-assign.unassigned {
+  border-style: dashed;
+  border-color: #fb923c;
+  color: #c2410c;
+  background: #fff7ed;
+}
+.ticket-btn-category {
+  background: white;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+.ticket-btn-category:hover {
+  filter: brightness(0.97);
 }
 .ticket-btn-assign:hover:not(:disabled) {
   background: #f1f5f9;

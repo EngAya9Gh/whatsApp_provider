@@ -158,7 +158,7 @@ class MetaController {
               channelId: channel.id,
               tenantId: channel.tenantId,
               payload: { msg, contacts, channel: { id: channel.id } }
-            }).catch(e => logger.error(`[MetaWebhook] Failed to queue message from ${msg.from}: ${e.message}`));
+            }, msg.id ? { jobId: `in-${String(msg.id).replace(/:/g, '_')}` } : undefined).catch(e => logger.error(`[MetaWebhook] Failed to queue message from ${msg.from}: ${e.message}`));
           }
         }
 
