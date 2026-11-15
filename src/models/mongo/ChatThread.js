@@ -18,6 +18,9 @@ const ChatThreadSchema = new mongoose.Schema({
   // AI: last conversation summary, and a suggested customer stage awaiting accept / reject
   aiSummary: { type: mongoose.Schema.Types.Mixed, default: null },      // { text, basedOnMessageAt, createdAt }
   aiSuggestion: { type: mongoose.Schema.Types.Mixed, default: null },   // { stageId, reason, status, basedOnMessageAt, createdAt }
+  // Meta Business Agent (Meta's AI) on this conversation: { lastAt, handedOffAt, handoffReason, takenAt, takenBy }.
+  // No default on purpose: updates set its keys with dot paths, which fail on a null value.
+  metaAi: { type: mongoose.Schema.Types.Mixed },
   tagIds: { type: [String], default: [] },
   stageId: { type: String, default: null },
   stageHistory: [{

@@ -486,7 +486,11 @@ module.exports = {
   processEvent,
   processAccountUpdate,
   coexHealth,
-  // exported for tests
+  // shared with meta.agent.inbox.js (messages that reach Live Chat outside the "messages" webhook)
   describeMessage,
+  findOrCreateThread,
+  insertNew,
+  emitThread,
+  // exported for tests
   historyCutoff
 };

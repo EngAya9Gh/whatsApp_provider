@@ -122,6 +122,10 @@
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="14" r="1.2"/></svg>
             <span class="nav-label">{{ locale === 'ar' ? 'الموظف الذكي' : 'AI Agent' }}</span>
           </router-link>
+          <router-link v-if="$hasFeature('META_AUTORESPONDER') && (!isSubUser || subUserPerms?.can_view_chatbot)" to="/meta-agent" class="nav-item" active-class="active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>
+            <span class="nav-label">{{ locale === 'ar' ? 'بوت Meta' : 'Meta Business Agent' }}</span>
+          </router-link>
           <router-link v-if="!isSubUser || subUserPerms?.can_view_chatbot" to="/meta-flows" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
             <span class="nav-label">{{ $t('sidebar.meta_flows') }}</span>

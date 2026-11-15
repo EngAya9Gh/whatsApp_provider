@@ -3,6 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { metaErrorInfo, metaErrorText } = require('./meta.errors');
 const coexistence = require('./meta.coexistence');
+const metaAgent = require('./meta.agent');
 
 const GRAPH = `https://graph.facebook.com/${process.env.GRAPH_API_VERSION || 'v21.0'}`;
 
@@ -20,6 +21,7 @@ const failed = (e) => {
  *   webhook - is OUR app subscribed to the WhatsApp account (otherwise incoming messages never arrive)?
  *   token   - is it valid, when does it expire, and which app issued it? (a token from another app than
  *             the platform's cannot use a number that belongs to the platform's app)
+ *   agent   - can the number use Meta Business Agent (Meta's AI agent)?
  */
 exports.getChannelHealth = async (req, res, next) => {
   try {
@@ -32,7 +34,7 @@ exports.getChannelHealth = async (req, res, next) => {
     const appSecret = process.env.META_APP_SECRET || null;
     const auth = { headers: { Authorization: `Bearer ${channel.metaAccessToken}` }, timeout: 15000 };
 
-    const [phoneR, subsR, tokenR] = await Promise.allSettled([
+    const [phoneR, subsR, tokenR, agent] = await Promise.allSettled([
       channel.metaPhoneNumberId
         ? axios.get(`${GRAPH}/${channel.metaPhoneNumberId}`, { ...auth, params: { fields: 'display_phone_number,verified_name,quality_rating,status' } })
         : Promise.reject({ message: 'Phone Number ID is missing' }),
@@ -41,7 +43,9 @@ exports.getChannelHealth = async (req, res, next) => {
         : Promise.reject({ message: 'WhatsApp Business Account ID is missing' }),
       appId && appSecret
         ? axios.get(`${GRAPH}/debug_token`, { timeout: 15000, params: { input_token: channel.metaAccessToken, access_token: `${appId}|${appSecret}` } })
-        : Promise.reject({ message: 'META_FB_APP_ID / META_APP_SECRET are not set on the server' })
+        : Promise.reject({ message: 'META_FB_APP_ID / META_APP_SECRET are not set on the server' }),
+      // Can the number use Meta Business Agent (Meta's AI agent)? Never throws.
+      metaAgent.checkEligibility(channel)
     ]);
 
     const phone = phoneR.status === 'fulfilled' ? { ok: true, data: phoneR.value.data } : failed(phoneR.reason);
@@ -77,7 +81,8 @@ exports.getChannelHealth = async (req, res, next) => {
       data: {
         platformAppId: appId,
         channel: { phoneNumberId: channel.metaPhoneNumberId, wabaId: channel.metaWabaId },
-        phone, webhook, token, coex
+        phone, webhook, token, coex,
+        agent: agent.status === 'fulfilled' ? agent.value : { ok: false, error: { message: agent.reason?.message || 'Check failed' } }
       }
     });
   } catch (err) {

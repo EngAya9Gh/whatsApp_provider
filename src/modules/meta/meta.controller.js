@@ -12,6 +12,7 @@ const webhookService = require('../webhook/webhook.service');
 // Queue-based processing — protects against data loss on server crashes
 const { metaWebhookQueue } = require('../../workers/meta.webhook.worker');
 const { COEX_FIELDS } = require('./meta.coexistence');
+const { AGENT_FIELDS } = require('./meta.agent.inbox');
 const crypto = require('crypto');
 
 /**
@@ -99,7 +100,8 @@ class MetaController {
         }
 
         const metadata = change.value.metadata;
-        const metaPhoneNumberId = metadata?.phone_number_id;
+        // messaging_handovers names the number as recipient, the other fields in metadata
+        const metaPhoneNumberId = metadata?.phone_number_id || change.value.recipient?.phone_number_id;
 
         logger.info(`[MetaWebhook] 🔍 Looking for channel with phone_number_id: "${metaPhoneNumberId}"`);
         const channel = await prisma.whatsAppChannel.findFirst({
@@ -129,6 +131,15 @@ class MetaController {
           logger.info(`[MetaWebhook] 📱 Queueing ${field} for channel ${channel.id}`);
           await metaWebhookQueue.add('coex-event', {
             type: 'COEX_EVENT', channelId: channel.id, tenantId: channel.tenantId,
+            payload: { field, value: change.value }
+          }).catch(e => logger.error(`[MetaWebhook] Failed to queue ${field}: ${e.message}`));
+          continue;
+        }
+        // Meta Business Agent: read-only copies of the conversations it answers, and its handovers to the team
+        if (AGENT_FIELDS.includes(field)) {
+          logger.info(`[MetaWebhook] 🤖 Queueing ${field} for channel ${channel.id}`);
+          await metaWebhookQueue.add('meta-ai-event', {
+            type: 'META_AI_EVENT', channelId: channel.id, tenantId: channel.tenantId,
             payload: { field, value: change.value }
           }).catch(e => logger.error(`[MetaWebhook] Failed to queue ${field}: ${e.message}`));
           continue;

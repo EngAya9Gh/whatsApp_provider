@@ -32,6 +32,9 @@ const worker = new Worker('meta-webhook-queue', async (job) => {
     await require('../modules/meta/meta.coexistence').runSyncJob(channelId);
   } else if (type === 'ACCOUNT_UPDATE') {
     await require('../modules/meta/meta.coexistence').processAccountUpdate(payload);
+  } else if (type === 'META_AI_EVENT') {
+    // Meta Business Agent: read-only copies of the conversations it answers, and its handovers to the team
+    await require('../modules/meta/meta.agent.inbox').processAgentEvent(channelId, payload);
   }
 }, { connection: redisConfig, concurrency: 10 });
 

@@ -78,6 +78,7 @@ const routes = [
   { path: '/meta-autoreply', component: MetaAutoReply, meta: { requiresAuth: true } },
   { path: '/meta-business-profile', component: MetaBusinessProfile, meta: { requiresAuth: true } },
   { path: '/meta-flows', component: MetaFlows, meta: { requiresAuth: true } },
+  { path: '/meta-agent', component: () => import('../views/MetaAgent.vue'), meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({
@@ -142,6 +143,7 @@ router.beforeEach((to, from, next) => {
       '/meta-chatbot': perms.can_view_chatbot,
       '/meta-autoreply': perms.can_view_chatbot,
       '/meta-flows': perms.can_view_chatbot,
+      '/meta-agent': perms.can_view_chatbot,
       '/meta-business-profile': perms.can_manage_settings,
       '/ticket-categories': perms.can_manage_settings,
       '/inbox-settings': perms.can_manage_settings,

@@ -277,6 +277,9 @@
                 <span v-else-if="msg.source === 'HISTORY'" class="source-badge" :title="isAr ? 'رسالة قديمة استُوردت من التطبيق' : 'Old message imported from the app'">
                   <i class="fas fa-clock-rotate-left"></i> {{ isAr ? 'مستوردة' : 'Imported' }}
                 </span>
+                <span v-else-if="msg.source === 'META_AI' && !msg.isInternal" class="source-badge" :title="isAr ? 'رد بوت Meta (Business Agent)' : 'Reply by Meta Business Agent'">
+                  🤖 {{ isAr ? 'بوت Meta' : 'Meta bot' }}
+                </span>
                 <span v-if="msg.type === 'TEMPLATE'" class="template-badge">
                   <i class="fas fa-file-lines"></i> {{ isAr ? 'قالب' : 'Template' }}
                 </span>
@@ -319,6 +322,15 @@
             <div class="window-banner-text">
               <strong>{{ isAr ? 'رقم هذه المحادثة لم يعد موجوداً' : 'The number of this conversation no longer exists' }}</strong>
               <span>{{ isAr ? 'حُذفت القناة التي أُنشئت عليها هذه المحادثة، لذلك لا يمكن الإرسال منها. يمكنك قراءتها أو حذفها. إذا كتب العميل إلى رقمك الحالي ستظهر محادثة جديدة.' : 'The channel this conversation was created on was removed, so nothing can be sent from it. You can read it or delete it. If the customer writes to your current number, a new conversation appears.' }}</span>
+            </div>
+          </div>
+
+          <!-- Meta Business Agent is answering this conversation -->
+          <div v-if="metaAiActive && !isInternal" class="window-banner ai-banner">
+            <span class="ai-banner-icon">🤖</span>
+            <div class="window-banner-text">
+              <strong>{{ isAr ? 'بوت Meta عم يرد على هالمحادثة' : 'Meta Business Agent is answering this conversation' }}</strong>
+              <span>{{ isAr ? 'إذا بعتت رسالة بتاخد المحادثة منه ويوقف يرد عليها. إذا Meta رفضت الإرسال، معناها تطبيق تاني ماسك المحادثة.' : 'If you send a message you take the conversation over and the agent stops answering it. If Meta refuses the send, another app holds the conversation.' }}</span>
             </div>
           </div>
 
@@ -741,6 +753,16 @@ const deleteThread = async () => {
     Swal.fire({ icon: 'error', title: isAr.value ? 'تعذّر الحذف' : 'Could not delete', text: err.response?.data?.message || err.message, confirmButtonColor: '#FF6600' })
   }
 }
+
+// Meta Business Agent holds this conversation: it answered recently (Meta frees a thread after 24h of
+// inactivity) and has not handed it to the team since
+const metaAiActive = computed(() => {
+  const ai = selectedThread.value?.metaAi
+  if (!isMetaThread.value || !ai?.lastAt) return false
+  const last = new Date(ai.lastAt).getTime()
+  if (nowTick.value - last >= WINDOW_MS) return false
+  return !ai.handedOffAt || last > new Date(ai.handedOffAt).getTime()
+})
 
 const windowExpired = computed(() => {
   if (!selectedThread.value || !isMetaThread.value || loadingMessages.value) return false
@@ -1538,6 +1560,7 @@ onMounted(() => {
       if (updatedThread.flowState !== undefined) threads.value[idx].flowState = updatedThread.flowState
       if (updatedThread.tagIds !== undefined) threads.value[idx].tagIds = updatedThread.tagIds
       if (updatedThread.stageId !== undefined) threads.value[idx].stageId = updatedThread.stageId
+      if (updatedThread.metaAi !== undefined) threads.value[idx].metaAi = updatedThread.metaAi
       // Another teammate decided on the AI suggestion
       if (updatedThread.aiSuggestion === null && selectedThread.value?.id === threads.value[idx].id) aiSuggestion.value = null
 
@@ -2032,6 +2055,16 @@ onUnmounted(() => {
   border-radius: 12px;
   color: #92400e;
   font-size: 0.8rem;
+}
+
+.ai-banner {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.ai-banner-icon {
+  font-size: 1.1rem;
 }
 
 .window-banner > i {

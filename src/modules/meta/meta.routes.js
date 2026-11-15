@@ -214,4 +214,29 @@ router.post('/channel/:channelId/flows/:flowId/assets', canManageBot, uploadFlow
 router.post('/channel/:channelId/flows/:flowId/publish', canManageBot, metaFlowController.publishFlow);
 router.delete('/channel/:channelId/flows/:flowId', canManageBot, metaFlowController.deleteFlow);
 
+// ────────────────────────────────────────────────────────────────────────────
+// Meta Business Agent — Meta's own AI agent on a number (configuration lives at Meta)
+// ────────────────────────────────────────────────────────────────────────────
+const agentCtl = require('./meta.agent.controller');
+const uploadAgentFile = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }); // Meta allows 100MB; 25MB here
+
+router.get('/agent/:channelId', canViewBot, agentCtl.overview);
+router.post('/agent/:channelId/onboard', canManageBot, agentCtl.onboard);
+router.delete('/agent/:channelId', canManageBot, agentCtl.remove);
+router.put('/agent/:channelId/settings', canManageBot, agentCtl.updateSettings);
+router.get('/agent/:channelId/business-info', canViewBot, agentCtl.getBusinessInfo);
+router.put('/agent/:channelId/business-info', canManageBot, agentCtl.putBusinessInfo);
+router.get('/agent/:channelId/files', canViewBot, agentCtl.listFiles);
+router.post('/agent/:channelId/files', canManageBot, uploadAgentFile.single('file'), agentCtl.uploadFile);
+router.delete('/agent/:channelId/files/:fileId', canManageBot, agentCtl.deleteFile);
+router.get('/agent/:channelId/allowlist', canViewBot, agentCtl.listAllowlist);
+router.post('/agent/:channelId/allowlist', canManageBot, agentCtl.addToAllowlist);
+router.delete('/agent/:channelId/allowlist/:entryId', canManageBot, agentCtl.removeFromAllowlist);
+router.post('/agent/:channelId/test', canViewBot, agentCtl.test);
+// faq | websites | skills (after the fixed paths above)
+router.get('/agent/:channelId/:kind', canViewBot, agentCtl.listItems);
+router.post('/agent/:channelId/:kind', canManageBot, agentCtl.createItem);
+router.put('/agent/:channelId/:kind/:itemId', canManageBot, agentCtl.updateItem);
+router.delete('/agent/:channelId/:kind/:itemId', canManageBot, agentCtl.deleteItem);
+
 module.exports = router;

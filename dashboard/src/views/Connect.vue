@@ -239,7 +239,7 @@
               <div v-if="health[channel.id] && !health[channel.id].loading" class="health-box" :dir="isAr ? 'rtl' : 'ltr'">
                 <div v-if="health[channel.id].failed" class="health-line bad">⚠️ {{ health[channel.id].failed }}</div>
                 <div v-for="(line, i) in health[channel.id].lines" :key="i" :class="['health-line', line.ok ? 'good' : 'bad']">
-                  <span>{{ line.ok ? '✅' : '❌' }}</span>
+                  <span>{{ line.info ? 'ℹ️' : (line.ok ? '✅' : '❌') }}</span>
                   <span>
                     <strong>{{ line.title }}</strong> — {{ line.text }}
                     <em v-if="line.hint" class="health-hint">{{ line.hint }}</em>
@@ -662,6 +662,21 @@ const describeHealth = (h) => {
 
   // 4. numbers that also stay on the WhatsApp Business app
   if (h.coex) lines.push(...describeCoex(h.coex, ar))
+
+  // 5. Meta Business Agent (Meta's AI agent): an ineligible number is information, not a fault of the channel
+  if (h.agent) {
+    const title = t('بوت Meta (Business Agent)', 'Meta Business Agent')
+    if (h.agent.ok && h.agent.eligible) {
+      lines.push({ ok: true, title, text: t('الرقم مؤهل لبوت Meta.', 'This number can use Meta Business Agent.'),
+        hint: t('خطوات تفعيله بصفحة «بوت Meta» بالقائمة الجانبية.', 'The steps to turn it on are on the "Meta Business Agent" page in the sidebar.') })
+    } else if (h.agent.ok) {
+      lines.push({ ok: true, info: true, title, text: `${t('الرقم غير مؤهل حالياً', 'Not eligible for now')}${h.agent.reason ? `: ${h.agent.reason}` : '.'}`,
+        hint: t('لا يؤثر على عمل الرقم. الأهلية تتغير، فأعد الفحص لاحقاً (مثلاً بعد توثيق النشاط التجاري).', 'This does not affect the number. Eligibility changes, so check again later (e.g. after business verification).') })
+    } else {
+      lines.push({ ok: true, info: true, title, text: `${t('تعذّر الفحص', 'Could not check')}: ${h.agent.error?.message || ''}`,
+        hint: t('فشل الطلب لا يعني أن الرقم غير مؤهل.', 'A failed request does not mean the number is not eligible.') })
+    }
+  }
   return lines
 }
 
