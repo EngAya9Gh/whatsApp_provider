@@ -2,6 +2,7 @@ const { Queue, Worker } = require('bullmq');
 const { PrismaClient } = require('@prisma/client');
 const logger = require('../utils/logger');
 const { bullConnection } = require('../config/redis');
+const { runsBackground } = require('../config/processRole');
 
 const prisma = new PrismaClient();
 
@@ -19,7 +20,7 @@ const metaWebhookQueue = new Queue('meta-webhook-queue', {
   }
 });
 
-const worker = new Worker('meta-webhook-queue', async (job) => {
+async function processJob(job) {
   const { type, channelId, tenantId, payload } = job.data;
   if (type === 'INCOMING_MESSAGE') {
     await processIncomingMessage(channelId, tenantId, payload);
@@ -36,7 +37,12 @@ const worker = new Worker('meta-webhook-queue', async (job) => {
     // Meta Business Agent: read-only copies of the conversations it answers, and its handovers to the team
     await require('../modules/meta/meta.agent.inbox').processAgentEvent(channelId, payload);
   }
-}, { connection: bullConnection, concurrency: 10 });
+}
+
+// Only the process that runs background jobs takes them (PROCESS_ROLE all / worker)
+const worker = runsBackground
+  ? new Worker('meta-webhook-queue', processJob, { connection: bullConnection, concurrency: 10 })
+  : null;
 
 async function processIncomingMessage(channelId, tenantId, payload) {
   const { msg, contacts } = payload;
@@ -175,7 +181,9 @@ async function processStatusUpdate(channelId, tenantId, payload) {
   logger.info(`[MetaWebhookWorker] ✅ Updated status for wamid ${wamid} → ${status}`);
 }
 
-worker.on('failed', (job, err) => logger.error(`[MetaWebhookWorker] Job ${job?.id} failed after all retries: ${err.message}`));
-worker.on('completed', (job) => logger.info(`[MetaWebhookWorker] Job ${job?.id} completed`));
+if (worker) {
+  worker.on('failed', (job, err) => logger.error(`[MetaWebhookWorker] Job ${job?.id} failed after all retries: ${err.message}`));
+  worker.on('completed', (job) => logger.info(`[MetaWebhookWorker] Job ${job?.id} completed`));
+}
 
-module.exports = { metaWebhookQueue };
+module.exports = { metaWebhookQueue, worker };

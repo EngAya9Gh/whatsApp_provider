@@ -53,16 +53,6 @@
           <span class="nav-text">{{ isAr ? 'جهات الاتصال' : 'Contacts' }}</span>
         </router-link>
 
-        <router-link v-if="!isSubUser || subUserPerms?.can_view_live_chat" to="/tickets" class="nav-item" active-class="active">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5v2"/><path d="M15 11v2"/><path d="M15 17v2"/><path d="M5 5h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7a2 2 0 0 1 2-2z"/></svg>
-          <span class="nav-text">{{ isAr ? 'التذاكر' : 'Tickets' }}</span>
-        </router-link>
-
-        <router-link v-if="!isSubUser || subUserPerms?.can_manage_settings" to="/ticket-categories" class="nav-item" active-class="active">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
-          <span class="nav-text">{{ isAr ? 'تصنيفات التذاكر' : 'Ticket Categories' }}</span>
-        </router-link>
-
         <router-link v-if="!isSubUser || subUserPerms?.can_manage_settings" to="/inbox-settings" class="nav-item" active-class="active">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h10a2 2 0 0 1 2 2v2"/><path d="M14 12h3"/><path d="M5 8v8a2 2 0 0 0 2 2h10"/></svg>
           <span class="nav-text">{{ isAr ? 'الوسوم ومراحل العميل' : 'Tags & Stages' }}</span>
@@ -72,6 +62,23 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
           <span class="nav-text">{{ isAr ? 'الردود السريعة' : 'Quick Replies' }}</span>
         </router-link>
+
+        <!-- TICKETS -->
+        <template v-if="!isSubUser || subUserPerms?.can_view_live_chat || subUserPerms?.can_manage_settings">
+          <div class="nav-section-title mt-4">{{ isAr ? 'التذاكر' : 'Tickets' }}</div>
+          <router-link v-if="!isSubUser || subUserPerms?.can_view_live_chat" to="/tickets" class="nav-item" active-class="active">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5v2"/><path d="M15 11v2"/><path d="M15 17v2"/><path d="M5 5h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7a2 2 0 0 1 2-2z"/></svg>
+            <span class="nav-text">{{ isAr ? 'كل التذاكر' : 'All Tickets' }}</span>
+          </router-link>
+          <router-link v-if="!isSubUser || subUserPerms?.can_manage_settings" to="/ticket-categories" class="nav-item" active-class="active">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+            <span class="nav-text">{{ isAr ? 'تصنيفات التذاكر' : 'Ticket Categories' }}</span>
+          </router-link>
+          <router-link v-if="!isSubUser || subUserPerms?.can_manage_settings" to="/ticket-settings" class="nav-item" active-class="active">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+            <span class="nav-text">{{ isAr ? 'إعدادات التذاكر' : 'Ticket Settings' }}</span>
+          </router-link>
+        </template>
 
         <!-- STANDARD (QR WEB) -->
         <template v-if="hasAnyQr">

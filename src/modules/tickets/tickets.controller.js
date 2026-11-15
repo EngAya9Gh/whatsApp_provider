@@ -217,6 +217,22 @@ class TicketsController {
     }
   }
 
+  async getSettings(req, res, next) {
+    try {
+      res.json({ success: true, data: await ticketsService.getSettings(req.tenant.id) });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async saveSettings(req, res, next) {
+    try {
+      res.json({ success: true, data: await ticketsService.saveSettings(req.tenant.id, req.body || {}) });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async toggleAutoCreate(req, res, next) {
     try {
       const channel = await prisma.whatsAppChannel.updateMany({

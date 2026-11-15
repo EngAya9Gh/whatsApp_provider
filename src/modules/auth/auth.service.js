@@ -110,6 +110,8 @@ class AuthService {
         postalCode: data.postalCode !== undefined ? data.postalCode : (currentFeatures.companyDetails?.postalCode || '')
       },
       ticketSettings: {
+        // Keys this form does not send (reopenHours, ratingEnabled…) are kept
+        ...(currentFeatures.ticketSettings || {}),
         ratingMessageText: data.ratingMessageText !== undefined ? data.ratingMessageText : (data.ticketSettings?.ratingMessageText !== undefined ? data.ticketSettings.ratingMessageText : (currentFeatures.ticketSettings?.ratingMessageText || 'تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).')),
         ratingType: data.ratingType !== undefined ? data.ratingType : (data.ticketSettings?.ratingType !== undefined ? data.ticketSettings.ratingType : (currentFeatures.ticketSettings?.ratingType || 'LIST_5_STARS')),
         autoCreateTickets: data.autoCreateTickets !== undefined ? Boolean(data.autoCreateTickets) : (data.ticketSettings?.autoCreateTickets !== undefined ? Boolean(data.ticketSettings.autoCreateTickets) : (currentFeatures.ticketSettings?.autoCreateTickets !== false)),

@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const sessionManager = require('./modules/whatsapp/session.manager');
 const socketService = require('./services/socket.service');
 const connectMongo = require('./config/mongo');
+const { role, runsBackground } = require('./config/processRole');
 
 const server = http.createServer(app);
 
@@ -29,6 +30,14 @@ const startServer = async () => {
     await redisClient.connect();
     logger.info('Connected to Redis');
 
+    // Dashboard events also travel through Redis, so the background worker process (or a second API
+    // process) can reach the browsers connected here
+    const { createAdapter } = require('@socket.io/redis-adapter');
+    const pubClient = redisClient.duplicate();
+    const subClient = redisClient.duplicate();
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+    io.adapter(createAdapter(pubClient, subClient));
+
     // Restore existing WhatsApp sessions
     await sessionManager.restoreAllSessions();
 
@@ -40,9 +49,15 @@ const startServer = async () => {
     // Initialize MongoDB
     await connectMongo();
 
-    // Start ticket inactivity auto-close scheduler
-    const ticketScheduler = require('./services/ticketScheduler');
-    ticketScheduler.start();
+    if (runsBackground) {
+      // Start the queue workers now rather than on first use, so jobs waiting from before a restart
+      // (scheduled or unfinished campaigns, retries) continue right away
+      require('./workers/meta.webhook.worker');
+      require('./workers/meta.campaign.worker');
+      // Ticket inactivity auto-close scheduler
+      require('./services/ticketScheduler').start();
+    }
+    logger.info(`Process role: ${role}${runsBackground ? ' (with background jobs)' : ' (background jobs run in src/worker.js)'}`);
 
     server.listen(config.port, () => {
       logger.info(`Server is running on port ${config.port} in ${config.env} mode`);

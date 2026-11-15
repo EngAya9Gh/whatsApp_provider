@@ -73,7 +73,7 @@ model WhatsAppChannel {
   // Human-readable label for this channel (e.g. "Support Line", "+966500000000")
   name               String? @default("") @map("name")
   displayPhoneNumber String? @map("display_phone_number") // from Meta Business Manager
-  autoCreateTickets  Boolean @default(false) @map("auto_create_tickets") // Automatically create tickets for incoming messages
+  autoCreateTickets  Boolean @default(true) @map("auto_create_tickets") // This number opens tickets for customer messages (Ticket settings)
 
   // Coexistence: the number was connected from the customer's WhatsApp Business app and keeps working there
   isCoexistence     Boolean   @default(false) @map("is_coexistence")
@@ -407,6 +407,7 @@ model Ticket {
   @@index([threadId], map: "tickets_thread_id_fkey")
   @@index([assignedToId], map: "tickets_assigned_to_id_fkey")
   @@index([categoryId], map: "tickets_category_id_fkey")
+  @@unique([tenantId, ticketNumber], map: "tickets_tenant_id_ticket_number_key")
   @@map("tickets")
 }
 

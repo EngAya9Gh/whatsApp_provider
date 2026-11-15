@@ -23,6 +23,9 @@
         <router-link to="/settings" class="nav-item" active-class="active">
           <span class="nav-icon">⚙️</span> Settings
         </router-link>
+        <router-link to="/system" class="nav-item" active-class="active">
+          <span class="nav-icon">🩺</span> {{ currentLang === 'ar' ? 'حالة النظام' : 'System health' }}
+        </router-link>
       </nav>
 
       <div class="sidebar-footer">

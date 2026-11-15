@@ -43,9 +43,13 @@
           <span class="flex-1">
             <span class="block font-semibold text-sm text-slate-800"><i class="fas fa-star text-amber-400 me-1"></i>{{ isAr ? 'اطلب من العميل تقييم الخدمة' : 'Ask the customer to rate the service' }}</span>
             <span class="block text-xs mt-0.5" :class="canRate ? 'text-slate-500' : 'text-amber-700'">
-              {{ canRate
+              <template v-if="!ratingEnabled">
+                {{ isAr ? 'طلب التقييم متوقف من' : 'Rating requests are off in' }}
+                <router-link to="/ticket-settings" class="underline font-semibold">{{ isAr ? 'إعدادات التذاكر' : 'Ticket settings' }}</router-link>.
+              </template>
+              <template v-else>{{ canRate
                 ? (isAr ? 'تصله رسالة تقييم من 1 إلى 5 نجوم على واتساب.' : 'They get a 1–5 star rating message on WhatsApp.')
-                : (isAr ? 'غير متاح: مرّ أكثر من 24 ساعة على آخر رسالة من العميل (سياسة Meta).' : 'Not available: more than 24h since the customer last wrote (Meta policy).') }}
+                : (isAr ? 'غير متاح: مرّ أكثر من 24 ساعة على آخر رسالة من العميل (سياسة Meta).' : 'Not available: more than 24h since the customer last wrote (Meta policy).') }}</template>
             </span>
           </span>
         </label>
@@ -67,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import CategoryChips from './CategoryChips.vue'
@@ -84,11 +88,21 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'closed'])
 
-const canRate = computed(() => props.windowOpen !== false)
+// Off in the ticket settings, or Meta's 24h window is closed
+const ratingEnabled = ref(true)
+const canRate = computed(() => ratingEnabled.value && props.windowOpen !== false)
 const categoryId = ref(props.ticket.categoryId || null)
 const description = ref('')
 const sendRating = ref(canRate.value)
 const saving = ref(false)
+
+onMounted(async () => {
+  try {
+    const res = await axios.get('/api/v1/tickets/settings')
+    ratingEnabled.value = res.data.data.ratingEnabled !== false
+    if (!ratingEnabled.value) sendRating.value = false
+  } catch (e) { /* keep the default */ }
+})
 
 const reasons = computed(() => (props.isAr
   ? ['تم حل المشكلة', 'تمت الإجابة على الاستفسار', 'تم البيع أو الحجز', 'العميل لم يرد', 'محادثة غير مهمة أو مكررة']

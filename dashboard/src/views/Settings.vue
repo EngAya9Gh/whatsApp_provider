@@ -37,15 +37,10 @@
               <span class="tab-title">{{ isAr ? 'بيانات المنشأة والضريبة' : 'Business & Tax' }}</span>
             </button>
 
-            <button 
-              type="button"
-              class="tab-btn" 
-              :class="{ active: currentTab === 'tickets' }"
-              @click="currentTab = 'tickets'"
-            >
+            <router-link to="/ticket-settings" class="tab-btn" :title="isAr ? 'انتقلت إلى قسم التذاكر في القائمة الجانبية' : 'Now in the Tickets section of the sidebar'">
               <span class="tab-icon">🎫</span>
-              <span class="tab-title">{{ isAr ? 'إعدادات التذاكر والدعم' : 'Tickets & Support' }}</span>
-            </button>
+              <span class="tab-title">{{ isAr ? 'إعدادات التذاكر' : 'Ticket settings' }} ↗</span>
+            </router-link>
 
             <button 
               type="button"
@@ -151,139 +146,6 @@
                 <span v-if="savedSuccess === 'business'" class="success-msg">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                   {{ isAr ? 'تم حفظ بيانات المنشأة بنجاح!' : 'Business details saved successfully!' }}
-                </span>
-              </transition>
-            </div>
-          </form>
-        </div>
-
-        <!-- ══ TAB 2: Tickets & Support Settings ══ -->
-        <div class="settings-card" v-if="currentTab === 'tickets'">
-          <div class="card-header">
-            <div>
-              <h3 class="card-title">{{ isAr ? 'إعدادات تذاكر الدعم الفني وخدمة العملاء' : 'Ticket & Customer Support Settings' }}</h3>
-              <p class="card-desc">{{ isAr ? 'تخصيص الفتح التلقائي للتذاكر، مهلة الإغلاق عند عدم النشاط، وخيارات تقييم الخدمة عبر واتساب' : 'Configure ticket auto-creation, inactivity auto-close, and WhatsApp CSAT ratings' }}</p>
-            </div>
-            <div class="header-icon-bg">🎫</div>
-          </div>
-
-          <form @submit.prevent="saveGeneralSettings('tickets')" class="form-grid">
-            
-            <!-- Section 1: Auto-Create Tickets -->
-            <div class="form-divider full-width">
-              <span>{{ isAr ? 'فتح التذاكر التلقائي (Auto-Create Tickets)' : 'Automatic Ticket Creation' }}</span>
-            </div>
-
-            <div class="form-group full-width">
-              <label class="toggle-card" :class="{ active: form.autoCreateTickets }">
-                <input type="checkbox" v-model="form.autoCreateTickets" class="hidden-checkbox" />
-                <div class="toggle-switch">
-                  <div class="toggle-slider"></div>
-                </div>
-                <div class="toggle-info">
-                  <span class="toggle-title">{{ isAr ? 'تفعيل فتح التذاكر تلقائياً عند استلام رسالة عميل' : 'Auto-Create Tickets on Inbound Customer Messages' }}</span>
-                  <span class="toggle-desc">{{ isAr ? 'عند تفعيل هذا الخيار، يتم فتح تذكرة دعم فني جديدة تلقائياً بمجرد مراسلة العميل إذا لم تكن هناك تذكرة نشطة حالياً.' : 'Automatically creates a new ticket whenever a client sends a message if no open ticket exists.' }}</span>
-                </div>
-              </label>
-            </div>
-
-            <!-- Section 2: Auto-Close Inactivity -->
-            <div class="form-divider full-width">
-              <span>{{ isAr ? 'الإغلاق التلقائي للتذاكر غير النشطة (Ticket Auto-Close)' : 'Ticket Inactivity Auto-Close' }}</span>
-            </div>
-
-            <div class="form-group full-width">
-              <label class="toggle-card" :class="{ active: form.autoCloseEnabled }">
-                <input type="checkbox" v-model="form.autoCloseEnabled" class="hidden-checkbox" />
-                <div class="toggle-switch">
-                  <div class="toggle-slider"></div>
-                </div>
-                <div class="toggle-info">
-                  <span class="toggle-title">{{ isAr ? 'تفعيل الإغلاق التلقائي للتذاكر غير النشطة' : 'Enable Auto-Close for Inactive Tickets' }}</span>
-                  <span class="toggle-desc">{{ isAr ? 'إغلاق التذكرة وإرسال رسالة التقييم تلقائياً بعد فترة من عدم استجابة العميل (شريطة أن يكون آخر رد صادراً من فريق الدعم).' : 'Automatically closes ticket and sends rating message if client remains inactive after support response.' }}</span>
-                </div>
-              </label>
-            </div>
-
-            <div class="form-group full-width" v-if="form.autoCloseEnabled">
-              <label>{{ isAr ? 'مهلة إغلاق التذكرة عند عدم رد العميل' : 'Inactivity Timeout' }}</label>
-              <select v-model="form.autoCloseHours" class="input-std">
-                <option :value="12">{{ isAr ? '12 ساعة (نصف يوم)' : '12 Hours (Half day)' }}</option>
-                <option :value="24">{{ isAr ? '24 ساعة (يوم واحد - موصى به لواتساب)' : '24 Hours (1 Day - Recommended)' }}</option>
-                <option :value="48">{{ isAr ? '48 ساعة (يومان)' : '48 Hours (2 Days)' }}</option>
-                <option :value="72">{{ isAr ? '72 ساعة (3 أيام)' : '72 Hours (3 Days)' }}</option>
-              </select>
-              <span style="font-size: 0.8rem; color: #64748B; margin-top: 4px;">
-                {{ isAr ? 'ملاحظة هامة: يتم الإغلاق فقط إذا كان آخر رد صادراً من موظف الدعم. إذا كان العميل هو من أرسل آخر رسالة فلن تُغلق التذكرة.' : 'Note: Only closes if last reply was from support team. Will never close if client spoke last.' }}
-              </span>
-            </div>
-
-            <!-- Section 3: WhatsApp Rating CSAT -->
-            <div class="form-divider full-width">
-              <span>{{ isAr ? 'إعدادات تقييم الخدمة (WhatsApp CSAT Rating)' : 'Customer Satisfaction Rating Settings' }}</span>
-            </div>
-
-            <div class="form-group full-width">
-              <label>{{ isAr ? 'طريقة إرسال التقييم للعميل' : 'Rating Input Method' }}</label>
-              <div class="rating-options-grid">
-                <label class="rating-option-card" :class="{ selected: form.ratingType === 'LIST_5_STARS' }">
-                  <input type="radio" value="LIST_5_STARS" v-model="form.ratingType" class="hidden-radio" />
-                  <div class="option-header">
-                    <span class="option-badge recommended">{{ isAr ? 'موصى به' : 'Recommended' }}</span>
-                    <span class="option-title">{{ isAr ? 'قائمة تفاعلية (5 نجوم)' : 'Interactive List (5 Stars)' }}</span>
-                  </div>
-                  <div class="option-stars">⭐⭐⭐⭐⭐ (1 - 5)</div>
-                  <p class="option-desc">
-                    {{ isAr ? 'قائمة منسدلة بـ 5 خيارات (1 إلى 5 نجوم) مع وصف لكل تقييم. تمنح العميل تقييماً دقيقاً وشاملاً.' : 'A 5-row list from 1 to 5 stars with descriptions.' }}
-                  </p>
-                </label>
-
-                <label class="rating-option-card" :class="{ selected: form.ratingType === 'BUTTONS_3' }">
-                  <input type="radio" value="BUTTONS_3" v-model="form.ratingType" class="hidden-radio" />
-                  <div class="option-header">
-                    <span class="option-title">{{ isAr ? 'أزرار سريعة (3 خيارات)' : 'Quick Buttons (3 Options)' }}</span>
-                  </div>
-                  <div class="option-stars">1⭐ | 3⭐ | 5⭐</div>
-                  <p class="option-desc">
-                    {{ isAr ? '3 أزرار تفاعلية سريعة. (ملاحظة: تفرض شركة Meta حداً أقصى 3 أزرار لأي رسالة في واتساب).' : '3 quick reply buttons (Meta Cloud API limit: max 3 buttons).' }}
-                  </p>
-                </label>
-
-                <label class="rating-option-card" :class="{ selected: form.ratingType === 'TEXT' }">
-                  <input type="radio" value="TEXT" v-model="form.ratingType" class="hidden-radio" />
-                  <div class="option-header">
-                    <span class="option-title">{{ isAr ? 'رسالة نصية مع رد رقمي' : 'Plain Text with Number' }}</span>
-                  </div>
-                  <div class="option-stars">1 ... 5 💬</div>
-                  <p class="option-desc">
-                    {{ isAr ? 'يرسل نصاً عادياً ويطلب من العميل الرد برقم من 1 إلى 5.' : 'Sends a regular text asking client to reply with a number 1-5.' }}
-                  </p>
-                </label>
-              </div>
-            </div>
-
-            <div class="form-group full-width">
-              <label>{{ isAr ? 'رسالة التقييم بعد إغلاق التذكرة' : 'Rating Message after Close' }}</label>
-              <textarea 
-                v-model="form.ratingMessageText" 
-                :placeholder="isAr ? 'تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).' : 'Your ticket has been closed. Please rate our service:'" 
-                class="input-std" 
-                rows="3"
-              ></textarea>
-              <span style="font-size: 0.8rem; color: #64748B; margin-top: 4px;">
-                {{ isAr ? 'يمكنك تخصيص نص الرسالة الترحيبية التي تظهر للعميل قبل خيارات التقييم.' : 'Customize the greeting message shown to the client before rating options.' }}
-              </span>
-            </div>
-
-            <div class="form-actions full-width">
-              <button type="submit" class="btn-save" :disabled="saving">
-                <span v-if="saving" class="spinner-sm"></span>
-                {{ saving ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'حفظ إعدادات التذاكر' : 'Save Ticket Settings') }}
-              </button>
-              <transition name="fade">
-                <span v-if="savedSuccess === 'tickets'" class="success-msg">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  {{ isAr ? 'تم حفظ إعدادات التذاكر بنجاح!' : 'Ticket settings saved successfully!' }}
                 </span>
               </transition>
             </div>
@@ -420,11 +282,6 @@ const form = ref({
   country: '',
   buildingNo: '',
   postalCode: '',
-  autoCreateTickets: true,
-  ratingMessageText: '',
-  ratingType: 'LIST_5_STARS',
-  autoCloseEnabled: true,
-  autoCloseHours: 24,
   geminiKey: ''
 })
 
@@ -447,7 +304,6 @@ const fetchProfile = async () => {
     form.value.accountName = data.name || ''
     
     const details = data.customFeatures?.companyDetails || {}
-    const ticketSettings = data.customFeatures?.ticketSettings || {}
     const aiSettings = data.customFeatures?.aiSettings || {}
     Object.assign(form.value, {
       vatNumber: details.vatNumber || '',
@@ -458,11 +314,6 @@ const fetchProfile = async () => {
       country: details.country || '',
       buildingNo: details.buildingNo || '',
       postalCode: details.postalCode || '',
-      autoCreateTickets: ticketSettings.autoCreateTickets !== false,
-      ratingMessageText: ticketSettings.ratingMessageText || '',
-      ratingType: ticketSettings.ratingType || 'LIST_5_STARS',
-      autoCloseEnabled: ticketSettings.autoCloseEnabled !== false,
-      autoCloseHours: Number(ticketSettings.autoCloseHours) || 24,
       geminiKey: aiSettings.geminiKey || ''
     })
     
@@ -486,11 +337,6 @@ const saveGeneralSettings = async (section) => {
       country: form.value.country,
       buildingNo: form.value.buildingNo,
       postalCode: form.value.postalCode,
-      autoCreateTickets: form.value.autoCreateTickets,
-      ratingMessageText: form.value.ratingMessageText,
-      ratingType: form.value.ratingType,
-      autoCloseEnabled: form.value.autoCloseEnabled,
-      autoCloseHours: form.value.autoCloseHours,
       geminiKey: form.value.geminiKey
     }, {
       headers: { Authorization: `Bearer ${token}` }
@@ -510,13 +356,6 @@ const saveGeneralSettings = async (section) => {
       country: form.value.country,
       buildingNo: form.value.buildingNo,
       postalCode: form.value.postalCode
-    }
-    tenant.customFeatures.ticketSettings = { 
-      autoCreateTickets: form.value.autoCreateTickets,
-      ratingMessageText: form.value.ratingMessageText,
-      ratingType: form.value.ratingType,
-      autoCloseEnabled: form.value.autoCloseEnabled,
-      autoCloseHours: form.value.autoCloseHours
     }
     tenant.customFeatures.aiSettings = {
       geminiKey: form.value.geminiKey
@@ -673,6 +512,7 @@ onMounted(fetchProfile)
 .tab-icon {
   font-size: 1.15rem;
 }
+a.tab-btn { text-decoration: none; }
 .tab-btn:hover {
   background: #F8FAFC;
   color: #0F172A;

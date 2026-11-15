@@ -8,13 +8,14 @@ const logger = require('../utils/logger');
 
 // Setup Redis Connection (same settings as the rest of the app, password included)
 const { bullConnection } = require('../config/redis');
+const { servesHttp } = require('../config/processRole');
 const connection = new Redis(bullConnection);
 
 // Initialize Queue
 const campaignQueue = new Queue('campaign-queue', { connection });
 
 // Initialize Worker
-const campaignWorker = new Worker('campaign-queue', async (job) => {
+async function processJob(job) {
   const { tenantId, phone, message, templateId, buttons, interactiveType, targetId, channelId } = job.data;
   let { mediaPath, mediaMime } = job.data;
   
@@ -87,13 +88,20 @@ const campaignWorker = new Worker('campaign-queue', async (job) => {
       data: { status: 'FAILED', error: error.message || 'Unknown error' }
     });
   }
-}, { connection, concurrency: 1 }); // Concurrency 1 ensures we process one by one per worker
+}
 
-campaignWorker.on('completed', (job) => {
-  logger.debug(`[Campaign] Job ${job.id} has completed!`);
-});
-campaignWorker.on('failed', (job, err) => {
-  logger.error(`[Campaign] Job ${job.id} has failed with ${err.message}`);
-});
+// QR campaigns send through the WhatsApp sessions, which live in the API process (PROCESS_ROLE all / api)
+const campaignWorker = servesHttp
+  ? new Worker('campaign-queue', processJob, { connection, concurrency: 1 }) // one by one
+  : null;
+
+if (campaignWorker) {
+  campaignWorker.on('completed', (job) => {
+    logger.debug(`[Campaign] Job ${job.id} has completed!`);
+  });
+  campaignWorker.on('failed', (job, err) => {
+    logger.error(`[Campaign] Job ${job.id} has failed with ${err.message}`);
+  });
+}
 
 module.exports = { campaignQueue, campaignWorker };

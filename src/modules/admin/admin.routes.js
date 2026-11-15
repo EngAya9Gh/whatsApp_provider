@@ -29,6 +29,15 @@ router.post('/auth/login', adminController.login.bind(adminController));
 
 // Protected: Admin routes
 router.get('/stats', adminAuth, adminController.getStats.bind(adminController));
+
+// System health: Redis, databases and background queues (is the worker running? are jobs piling up?)
+router.get('/system/health', adminAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await require('./system.health').getHealth() });
+  } catch (error) {
+    next(error);
+  }
+});
 router.get('/tenants', adminAuth, adminController.getTenants.bind(adminController));
 router.get('/tenants/:id', adminAuth, adminController.getTenantById.bind(adminController));
 router.put('/tenants/:id/plan', adminAuth, adminController.updatePlan.bind(adminController));

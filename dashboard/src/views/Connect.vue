@@ -222,10 +222,6 @@
                   <span class="ci-status"><span class="ci-dot"></span>{{ channel.status }}
                     <span v-if="channel.isCoexistence" class="coex-badge">{{ isAr ? 'تطبيق + API' : 'App + API' }}</span>
                   </span>
-                  <label class="flex items-center gap-2 mt-2 cursor-pointer">
-                    <input type="checkbox" v-model="channel.autoCreateTickets" @change="toggleAutoCreate(channel)" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500">
-                    <span class="text-xs text-slate-600 font-semibold">{{ isAr ? 'استقبال الدعم الفني (فتح تذاكر آلياً)' : 'Support Line (Auto-create tickets)' }}</span>
-                  </label>
                 </div>
                 <div class="ci-actions">
                   <button @click="checkChannel(channel)" class="btn-check" :disabled="health[channel.id]?.loading">
@@ -691,21 +687,6 @@ const fetchMetaChannels = async () => {
     metaChannels.value = res.data.data
   } catch (err) {
     console.error('Failed to fetch meta channels', err)
-  }
-}
-
-const toggleAutoCreate = async (channel) => {
-  const token = localStorage.getItem('token')
-  try {
-    await axios.put(`/api/v1/tickets/channels/${channel.id}/auto-create`, {
-      autoCreateTickets: channel.autoCreateTickets
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-  } catch (err) {
-    console.error('Failed to update channel settings', err)
-    channel.autoCreateTickets = !channel.autoCreateTickets // revert on failure
-    alert(isAr.value ? 'فشل حفظ الإعدادات' : 'Failed to update settings')
   }
 }
 

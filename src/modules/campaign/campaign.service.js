@@ -299,7 +299,7 @@ class CampaignService {
     let jobs = [];
     if (campaign.campaignType === 'META') {
       const { metaCampaignQueue } = require('../../workers/meta.campaign.worker');
-      jobs = campaign.targets.map((target, index) => ({
+      jobs = campaign.targets.map((target) => ({
         name: 'send-meta-campaign-message',
         data: {
           campaignId: campaign.id,
@@ -312,7 +312,8 @@ class CampaignService {
           templateLanguage: campaign.templateId || 'ar', // templateId stores the language for META
           metaCategory: campaign.metaCategory
         },
-        opts: { delay: baseDelay + (index * 1000) } // Stagger by 1 sec after base delay
+        // Pace is set by the queue's rate limit (META_CAMPAIGN_RATE_PER_SECOND), not by spacing jobs out
+        opts: baseDelay > 0 ? { delay: baseDelay } : {}
       }));
       if (jobs.length > 0) await metaCampaignQueue.addBulk(jobs);
     } else {

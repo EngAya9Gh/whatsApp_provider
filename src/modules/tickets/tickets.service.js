@@ -8,12 +8,36 @@ const ACTIVE_STATUSES = ['OPEN', 'PENDING'];
 const CLOSED_STATUSES = ['CLOSED', 'RESOLVED'];
 const PRIORITIES = ['LOW', 'NORMAL', 'HIGH', 'URGENT'];
 const HOUR_MS = 60 * 60 * 1000;
-// A customer who writes again within this time after a close (without rating) reopens the same ticket
-const REOPEN_WINDOW_HOURS = 24;
 // Meta only lets a business send free-form messages within 24h of the customer's last message
 const CUSTOMER_WINDOW_MS = 24 * HOUR_MS;
 // Rating request and thanks: not part of the conversation a ticket is about
 const RATING_TEXT = /تقييم|شكراً لتقييمك/;
+
+const RATING_TYPES = ['LIST_5_STARS', 'BUTTONS_3', 'TEXT'];
+const DEFAULT_RATING_TEXT = 'تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).';
+
+/**
+ * Ticket settings of a tenant (customFeatures.ticketSettings), with defaults:
+ *  autoCreateTickets  open a ticket when a customer writes (master switch; each number can opt out)
+ *  reopenHours        a customer who writes again within this many hours of a close, without having
+ *                     rated, reopens the same ticket (0 = always a new ticket)
+ *  autoCloseEnabled / autoCloseHours   close when the customer stays silent after our answer
+ *  ratingEnabled / ratingType / ratingMessageText   the rating request sent on close
+ */
+function ticketSettingsOf(customFeatures) {
+  const features = customFeatures && typeof customFeatures === 'object' ? customFeatures : {};
+  const s = features.ticketSettings || {};
+  const reopen = Number(s.reopenHours);
+  return {
+    autoCreateTickets: s.autoCreateTickets !== false,
+    reopenHours: Number.isFinite(reopen) && reopen >= 0 ? reopen : 24,
+    autoCloseEnabled: s.autoCloseEnabled !== false,
+    autoCloseHours: Number(s.autoCloseHours) || 24,
+    ratingEnabled: s.ratingEnabled !== false,
+    ratingType: RATING_TYPES.includes(s.ratingType) ? s.ratingType : 'LIST_5_STARS',
+    ratingMessageText: String(s.ratingMessageText || '').trim() || DEFAULT_RATING_TEXT
+  };
+}
 
 const formatNumber = (n) => `#TK-${String(n).padStart(4, '0')}`;
 const fail = (status, message) => ({ status, message });
@@ -80,13 +104,13 @@ class TicketsService {
   async autoCreateTicketIfNeeded(tenantId, channelId, threadId, crmClientId, firstMessageText = '', options = {}) {
     try {
       const [channel, tenant] = await Promise.all([
-        prisma.whatsAppChannel.findUnique({ where: { id: channelId }, select: { id: true } }),
+        prisma.whatsAppChannel.findUnique({ where: { id: channelId }, select: { id: true, autoCreateTickets: true } }),
         prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } })
       ]);
       if (!channel) return null;
-      const features = tenant?.customFeatures && typeof tenant.customFeatures === 'object' ? tenant.customFeatures : {};
-      // Settings → Tickets "open tickets automatically" is the master switch
-      if (features.ticketSettings?.autoCreateTickets === false) return null;
+      const settings = ticketSettingsOf(tenant?.customFeatures);
+      // Ticket settings: the main switch, then each number can opt out (e.g. a marketing number)
+      if (!settings.autoCreateTickets || channel.autoCreateTickets === false) return null;
 
       return await withLock(threadLock(threadId), async () => {
         const active = await this.getActiveTicket(tenantId, threadId);
@@ -96,7 +120,11 @@ class TicketsService {
           where: { tenantId, threadId, status: 'CLOSED' },
           orderBy: { resolvedAt: 'desc' }
         });
-        if (lastClosed?.resolvedAt && !lastClosed.rating && Date.now() - new Date(lastClosed.resolvedAt).getTime() < REOPEN_WINDOW_HOURS * HOUR_MS) {
+        // The customer writes again soon after a close and has not rated: the problem is probably not
+        // solved, so the same ticket continues with the same agent
+        const withinReopenWindow = lastClosed?.resolvedAt && settings.reopenHours > 0 &&
+          Date.now() - new Date(lastClosed.resolvedAt).getTime() < settings.reopenHours * HOUR_MS;
+        if (withinReopenWindow && !lastClosed.rating) {
           logger.info(`[TicketsService] Customer wrote again: reopening ticket ${lastClosed.id}`);
           return this._reopen(tenantId, lastClosed, { byCustomer: true, skipRouting: options.skipRouting });
         }
@@ -130,6 +158,15 @@ class TicketsService {
   }
 
   async _nextNumber(tenantId) {
+    // Highest number in use (numbers are text, so "#TK-10000" must be compared as a number)
+    if (typeof prisma.$queryRaw === 'function') {
+      try {
+        const rows = await prisma.$queryRaw`SELECT MAX(CAST(SUBSTRING(ticket_number, 5) AS UNSIGNED)) AS maxNo FROM tickets WHERE tenant_id = ${tenantId} AND ticket_number REGEXP '^#TK-[0-9]{1,9}$'`;
+        return Number(rows?.[0]?.maxNo || 0) + 1;
+      } catch (err) {
+        logger.warn(`[TicketsService] Could not read the highest ticket number: ${err.message}`);
+      }
+    }
     const [count, latest] = await Promise.all([
       prisma.ticket.count({ where: { tenantId } }),
       prisma.ticket.findFirst({ where: { tenantId }, orderBy: { createdAt: 'desc' }, select: { ticketNumber: true } })
@@ -143,20 +180,30 @@ class TicketsService {
     const { ChatThread, ChatMessage } = models();
     const thread = await ChatThread.findById(threadId).catch(() => null);
 
-    // Number and insert under one tenant-wide lock, so two tickets never share a number
-    const ticket = await withLock(`ticket-number:${tenantId}`, async () => prisma.ticket.create({
-      data: {
-        tenantId,
-        channelId,
-        threadId,
-        ticketNumber: formatNumber(await this._nextNumber(tenantId)),
-        status: 'OPEN',
-        subject: subject || 'محادثة واتساب',
-        crmClientId: crmClientId || null,
-        ...(categoryId && { categoryId }),
-        ...(assignedToId && { assignedToId })
+    // Number and insert under one tenant-wide lock, so two tickets never share a number. The database
+    // also refuses a repeated number (unique tenant + number): then the next free one is taken.
+    const ticket = await withLock(`ticket-number:${tenantId}`, async () => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await prisma.ticket.create({
+            data: {
+              tenantId,
+              channelId,
+              threadId,
+              ticketNumber: formatNumber(await this._nextNumber(tenantId) + attempt),
+              status: 'OPEN',
+              subject: subject || 'محادثة واتساب',
+              crmClientId: crmClientId || null,
+              ...(categoryId && { categoryId }),
+              ...(assignedToId && { assignedToId })
+            }
+          });
+        } catch (err) {
+          if (err?.code === 'P2002' && attempt < 5) continue;
+          throw err;
+        }
       }
-    }), { ttlMs: 10000 });
+    }, { ttlMs: 10000 });
 
     // Nobody chosen → the team that owns the number (skipped while a flow is talking; null = leave unassigned)
     if (!ticket.assignedToId && !skipRouting && assignedToId !== null) {
@@ -378,7 +425,7 @@ class TicketsService {
     });
   }
 
-  /** Returns 'SENT', 'WINDOW_CLOSED', 'FAILED' or 'SKIPPED' */
+  /** Returns 'SENT', 'WINDOW_CLOSED', 'FAILED', 'OFF' (rating turned off in settings) or 'SKIPPED' */
   async _sendRatingRequest(tenantId, ticket) {
     try {
       const { ChatThread, ChatMessage } = models();
@@ -386,9 +433,10 @@ class TicketsService {
       if (!thread || !ticket.channel) return 'SKIPPED';
 
       const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } });
-      const settings = (tenant?.customFeatures && typeof tenant.customFeatures === 'object' ? tenant.customFeatures : {}).ticketSettings || {};
-      const ratingText = settings.ratingMessageText || 'تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).';
-      const ratingType = settings.ratingType || 'LIST_5_STARS';
+      const settings = ticketSettingsOf(tenant?.customFeatures);
+      if (!settings.ratingEnabled) return 'OFF';
+      const ratingText = settings.ratingMessageText;
+      const ratingType = settings.ratingType;
 
       if (ticket.channel.providerType !== 'META_CLOUD') {
         const chatService = require('../chat/chat.service');
@@ -468,10 +516,9 @@ class TicketsService {
 
       for (const ticket of openTickets) {
         try {
-          const features = ticket.tenant?.customFeatures && typeof ticket.tenant.customFeatures === 'object' ? ticket.tenant.customFeatures : {};
-          const settings = features.ticketSettings || {};
-          if (settings.autoCloseEnabled === false) continue;
-          const timeoutHours = Number(settings.autoCloseHours) || 24;
+          const settings = ticketSettingsOf(ticket.tenant?.customFeatures);
+          if (!settings.autoCloseEnabled) continue;
+          const timeoutHours = settings.autoCloseHours;
 
           if (!mongoose.Types.ObjectId.isValid(ticket.threadId)) continue;
           const lastMsg = await ChatMessage.findOne({
@@ -508,6 +555,63 @@ class TicketsService {
       logger.error(`[AutoClose] Error in autoCloseInactiveTickets: ${err.message}`);
       return { error: err.message };
     }
+  }
+
+  // ─── Settings ───────────────────────────────────────────────────────
+
+  /** Ticket settings + the Meta numbers with their own "open tickets" switch */
+  async getSettings(tenantId) {
+    const [tenant, channels] = await Promise.all([
+      prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } }),
+      prisma.whatsAppChannel.findMany({
+        where: { tenantId, providerType: 'META_CLOUD' },
+        select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true, autoCreateTickets: true },
+        orderBy: { createdAt: 'asc' }
+      })
+    ]);
+    return { ...ticketSettingsOf(tenant?.customFeatures), channels };
+  }
+
+  /** Saves the given fields only (other ticket settings and other customFeatures stay as they are) */
+  async saveSettings(tenantId, body = {}) {
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } });
+    if (!tenant) throw fail(404, 'Account not found');
+    const features = tenant.customFeatures && typeof tenant.customFeatures === 'object' ? tenant.customFeatures : {};
+    const next = { ...(features.ticketSettings || {}) };
+
+    for (const key of ['autoCreateTickets', 'autoCloseEnabled', 'ratingEnabled']) {
+      if (body[key] !== undefined) next[key] = !!body[key];
+    }
+    if (body.reopenHours !== undefined) {
+      const hours = Number(body.reopenHours);
+      if (!Number.isInteger(hours) || hours < 0 || hours > 720) throw fail(400, 'Reopen period must be between 0 and 720 hours');
+      next.reopenHours = hours;
+    }
+    if (body.autoCloseHours !== undefined) {
+      const hours = Number(body.autoCloseHours);
+      if (!Number.isInteger(hours) || hours < 1 || hours > 720) throw fail(400, 'Auto-close period must be between 1 and 720 hours');
+      next.autoCloseHours = hours;
+    }
+    if (body.ratingType !== undefined) {
+      if (!RATING_TYPES.includes(body.ratingType)) throw fail(400, 'Unknown rating type');
+      next.ratingType = body.ratingType;
+    }
+    if (body.ratingMessageText !== undefined) {
+      const text = String(body.ratingMessageText || '').trim();
+      // WhatsApp list and button messages accept at most 1024 characters of body text
+      if (text.length > 1000) throw fail(400, 'The rating message is too long (max 1000 characters)');
+      next.ratingMessageText = text;
+    }
+
+    await prisma.tenant.update({ where: { id: tenantId }, data: { customFeatures: { ...features, ticketSettings: next } } });
+
+    if (Array.isArray(body.channels)) {
+      for (const ch of body.channels) {
+        if (!ch?.id || ch.autoCreateTickets === undefined) continue;
+        await prisma.whatsAppChannel.updateMany({ where: { id: String(ch.id), tenantId }, data: { autoCreateTickets: !!ch.autoCreateTickets } });
+      }
+    }
+    return this.getSettings(tenantId);
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────
@@ -576,3 +680,4 @@ class TicketsService {
 module.exports = new TicketsService();
 module.exports.ACTIVE_STATUSES = ACTIVE_STATUSES;
 module.exports.PRIORITIES = PRIORITIES;
+module.exports.ticketSettingsOf = ticketSettingsOf;

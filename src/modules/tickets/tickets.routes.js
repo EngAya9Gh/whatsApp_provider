@@ -18,6 +18,10 @@ router.get('/categories', requireAnyPermission('can_view_live_chat', 'can_manage
 router.post('/categories', settings, ticketsController.createCategory);
 router.delete('/categories/:id', settings, ticketsController.deleteCategory);
 
+// Ticket settings: when tickets open, reopen, close, and the rating request
+router.get('/settings', requireAnyPermission('can_view_live_chat', 'can_manage_settings'), ticketsController.getSettings);
+router.put('/settings', settings, ticketsController.saveSettings);
+
 // Team members for the assign picker (shift + current load)
 router.get('/assignees', liveChat, ticketsController.getAssignees);
 

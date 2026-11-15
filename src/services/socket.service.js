@@ -10,11 +10,27 @@ const CHAT_EVENT_THREAD = {
 class SocketService {
   constructor() {
     this.io = null;
+    this.emitter = null;
   }
 
   init(ioInstance) {
     this.io = ioInstance;
     logger.info('SocketService initialized with IO instance');
+  }
+
+  /**
+   * Background worker process (no HTTP server): events are published to Redis, and the API process
+   * (Socket.io Redis adapter) delivers them to the dashboards connected to it.
+   */
+  useRedisEmitter(redisClient) {
+    const { Emitter } = require('@socket.io/redis-emitter');
+    this.emitter = new Emitter(redisClient);
+    logger.info('SocketService sends events through Redis (worker process)');
+  }
+
+  /** Where events go: this process's Socket.io server, or Redis in a worker process */
+  _out() {
+    return this.io || this.emitter;
   }
 
   /** Authenticates every connection with the login token, then joins the rooms that identity may see */
@@ -63,23 +79,25 @@ class SocketService {
   }
 
   emitToTenant(tenantId, event, data) {
-    if (!this.io) {
+    const out = this._out();
+    if (!out) {
       logger.warn('SocketService is not initialized. Cannot emit event.');
       return;
     }
     const room = `tenant_${tenantId}`;
-    this.io.to(room).emit(event, data);
+    out.to(room).emit(event, data);
 
     // Restricted agents only learn that a conversation changed, then reload it through the API
     // (which applies their visibility scope) — message content never reaches them this way
     const threadId = CHAT_EVENT_THREAD[event]?.(data || {});
-    if (threadId) this.io.to(`${room}:scoped`).emit('chat_activity', { threadId: String(threadId), event });
+    if (threadId) out.to(`${room}:scoped`).emit('chat_activity', { threadId: String(threadId), event });
     logger.info(`Emitted '${event}' to room '${room}'`);
   }
 
   emitToMember(tenantId, memberKey, event, data) {
-    if (!this.io) return;
-    this.io.to(this.memberRoom(tenantId, memberKey)).emit(event, data);
+    const out = this._out();
+    if (!out) return;
+    out.to(this.memberRoom(tenantId, memberKey)).emit(event, data);
   }
 }
 
