@@ -6,6 +6,7 @@ const redisClient = new Redis({
   host: config.redis.host,
   port: config.redis.port,
   password: config.redis.password,
+  db: config.redis.db,
   // Retry strategy
   retryStrategy(times) {
     const delay = Math.min(times * 50, 2000);
@@ -28,6 +29,7 @@ const bullConnection = {
   host: config.redis.host,
   port: config.redis.port,
   ...(config.redis.password && { password: config.redis.password }),
+  db: config.redis.db,
   maxRetriesPerRequest: null
 };
 

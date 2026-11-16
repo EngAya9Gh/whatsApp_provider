@@ -91,6 +91,18 @@ async function queueHealth(def) {
   }
 }
 
+/** Removes the failed jobs of one queue (their reasons were already shown); returns how many */
+async function cleanFailed(name) {
+  if (!QUEUES.some(q => q.name === name)) throw { status: 404, message: 'Unknown queue' };
+  let removed = 0;
+  // In batches, so a long list does not block Redis
+  for (;;) {
+    const batch = await queueOf(name).clean(0, 1000, 'failed');
+    removed += batch.length;
+    if (batch.length < 1000) return removed;
+  }
+}
+
 async function getHealth() {
   const [redis, queueList, mysql] = await Promise.all([
     redisHealth(),
@@ -113,4 +125,10 @@ async function getHealth() {
   };
 }
 
-module.exports = { getHealth, QUEUES };
+/** Close the Queue objects opened above (graceful shutdown and tests) */
+async function close() {
+  await Promise.all([...queues.values()].map(q => q.close().catch(() => {})));
+  queues.clear();
+}
+
+module.exports = { getHealth, cleanFailed, close, QUEUES };

@@ -38,6 +38,13 @@ router.get('/system/health', adminAuth, async (req, res, next) => {
     next(error);
   }
 });
+router.post('/system/queues/:name/clean-failed', adminAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, data: { removed: await require('./system.health').cleanFailed(req.params.name) } });
+  } catch (error) {
+    next(error);
+  }
+});
 router.get('/tenants', adminAuth, adminController.getTenants.bind(adminController));
 router.get('/tenants/:id', adminAuth, adminController.getTenantById.bind(adminController));
 router.put('/tenants/:id/plan', adminAuth, adminController.updatePlan.bind(adminController));

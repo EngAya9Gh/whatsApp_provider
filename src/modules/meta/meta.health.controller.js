@@ -34,7 +34,7 @@ exports.getChannelHealth = async (req, res, next) => {
     const appSecret = process.env.META_APP_SECRET || null;
     const auth = { headers: { Authorization: `Bearer ${channel.metaAccessToken}` }, timeout: 15000 };
 
-    const [phoneR, subsR, tokenR, agent] = await Promise.allSettled([
+    const [phoneR, subsR, tokenR, agent, businessR] = await Promise.allSettled([
       channel.metaPhoneNumberId
         ? axios.get(`${GRAPH}/${channel.metaPhoneNumberId}`, { ...auth, params: { fields: 'display_phone_number,verified_name,quality_rating,status' } })
         : Promise.reject({ message: 'Phone Number ID is missing' }),
@@ -45,8 +45,11 @@ exports.getChannelHealth = async (req, res, next) => {
         ? axios.get(`${GRAPH}/debug_token`, { timeout: 15000, params: { input_token: channel.metaAccessToken, access_token: `${appId}|${appSecret}` } })
         : Promise.reject({ message: 'META_FB_APP_ID / META_APP_SECRET are not set on the server' }),
       // Can the number use Meta Business Agent (Meta's AI agent)? Never throws.
-      metaAgent.checkEligibility(channel)
+      metaAgent.checkEligibility(channel),
+      // The portfolio that owns the account, for links into Meta's screens (payment method…). Never throws.
+      metaAgent.ownerBusinessId(channel)
     ]);
+    const businessId = businessR.status === 'fulfilled' ? businessR.value : null;
 
     const phone = phoneR.status === 'fulfilled' ? { ok: true, data: phoneR.value.data } : failed(phoneR.reason);
 
@@ -82,7 +85,8 @@ exports.getChannelHealth = async (req, res, next) => {
         platformAppId: appId,
         channel: { phoneNumberId: channel.metaPhoneNumberId, wabaId: channel.metaWabaId },
         phone, webhook, token, coex,
-        agent: agent.status === 'fulfilled' ? agent.value : { ok: false, error: { message: agent.reason?.message || 'Check failed' } }
+        agent: agent.status === 'fulfilled' ? agent.value : { ok: false, error: { message: agent.reason?.message || 'Check failed' } },
+        links: metaAgent.metaLinks(businessId, channel.metaWabaId)
       }
     });
   } catch (err) {

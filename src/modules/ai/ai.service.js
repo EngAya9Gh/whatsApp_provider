@@ -27,6 +27,22 @@ async function loadThread(tenantId, threadId) {
   return thread;
 }
 
+const REPLY_TONES = {
+  default: '',
+  shorter: 'اجعل الرد أقصر ما يمكن (جملة أو جملتين).',
+  formal: 'استخدم أسلوباً رسمياً ومهذباً.',
+  friendly: 'استخدم أسلوباً ودوداً وقريباً من العميل.'
+};
+
+const SUGGESTION_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    reply: { type: 'STRING', description: 'Draft of the next message to the customer' },
+    missing: { type: 'STRING', description: 'In Arabic: what the agent must check or fill in before sending, or empty' }
+  },
+  required: ['reply', 'missing']
+};
+
 class AIService {
   /** Short summary saved on a ticket when it closes. Never throws (closing must not fail). */
   async summarizeTicket(tenantId, threadId) {
@@ -67,6 +83,51 @@ class AIService {
     const aiSummary = { text, basedOnMessageAt: basedOn, createdAt: new Date() };
     await ChatThread.updateOne({ _id: thread._id }, { $set: { aiSummary } });
     return aiSummary;
+  }
+
+  /**
+   * Draft of the next reply for the agent in Live Chat (the agent edits it and sends it themselves).
+   * Uses the business info of the AI agent page. Facts that are not there become [placeholders] and are
+   * listed in `missing`, so nothing invented reaches the customer.
+   */
+  async suggestReply(tenantId, threadId, { tone = 'default' } = {}) {
+    const thread = await loadThread(tenantId, threadId);
+    const messages = await recentMessages(thread._id, 30);
+    if (!messages.some(m => m.direction === 'INBOUND')) throw { status: 400, message: 'The customer has not written anything yet' };
+
+    const AiAgent = require('../../models/mongo/AiAgent');
+    const agent = await AiAgent.findOne({ tenantId }).lean();
+    const knowledge = (agent?.knowledge || [])
+      .filter(k => String(k.content || '').trim())
+      .map(k => `### ${k.title || 'معلومة'}\n${k.content.trim()}`)
+      .join('\n\n');
+
+    const result = await aiClient.generate(tenantId, {
+      system: [
+        'أنت تساعد موظف خدمة عملاء يرد على عميل عبر واتساب. اكتب مسودة الرسالة التالية التي سيرسلها الموظف للعميل.',
+        '',
+        'قواعد:',
+        '- اكتب بلسان الموظف، بنفس لغة العميل ولهجته، رداً قصيراً يناسب واتساب (سطر إلى أربعة أسطر)، بدون Markdown.',
+        '- استخدم فقط "معلومات النشاط" أدناه وما ورد في المحادثة. لا تخترع أسعاراً أو مواعيد أو سياسات أو روابط.',
+        '- إذا احتاج الرد معلومة غير موجودة فاكتب مكانها [بين أقواس مربعة]، مثل [سعر الباقة]، واذكرها في missing.',
+        '- إذا كانت آخر رسالة من الفريق، فاكتب متابعة مناسبة بدل تكرار ما قيل.',
+        '- لا تطلب بيانات حساسة (كلمات مرور، أرقام بطاقات).',
+        agent?.instructions ? `\nتعليمات النشاط:\n${agent.instructions}` : '',
+        REPLY_TONES[tone] ? `\nالأسلوب: ${REPLY_TONES[tone]}` : '',
+        '',
+        'معلومات النشاط:',
+        knowledge || '(لا توجد معلومات نشاط محفوظة)'
+      ].join('\n'),
+      contents: [{ role: 'user', text: `المحادثة حتى الآن:\n\n${aiClient.transcript(messages)}\n\nاكتب مسودة الرد التالي للموظف.` }],
+      schema: SUGGESTION_SCHEMA,
+      temperature: 0.5,
+      maxOutputTokens: 500
+    });
+    return {
+      text: String(result.reply || '').trim().slice(0, 4000),
+      missing: String(result.missing || '').trim().slice(0, 300),
+      hasKnowledge: !!knowledge
+    };
   }
 
   /**

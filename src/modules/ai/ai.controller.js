@@ -22,6 +22,15 @@ class AIController {
     }
   }
 
+  async suggestReply(req, res, next) {
+    try {
+      const tone = ['default', 'shorter', 'formal', 'friendly'].includes(req.body?.tone) ? req.body.tone : 'default';
+      res.json({ success: true, data: await aiService.suggestReply(req.tenant.id, req.params.threadId, { tone }) });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async suggestStage(req, res, next) {
     try {
       const suggestion = await aiService.suggestStage(req.tenant.id, req.params.threadId);

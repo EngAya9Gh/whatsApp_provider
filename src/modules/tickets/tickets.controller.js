@@ -233,13 +233,12 @@ class TicketsController {
     }
   }
 
+  /** Older dashboards: one number's "open tickets" switch (now part of the ticket settings) */
   async toggleAutoCreate(req, res, next) {
     try {
-      const channel = await prisma.whatsAppChannel.updateMany({
-        where: { id: req.params.channelId, tenantId: req.tenant.id },
-        data: { autoCreateTickets: !!req.body.autoCreateTickets }
-      });
-      if (channel.count === 0) return res.status(404).json({ error: { message: 'Channel not found' } });
+      const channel = await prisma.whatsAppChannel.findFirst({ where: { id: req.params.channelId, tenantId: req.tenant.id }, select: { id: true } });
+      if (!channel) return res.status(404).json({ error: { message: 'Channel not found' } });
+      await ticketsService.saveSettings(req.tenant.id, { channels: [{ id: channel.id, autoCreateTickets: !!req.body.autoCreateTickets }] });
       res.status(200).json({ success: true, message: 'Channel updated successfully' });
     } catch (error) {
       logger.error('Error toggling autoCreateTickets:', error);

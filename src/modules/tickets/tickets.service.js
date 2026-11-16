@@ -18,7 +18,11 @@ const DEFAULT_RATING_TEXT = 'تم إغلاق التذكرة الخاصة بك. �
 
 /**
  * Ticket settings of a tenant (customFeatures.ticketSettings), with defaults:
- *  autoCreateTickets  open a ticket when a customer writes (master switch; each number can opt out)
+ *  autoCreateTickets  open a ticket when a customer writes (master switch)
+ *  ticketlessChannelIds  numbers that never open tickets automatically (e.g. a marketing number).
+ *                     Kept here, not in whatsapp_channels.auto_create_tickets: that old column was false
+ *                     for every number connected through Embedded Signup and had no effect, so it cannot
+ *                     tell a real "off" apart.
  *  reopenHours        a customer who writes again within this many hours of a close, without having
  *                     rated, reopens the same ticket (0 = always a new ticket)
  *  autoCloseEnabled / autoCloseHours   close when the customer stays silent after our answer
@@ -30,6 +34,7 @@ function ticketSettingsOf(customFeatures) {
   const reopen = Number(s.reopenHours);
   return {
     autoCreateTickets: s.autoCreateTickets !== false,
+    ticketlessChannelIds: Array.isArray(s.ticketlessChannelIds) ? s.ticketlessChannelIds.map(String) : [],
     reopenHours: Number.isFinite(reopen) && reopen >= 0 ? reopen : 24,
     autoCloseEnabled: s.autoCloseEnabled !== false,
     autoCloseHours: Number(s.autoCloseHours) || 24,
@@ -104,13 +109,13 @@ class TicketsService {
   async autoCreateTicketIfNeeded(tenantId, channelId, threadId, crmClientId, firstMessageText = '', options = {}) {
     try {
       const [channel, tenant] = await Promise.all([
-        prisma.whatsAppChannel.findUnique({ where: { id: channelId }, select: { id: true, autoCreateTickets: true } }),
+        prisma.whatsAppChannel.findUnique({ where: { id: channelId }, select: { id: true } }),
         prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } })
       ]);
       if (!channel) return null;
       const settings = ticketSettingsOf(tenant?.customFeatures);
       // Ticket settings: the main switch, then each number can opt out (e.g. a marketing number)
-      if (!settings.autoCreateTickets || channel.autoCreateTickets === false) return null;
+      if (!settings.autoCreateTickets || settings.ticketlessChannelIds.includes(channelId)) return null;
 
       return await withLock(threadLock(threadId), async () => {
         const active = await this.getActiveTicket(tenantId, threadId);
@@ -565,11 +570,15 @@ class TicketsService {
       prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } }),
       prisma.whatsAppChannel.findMany({
         where: { tenantId, providerType: 'META_CLOUD' },
-        select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true, autoCreateTickets: true },
+        select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true },
         orderBy: { createdAt: 'asc' }
       })
     ]);
-    return { ...ticketSettingsOf(tenant?.customFeatures), channels };
+    const { ticketlessChannelIds, ...settings } = ticketSettingsOf(tenant?.customFeatures);
+    return {
+      ...settings,
+      channels: channels.map(c => ({ ...c, autoCreateTickets: !ticketlessChannelIds.includes(c.id) }))
+    };
   }
 
   /** Saves the given fields only (other ticket settings and other customFeatures stay as they are) */
@@ -603,14 +612,18 @@ class TicketsService {
       next.ratingMessageText = text;
     }
 
-    await prisma.tenant.update({ where: { id: tenantId }, data: { customFeatures: { ...features, ticketSettings: next } } });
-
     if (Array.isArray(body.channels)) {
+      const own = new Set((await prisma.whatsAppChannel.findMany({ where: { tenantId }, select: { id: true } })).map(c => c.id));
+      const off = new Set(Array.isArray(next.ticketlessChannelIds) ? next.ticketlessChannelIds.filter(id => own.has(id)) : []);
       for (const ch of body.channels) {
-        if (!ch?.id || ch.autoCreateTickets === undefined) continue;
-        await prisma.whatsAppChannel.updateMany({ where: { id: String(ch.id), tenantId }, data: { autoCreateTickets: !!ch.autoCreateTickets } });
+        if (!ch?.id || ch.autoCreateTickets === undefined || !own.has(String(ch.id))) continue;
+        if (ch.autoCreateTickets) off.delete(String(ch.id));
+        else off.add(String(ch.id));
       }
+      next.ticketlessChannelIds = [...off];
     }
+
+    await prisma.tenant.update({ where: { id: tenantId }, data: { customFeatures: { ...features, ticketSettings: next } } });
     return this.getSettings(tenantId);
   }
 

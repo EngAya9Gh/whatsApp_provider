@@ -1,6 +1,6 @@
 // Ready-made chat flows: what each one is for, what the customer sees, and the steps it builds.
 // Message texts marked `sample: true` are examples the owner should rewrite before publishing.
-import { newOptionId } from './flowNodes'
+import { newOptionId } from './flowNodes.js'
 
 /** Small graph builder: node() returns the id, link() connects two steps */
 function graph(inactivityHours) {

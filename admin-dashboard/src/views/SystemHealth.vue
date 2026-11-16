@@ -61,7 +61,16 @@
                   </tr>
                   <tr v-if="q.recentFailures?.length" class="bg-red-50/40">
                     <td colspan="7" class="px-5 py-2">
-                      <div class="text-[11px] font-bold text-red-700 mb-1">{{ isAr ? 'آخر الأخطاء' : 'Latest failures' }}</div>
+                      <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                        <span class="text-[11px] font-bold text-red-700">
+                          {{ isAr ? 'آخر الأخطاء' : 'Latest failures' }}
+                          <span class="font-normal" :class="isOld(q) ? 'text-slate-500' : 'text-red-700'">· {{ lastFailureLabel(q) }}</span>
+                        </span>
+                        <button type="button" class="clean" :disabled="cleaning === q.name" @click="cleanFailed(q)">
+                          {{ cleaning === q.name ? (isAr ? 'جارِ المسح…' : 'Clearing…') : (isAr ? `مسح الأخطاء (${q.counts.failed})` : `Clear failures (${q.counts.failed})`) }}
+                        </button>
+                      </div>
+                      <p v-if="isOld(q)" class="text-[11px] text-slate-500 mb-1">{{ isAr ? 'أخطاء قديمة ولا جديد منذ أكثر من يوم: غالباً لا شيء يستدعي القلق. امسحها لتلاحظ أي خطأ جديد بسرعة.' : 'Old failures and nothing new for over a day: likely nothing to worry about. Clear them to spot new ones quickly.' }}</p>
                       <div v-for="f in q.recentFailures" :key="f.id" class="text-xs text-slate-600 flex gap-2 py-0.5">
                         <span class="text-slate-400 whitespace-nowrap">{{ fmtTime(f.at) }}</span>
                         <span class="truncate" dir="auto" :title="f.reason">{{ f.reason || '—' }}</span>
@@ -126,6 +135,37 @@ const health = ref(null)
 const loading = ref(false)
 const error = ref('')
 let timer = null
+
+const cleaning = ref('')
+const DAY_MS = 24 * 60 * 60 * 1000
+const lastFailureAt = (q) => (q.recentFailures?.[0]?.at ? new Date(q.recentFailures[0].at).getTime() : null)
+const isOld = (q) => !!lastFailureAt(q) && Date.now() - lastFailureAt(q) > DAY_MS
+const lastFailureLabel = (q) => {
+  const at = lastFailureAt(q)
+  if (!at) return ''
+  const minutes = Math.floor((Date.now() - at) / 60000)
+  if (minutes < 60) return isAr.value ? `آخرها قبل ${minutes} دقيقة` : `last one ${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return isAr.value ? `آخرها قبل ${hours} ساعة` : `last one ${hours} h ago`
+  const days = Math.floor(hours / 24)
+  return isAr.value ? `آخرها قبل ${days} يوم` : `last one ${days} days ago`
+}
+
+const cleanFailed = async (q) => {
+  const ok = window.confirm(isAr.value
+    ? `مسح ${q.counts.failed} خطأ من «${q.ar}»؟ لن يُعاد إرسال شيء، تُحذف السجلات فقط.`
+    : `Clear ${q.counts.failed} failures from "${q.en}"? Nothing is sent again; only the records are removed.`)
+  if (!ok) return
+  cleaning.value = q.name
+  try {
+    await axios.post(`/api/admin/system/queues/${q.name}/clean-failed`, {}, { headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` } })
+    await load()
+  } catch (err) {
+    error.value = isAr.value ? `تعذّر المسح: ${err.response?.data?.error?.message || err.message}` : `Could not clear: ${err.response?.data?.error?.message || err.message}`
+  } finally {
+    cleaning.value = ''
+  }
+}
 
 const evictionOk = computed(() => !health.value?.redis?.evictionPolicy || health.value.redis.evictionPolicy === 'noeviction')
 const roleLabel = computed(() => ({
@@ -197,6 +237,9 @@ onUnmounted(() => clearInterval(timer))
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; }
 .kv dt { color: #64748b; }
 .kv dd { color: #0f172a; font-weight: 600; margin: 0; }
+.clean { font-size: 11px; font-weight: 700; color: #b91c1c; background: white; border: 1px solid #fecaca; border-radius: 8px; padding: 3px 10px; cursor: pointer; }
+.clean:hover { background: #fef2f2; }
+.clean:disabled { opacity: 0.6; cursor: wait; }
 .refresh { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px; border: 1px solid #e2e8f0; background: white; font-weight: 600; font-size: 13px; cursor: pointer; }
 .spin { display: inline-block; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

@@ -73,10 +73,15 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            <tr v-for="t in tickets" :key="t.id" class="hover:bg-slate-50/70 transition-colors">
+            <template v-for="t in tickets" :key="t.id">
+            <tr class="hover:bg-slate-50/70 transition-colors">
               <td class="td">
                 <div class="font-mono font-bold text-slate-700" dir="ltr">{{ t.ticketNumber }}</div>
                 <div class="text-xs text-slate-500 max-w-[220px] truncate" :title="t.subject" dir="auto">{{ t.subject || (isAr ? 'محادثة واتساب' : 'WhatsApp chat') }}</div>
+                <button v-if="t.summary" type="button" class="summary-chip" :class="{ on: expanded[t.id] }" @click="expanded[t.id] = !expanded[t.id]">
+                  <i class="fas fa-wand-magic-sparkles"></i>{{ isAr ? 'ملخص' : 'Summary' }}
+                  <i class="fas text-[9px]" :class="expanded[t.id] ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                </button>
               </td>
               <td class="td">
                 <div class="font-semibold text-slate-800 max-w-[180px] truncate" dir="auto">{{ t.contact?.name || t.contact?.phone || '—' }}</div>
@@ -110,6 +115,15 @@
                 </div>
               </td>
             </tr>
+            <tr v-if="t.summary && expanded[t.id]" class="bg-violet-50/40">
+              <td colspan="7" class="px-4 pb-3 pt-1">
+                <div class="summary-box" dir="auto">
+                  <div class="summary-title"><i class="fas fa-wand-magic-sparkles"></i> {{ isAr ? 'ملخص المحادثة بالذكاء الاصطناعي (عند الإغلاق)' : 'AI summary of the conversation (at close)' }}</div>
+                  <p class="summary-text">{{ t.summary }}</p>
+                </div>
+              </td>
+            </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -166,6 +180,7 @@ const total = ref(0)
 const view = ref(myId ? 'mine' : 'all')
 const filters = ref({ search: '', status: 'ACTIVE', assignedToId: '', categoryId: '' })
 
+const expanded = ref({}) // ticket id → summary row open
 const assignTicket = ref(null)
 const closeTicket = ref(null)
 const categoryTicket = ref(null)
@@ -287,6 +302,11 @@ onUnmounted(() => {
 .act { width: 32px; height: 32px; border-radius: 9px; border: 1px solid #e2e8f0; background: white; color: #64748b; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; font-size: 12.5px; }
 .act:hover { border-color: #FF6600; color: #FF6600; }
 .act-ok:hover { border-color: #10b981; color: #059669; }
+.summary-chip { margin-top: 4px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #6d28d9; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 999px; padding: 2px 9px; cursor: pointer; }
+.summary-chip.on { background: #ede9fe; }
+.summary-box { background: white; border: 1px solid #ddd6fe; border-radius: 12px; padding: 10px 14px; }
+.summary-title { font-size: 11.5px; font-weight: 800; color: #6d28d9; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+.summary-text { margin: 0; font-size: 13px; line-height: 1.7; color: #1e293b; white-space: pre-line; }
 .pg { padding: 7px 14px; background: white; border: 1px solid #cbd5e1; border-radius: 10px; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer; }
 .pg:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

@@ -1,17 +1,72 @@
-name: Deploy to Hostinger VPS
+name: Test and deploy to Hostinger VPS
 
 on:
   push:
     branches:
       - main
+  pull_request:
 
 jobs:
+  # The backend tests run first; a failing test stops the deploy
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+      mongo:
+        image: mongo:7.0
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd="mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+
+    env:
+      TEST_MYSQL_URL: mysql://root@127.0.0.1:3306
+      TEST_MONGO_URL: mongodb://127.0.0.1:27017
+      TEST_REDIS_HOST: 127.0.0.1
+      TEST_REDIS_PORT: '6379'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run backend tests
+        run: npm test
+
   deploy:
+    needs: test
+    # Only pushes to main deploy (pull requests only run the tests)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
       - name: SSH into VPS and deploy
-        uses: appleboy/ssh-action@master
+        # Pinned (v1.2.5): "@master" could change under us and once failed to download its own binary
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
@@ -19,6 +74,9 @@ jobs:
           port: 22
 
           script: |
+            # Stop at the first failing step: the server keeps running the previous version, and this
+            # run turns red in GitHub instead of reporting success after a failed database update
+            set -e
             export PATH=/home/provider/.nvm/versions/node/v22.23.1/bin:$PATH
 
             echo "--- Node: $(node -v) | NPM: $(npm -v) ---"
@@ -32,6 +90,8 @@ jobs:
 
             echo "3. Setting up Backend..."
             npm install
+            # Repeated ticket numbers + their unique index (db push refuses to add a unique index by itself)
+            node prisma/scripts/fix-ticket-numbers.js
             npx prisma db push
             npx prisma generate
 
@@ -45,7 +105,7 @@ jobs:
             cd admin-dashboard
             npm install
             npm run build
-            
+
             echo "6. Merging Admin Panel into Main Dashboard..."
             rm -rf ../dashboard/dist/admin
             cp -r dist ../dashboard/dist/admin
@@ -53,4 +113,6 @@ jobs:
 
             echo "7. Restarting Node.js Server..."
             pm2 restart whatsapp-api || pm2 start src/server.js --name whatsapp-api
+            # Background worker process, if it was started from ecosystem.config.js
+            if pm2 describe whatsapp-worker > /dev/null 2>&1; then pm2 restart whatsapp-worker; fi
             pm2 save

@@ -359,6 +359,41 @@
             <i class="far fa-clock"></i> {{ windowRemainingLabel }}
           </div>
 
+          <!-- AI reply draft: the agent reviews it, then uses it in the composer -->
+          <div v-if="replyDraft.open" class="reply-draft" :dir="isAr ? 'rtl' : 'ltr'">
+            <div class="reply-draft-head">
+              <span><i class="fas fa-wand-magic-sparkles"></i> {{ isAr ? 'رد مقترح' : 'Suggested reply' }}</span>
+              <button type="button" class="reply-draft-close" @click="closeReplyDraft" :title="isAr ? 'إغلاق' : 'Close'"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div v-if="replyDraft.loading" class="reply-draft-loading"><i class="fas fa-spinner fa-spin"></i> {{ isAr ? 'يكتب الذكاء الاصطناعي مسودة من معلومات نشاطك…' : 'Writing a draft from your business info…' }}</div>
+            <div v-else-if="replyDraft.error" class="reply-draft-error">{{ replyDraft.error }}</div>
+            <template v-else>
+              <p class="reply-draft-text" dir="auto">{{ replyDraft.text }}</p>
+              <div v-if="replyDraft.missing" class="reply-draft-missing">
+                <i class="fas fa-triangle-exclamation"></i>
+                <span>{{ isAr ? 'أكمل قبل الإرسال:' : 'Fill in before sending:' }} {{ replyDraft.missing }}</span>
+              </div>
+              <div v-if="!replyDraft.hasKnowledge" class="reply-draft-missing">
+                <i class="fas fa-circle-info"></i>
+                <span>{{ isAr ? 'لا توجد معلومات نشاط محفوظة، فالاقتراح عام.' : 'No business info saved, so the draft is generic.' }} <router-link to="/ai-agent" class="underline">{{ isAr ? 'أضفها من صفحة الموظف الذكي' : 'Add it on the AI agent page' }}</router-link></span>
+              </div>
+            </template>
+            <div class="reply-draft-actions">
+              <button type="button" class="reply-draft-use" :disabled="replyDraft.loading || !replyDraft.text" @click="useReplyDraft">
+                <i class="fas fa-pen"></i> {{ isAr ? 'استخدمه وعدّله' : 'Use and edit' }}
+              </button>
+              <button
+                v-for="t in replyTones"
+                :key="t.key"
+                type="button"
+                class="reply-draft-tone"
+                :class="{ on: replyDraft.tone === t.key }"
+                :disabled="replyDraft.loading"
+                @click="suggestReply(t.key)"
+              >{{ t.label }}</button>
+            </div>
+          </div>
+
           <div class="attachment-preview" v-if="attachment">
             <span>{{ attachment.name }}</span>
             <button @click="attachment = null" class="btn-clear"><i class="fas fa-times"></i></button>
@@ -414,6 +449,16 @@
             <button v-if="isMetaThread" type="button" class="btn-attach" @click="showTemplateModal = true" :title="isAr ? 'إرسال قالب' : 'Send template'">
               <i class="fas fa-file-lines"></i>
             </button>
+            <button
+              v-if="aiConfigured && !isInternal && !channelMissing && !windowExpired"
+              type="button"
+              class="btn-attach btn-ai-reply"
+              :disabled="replyDraft.loading"
+              @click="suggestReply()"
+              :title="isAr ? 'اقترح رداً بالذكاء الاصطناعي من معلومات نشاطك' : 'Suggest a reply with AI from your business info'"
+            >
+              <i class="fas" :class="replyDraft.loading ? 'fa-spinner fa-spin' : 'fa-wand-magic-sparkles'"></i>
+            </button>
             <button type="button" class="btn-attach" @click="toggleRecording" :class="{'recording': isRecording}" title="تسجيل صوتي">
               <i class="fas fa-microphone" v-if="!isRecording"></i>
               <i class="fas fa-stop-circle text-danger" v-else></i>
@@ -426,16 +471,17 @@
               accept="image/*,video/*,audio/*,application/pdf"
             />
             
-            <input 
-              type="text" 
+            <textarea
               ref="msgInput"
-              v-model="newMessage" 
+              rows="1"
+              v-model="newMessage"
               @input="handleInput"
+              @keydown.enter.exact.prevent="sendMessage"
               :placeholder="isRecording ? 'جاري التسجيل...' : (isInternal ? 'اكتب ملاحظة داخلية لفريق العمل (لن يراها العميل)… استخدم @ للإشارة إلى زميل' : (windowExpired ? (isAr ? 'أرسل قالباً، أو فعّل الملاحظة الداخلية 🔒' : 'Send a template, or switch to an internal note 🔒') : 'Type a message...'))"
               class="form-control msg-input"
               :class="{ 'input-internal': isInternal }"
               :disabled="isRecording || channelMissing || (windowExpired && !isInternal)"
-            />
+            ></textarea>
             
             <button 
               type="submit" 
@@ -527,7 +573,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, computed, watch } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import { connectSocket } from '../services/realtime'
@@ -662,6 +708,54 @@ const openThreadFromLink = async () => {
 }
 
 const aiConfigured = ref(false)
+
+// ─── AI: suggested reply ──────────────────────────────────────
+const replyDraft = ref({ open: false, loading: false, text: '', missing: '', hasKnowledge: true, error: '', tone: 'default', threadId: null })
+const replyTones = computed(() => [
+  { key: 'default', label: isAr.value ? 'اقتراح آخر' : 'Another one' },
+  { key: 'shorter', label: isAr.value ? 'أقصر' : 'Shorter' },
+  { key: 'formal', label: isAr.value ? 'أكثر رسمية' : 'More formal' },
+  { key: 'friendly', label: isAr.value ? 'أكثر ودّاً' : 'Friendlier' }
+])
+const closeReplyDraft = () => { replyDraft.value = { ...replyDraft.value, open: false } }
+
+const suggestReply = async (tone = 'default') => {
+  const thread = selectedThread.value
+  if (!thread) return
+  replyDraft.value = { open: true, loading: true, text: '', missing: '', hasKnowledge: true, error: '', tone, threadId: thread.id }
+  try {
+    const res = await axios.post(`/api/v1/ai/threads/${thread.id}/suggest-reply`, { tone })
+    // The agent may have opened another conversation meanwhile
+    if (selectedThread.value?.id !== thread.id) return
+    replyDraft.value = { ...replyDraft.value, loading: false, ...res.data.data }
+  } catch (err) {
+    if (selectedThread.value?.id !== thread.id) return
+    const raw = err.response?.data?.error?.message
+    replyDraft.value = {
+      ...replyDraft.value,
+      loading: false,
+      error: raw === 'The customer has not written anything yet'
+        ? (isAr.value ? 'لم يكتب العميل شيئاً بعد.' : 'The customer has not written anything yet.')
+        : (aiErrorMessage(err, isAr.value) || (isAr.value ? 'تعذّر اقتراح رد.' : 'Could not suggest a reply.'))
+    }
+  }
+}
+
+const useReplyDraft = () => {
+  newMessage.value = replyDraft.value.text
+  closeReplyDraft()
+  nextTick(() => {
+    resizeComposer()
+    const el = msgInput.value
+    if (!el) return
+    el.focus()
+    // Select the first [placeholder] so the agent can type over it
+    const start = newMessage.value.indexOf('[')
+    const end = start >= 0 ? newMessage.value.indexOf(']', start) : -1
+    if (start >= 0 && end > start) el.setSelectionRange(start, end + 1)
+  })
+}
+
 const aiSuggestion = ref(null)
 const aiSummary = ref(null)
 const loadingSummary = ref(false)
@@ -892,6 +986,13 @@ const onTicketChanged = (ticket) => {
 const loadingMessages = ref(false)
 const msgInput = ref(null)
 const focusInput = () => nextTick(() => msgInput.value?.focus())
+const resizeComposer = () => {
+  const el = msgInput.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${Math.min(el.scrollHeight, 150)}px`
+}
+watch(newMessage, () => nextTick(resizeComposer))
 let pendingSeq = 0
 const messagesContainer = ref(null)
 
@@ -1029,6 +1130,7 @@ const selectThread = async (thread) => {
   selectedThread.value = thread
   aiSuggestion.value = null
   aiSummary.value = null
+  closeReplyDraft() // a draft belongs to the conversation it was written for
   activeTicket.value = null // Reset so old thread's ticket isn't shown while loading
   thread.unreadCount = 0 // Optimistic update
   await Promise.all([
@@ -2379,7 +2481,7 @@ onUnmounted(() => {
 
 .chat-form {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 10px;
 }
 
@@ -2399,11 +2501,43 @@ onUnmounted(() => {
 
 .msg-input {
   flex: 1;
-  border-radius: 25px;
-  padding: 12px 20px;
+  border-radius: 22px;
+  padding: 11px 18px;
   border: none;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  /* Multi-line: Enter sends, Shift+Enter adds a line; grows up to ~6 lines */
+  resize: none;
+  min-height: 44px;
+  max-height: 150px;
+  line-height: 1.45;
+  font-family: inherit;
+  overflow-y: auto;
 }
+
+.btn-ai-reply { color: #7c3aed !important; }
+.btn-ai-reply:hover:not(:disabled) { background: #f5f3ff !important; }
+
+.reply-draft {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #faf5ff;
+  border: 1px solid #ddd6fe;
+}
+.reply-draft-head { display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; font-weight: 800; color: #6d28d9; margin-bottom: 6px; }
+.reply-draft-head i { margin-inline-end: 4px; }
+.reply-draft-close { background: none; border: none; color: #a78bfa; cursor: pointer; padding: 2px 6px; }
+.reply-draft-loading, .reply-draft-error { font-size: 0.85rem; color: #6b21a8; padding: 4px 0; }
+.reply-draft-error { color: #b91c1c; }
+.reply-draft-text { margin: 0; font-size: 0.92rem; line-height: 1.6; color: #1e1b4b; white-space: pre-line; overflow-wrap: anywhere; }
+.reply-draft-missing { display: flex; gap: 6px; align-items: flex-start; margin-top: 8px; font-size: 0.78rem; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 6px 10px; }
+.reply-draft-missing i { margin-top: 2px; }
+.reply-draft-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.reply-draft-use { background: #7c3aed; color: white; border: none; border-radius: 10px; padding: 6px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+.reply-draft-use:disabled { opacity: 0.5; cursor: not-allowed; }
+.reply-draft-tone { background: white; color: #6d28d9; border: 1px solid #ddd6fe; border-radius: 999px; padding: 5px 11px; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.reply-draft-tone.on { background: #ede9fe; }
+.reply-draft-tone:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-send {
   background: #ff6b00;

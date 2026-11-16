@@ -239,6 +239,7 @@
                   <span>
                     <strong>{{ line.title }}</strong> — {{ line.text }}
                     <em v-if="line.hint" class="health-hint">{{ line.hint }}</em>
+                    <a v-if="line.link" :href="line.link" target="_blank" rel="noopener" class="health-link">{{ line.linkLabel }} ↗</a>
                   </span>
                 </div>
                 <button v-if="health[channel.id].canSubscribe" @click="subscribeWebhook(channel)" class="btn-check btn-fix" :disabled="health[channel.id].subscribing">
@@ -659,6 +660,16 @@ const describeHealth = (h) => {
   // 4. numbers that also stay on the WhatsApp Business app
   if (h.coex) lines.push(...describeCoex(h.coex, ar))
 
+  // Payment method: Meta does not tell us, so say what it changes and where to add it (it can be skipped in the popup)
+  lines.push({
+    ok: true, info: true, title: t('وسيلة الدفع', 'Payment method'),
+    text: t('ما منقدر نتحقق منها من هون. بدونها الرقم بيستقبل الرسائل وبيرد لحد 1,000 رد بالشهر، بس ما بيقدر يبلّش محادثة (قوالب وحملات).',
+      'We cannot check it from here. Without one the number still receives messages and can send up to 1,000 replies a month, but cannot start conversations (templates, campaigns).'),
+    hint: t('إذا تخطيتها بنافذة فيسبوك («Skip and finish setup»)، ضيفها من Billing Hub أو من إعدادات Meta Business Suite ← الفوترة والمدفوعات، واختار حساب الواتساب.',
+      'If you skipped it in the Facebook window ("Skip and finish setup"), add it in Billing Hub or Meta Business Suite settings › Billing & payments, and pick the WhatsApp account.'),
+    link: h.links?.billing, linkLabel: t('افتح Billing Hub', 'Open Billing Hub')
+  })
+
   // 5. Meta Business Agent (Meta's AI agent): an ineligible number is information, not a fault of the channel
   if (h.agent) {
     const title = t('بوت Meta (Business Agent)', 'Meta Business Agent')
@@ -984,6 +995,7 @@ const disconnect = async () => {
 .health-line { display: flex; gap: 0.5rem; line-height: 1.6; }
 .health-line.bad { color: #991B1B; }
 .health-hint { display: block; font-style: normal; color: #475569; margin-top: 2px; }
+.health-link { display: inline-block; margin-top: 4px; color: #1D4ED8; font-weight: 700; text-decoration: underline; }
 .btn-remove { background: #FEF2F2; color: #DC2626; border: 1px solid #FEE2E2; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: inherit; }
 .btn-remove:hover { background: #FCA5A5; color: white; border-color: #FCA5A5; }
 

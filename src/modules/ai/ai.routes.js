@@ -15,6 +15,7 @@ router.get('/status', bind('getStatus'));
 router.param('threadId', accessService.threadParamGuard());
 const liveChat = [requireFeature('LIVE_CHAT'), requirePermission('can_view_live_chat')];
 router.post('/threads/:threadId/summary', liveChat, bind('summarize'));
+router.post('/threads/:threadId/suggest-reply', liveChat, bind('suggestReply'));
 router.post('/threads/:threadId/stage-suggestion', liveChat, bind('suggestStage'));
 router.post('/threads/:threadId/stage-suggestion/accept', liveChat, bind('acceptSuggestion'));
 router.post('/threads/:threadId/stage-suggestion/reject', liveChat, bind('rejectSuggestion'));

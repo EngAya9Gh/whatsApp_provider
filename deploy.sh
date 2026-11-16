@@ -1,36 +1,42 @@
 #!/bin/bash
+# Manual deploy on the server: the same steps as the GitHub deploy (.github/workflows/deploy.yml).
+set -e
 
 echo "Starting Deployment..."
 
 # 1. Update source code
 git pull origin main
 
-# 2. Install dependencies for root (backend)
+# 2. Backend dependencies
 echo "Installing backend dependencies..."
 npm install
 
-# 3. Update database schema & generate Prisma client
+# 3. Database (see prisma/README.md): fix repeated ticket numbers, then db push
 echo "Updating Database..."
+node prisma/scripts/fix-ticket-numbers.js
+npx prisma db push
 npx prisma generate
-# Use migrate deploy (safe for production — never drops data, uses migration files)
-npx prisma migrate deploy
 
-# 4. Build Client Dashboard
+# 4. Client dashboard
 echo "Building Client Dashboard..."
 cd dashboard
 npm install
 npm run build
 cd ..
 
-# 5. Build Admin Dashboard
+# 5. Admin dashboard, served from the client dashboard at /admin
 echo "Building Admin Dashboard..."
 cd admin-dashboard
 npm install
 npm run build
+rm -rf ../dashboard/dist/admin
+cp -r dist ../dashboard/dist/admin
 cd ..
 
-# 6. Restart Backend Server
+# 6. Restart (the worker process only if it was started from ecosystem.config.js)
 echo "Restarting Backend Server..."
-pm2 restart all
+pm2 restart whatsapp-api || pm2 start src/server.js --name whatsapp-api
+if pm2 describe whatsapp-worker > /dev/null 2>&1; then pm2 restart whatsapp-worker; fi
+pm2 save
 
 echo "Deployment Complete! ✅"
