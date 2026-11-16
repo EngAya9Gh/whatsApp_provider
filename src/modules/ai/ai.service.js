@@ -50,6 +50,7 @@ class AIService {
       const messages = await recentMessages(threadId, 50);
       if (messages.length === 0) return null;
       return await aiClient.generate(tenantId, {
+        feature: 'ticket_summary',
         system: 'أنت مساعد متخصص في تلخيص تذاكر الدعم الفني باللغة العربية.',
         contents: [{
           role: 'user',
@@ -73,6 +74,7 @@ class AIService {
     if (!refresh && thread.aiSummary && sameTime(thread.aiSummary.basedOnMessageAt, basedOn)) return thread.aiSummary;
 
     const text = await aiClient.generate(tenantId, {
+      feature: 'chat_summary',
       system: 'أنت مساعد لفريق خدمة العملاء. تلخّص محادثات واتساب بالعربية بإيجاز ووضوح.',
       contents: [{
         role: 'user',
@@ -103,6 +105,7 @@ class AIService {
       .join('\n\n');
 
     const result = await aiClient.generate(tenantId, {
+      feature: 'suggest_reply',
       system: [
         'أنت تساعد موظف خدمة عملاء يرد على عميل عبر واتساب. اكتب مسودة الرسالة التالية التي سيرسلها الموظف للعميل.',
         '',
@@ -153,6 +156,7 @@ class AIService {
     const stageList = config.stages.map(s => `- id: ${s.id} | ${s.name} | ${s.group === 'MAIN' ? 'المسار الرئيسي' : 'مسار الخسارة'}`).join('\n');
     const current = config.stages.find(s => s.id === thread.stageId);
     const result = await aiClient.generate(tenantId, {
+      feature: 'stage_suggestion',
       system: 'أنت محلل مبيعات وخدمة عملاء. تحدد مرحلة العميل من محادثته على واتساب بناءً على قائمة مراحل يحددها النشاط التجاري.',
       contents: [{
         role: 'user',

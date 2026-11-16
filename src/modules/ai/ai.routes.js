@@ -10,6 +10,7 @@ router.use(authMiddleware);
 const bind = (method) => aiController[method].bind(aiController);
 
 router.get('/status', bind('getStatus'));
+router.get('/usage', bind('getUsage'));
 
 // Chat helpers (same access rules as the conversation itself)
 router.param('threadId', accessService.threadParamGuard());

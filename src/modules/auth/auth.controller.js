@@ -57,7 +57,9 @@ class AuthController {
         data: {
           ...req.tenant,
           isSubUser: false,
-          allowedFeatures
+          allowedFeatures,
+          // Set when an admin opened this dashboard ("log in as customer"): the dashboard shows the countdown
+          impersonation: req.impersonation ? { by: req.impersonation.by, expiresAt: req.impersonation.expiresAt } : null
         }
       });
     } catch (error) {

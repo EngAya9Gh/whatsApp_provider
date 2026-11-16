@@ -1,5 +1,6 @@
 <template>
   <div class="app-root" :class="{ 'rtl-mode': currentLang === 'ar' }">
+    <SupportSessionBanner />
     
     <!-- Mobile Overlay -->
     <div v-if="showSidebar && isMobileMenuOpen" class="mobile-overlay" @click="closeMobileMenu"></div>
@@ -212,6 +213,7 @@
 
 <script setup>
 import { tenantHasMeta } from './utils/meta-access'
+import SupportSessionBanner from './components/SupportSessionBanner.vue'
 import { tenantHasQr } from './utils/qr-access'
 import { computed, ref, onMounted } from 'vue'
 import { connectSocket } from './services/realtime'

@@ -135,6 +135,7 @@ class AiAgentService {
     }
 
     const result = await aiClient.generate(tenantId, {
+      feature: 'agent_reply',
       system: buildSystemPrompt(agent),
       contents: merged,
       schema: REPLY_SCHEMA,

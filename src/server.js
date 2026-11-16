@@ -56,6 +56,8 @@ const startServer = async () => {
       require('./workers/meta.campaign.worker');
       // Ticket inactivity auto-close scheduler
       require('./services/ticketScheduler').start();
+      // Campaign completion + refunds of failed messages
+      require('./services/campaignBillingScheduler').start();
     }
     logger.info(`Process role: ${role}${runsBackground ? ' (with background jobs)' : ' (background jobs run in src/worker.js)'}`);
 
@@ -76,6 +78,7 @@ const shutdown = () => {
   try {
     const ticketScheduler = require('./services/ticketScheduler');
     ticketScheduler.stop();
+    require('./services/campaignBillingScheduler').stop();
   } catch (e) {}
 
   server.close(() => {

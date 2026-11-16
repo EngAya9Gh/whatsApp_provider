@@ -598,6 +598,9 @@ class ChatService {
   async sendTemplateMessage(tenantId, threadId, payload) {
     const { templateName, language, bodyParams = [], buttonParams = [], previewText } = payload;
     if (!templateName || !language) throw { status: 400, message: 'templateName and language are required' };
+    // The image / video / PDF of a media-header template ({ type, id | link, filename })
+    const { normalizeHeaderMedia, headerComponent } = require('../meta/meta.templateMedia');
+    const headerMedia = normalizeHeaderMedia(payload.headerMedia);
     if (!Array.isArray(bodyParams) || !Array.isArray(buttonParams)) throw { status: 400, message: 'bodyParams and buttonParams must be arrays' };
     for (const b of buttonParams) {
       if (!Number.isInteger(b?.index) || b.index < 0 || b.index > 9 || typeof b.text !== 'string' || !b.text.trim() || b.text.length > 1000) {
@@ -615,6 +618,7 @@ class ChatService {
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
     const components = [];
+    if (headerMedia) components.push(headerComponent(headerMedia));
     if (bodyParams.length > 0) {
       components.push({ type: 'body', parameters: bodyParams.map(text => ({ type: 'text', text: String(text) })) });
     }

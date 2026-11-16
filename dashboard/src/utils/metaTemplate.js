@@ -16,10 +16,13 @@ export const urlPrefix = (url) => url.replace('{{1}}', '')
 const FORM_COMPONENTS = ['HEADER', 'BODY', 'FOOTER', 'BUTTONS']
 const FORM_BUTTONS = ['QUICK_REPLY', 'URL', 'PHONE_NUMBER']
 
+// Media headers a form can send: the sender uploads the file or gives its link (LOCATION headers cannot)
+const MEDIA_HEADERS = { IMAGE: 'image', VIDEO: 'video', DOCUMENT: 'document' }
+
 /**
- * Only text templates whose variables are positional body variables (plus an optional dynamic URL button)
- * can be sent from a form; media headers, carousels, copy-code/OTP/flow/catalog buttons and other variable
- * placements cannot.
+ * Templates whose variables are positional body variables (plus an optional dynamic URL button and an
+ * image / video / PDF header) can be sent from a form; carousels, location headers, copy-code/OTP/flow/catalog
+ * buttons and other variable placements cannot.
  */
 export function normalizeTemplate(tpl) {
   const components = tpl.components || []
@@ -28,7 +31,8 @@ export function normalizeTemplate(tpl) {
   const buttons = components.find(c => c.type === 'BUTTONS')?.buttons || []
   const variables = [...new Set([...body.matchAll(POSITIONAL)].map(m => Number(m[1])))].sort((a, b) => a - b)
   const bodyHasNamed = ANY_VARIABLE.test(body.replace(POSITIONAL, ''))
-  const headerUnsupported = header && (header.format !== 'TEXT' || ANY_VARIABLE.test(header.text || ''))
+  const headerMedia = MEDIA_HEADERS[header?.format] || null
+  const headerUnsupported = header && !headerMedia && (header.format !== 'TEXT' || ANY_VARIABLE.test(header.text || ''))
   const buttonVars = buttons
     .map((b, index) => ({ b, index }))
     .filter(({ b }) => b.type === 'URL' && DYNAMIC_URL.test(b.url || ''))
@@ -51,6 +55,8 @@ export function normalizeTemplate(tpl) {
     status: tpl.status,
     body,
     headerText: header?.format === 'TEXT' ? header.text : '',
+    // 'image' | 'video' | 'document' when the template starts with a media header (the file is given at send time)
+    headerMedia,
     variables,
     buttonVars,
     supported: unsupportedKind === null,
@@ -93,14 +99,31 @@ export function buildPreview(tpl, values = [], buttonValues = []) {
     const v = values[tpl.variables.indexOf(Number(n))]
     return v || `{{${n}}}`
   })
-  const text = tpl.headerText ? `${tpl.headerText}\n\n${body}` : body
+  const mediaLine = tpl.headerMedia ? `${{ image: '🖼️', video: '🎬', document: '📄' }[tpl.headerMedia]} ${mediaLabel(tpl.headerMedia)}\n\n` : ''
+  const text = mediaLine + (tpl.headerText ? `${tpl.headerText}\n\n${body}` : body)
   const links = tpl.buttonVars.map((b, i) => `🔗 ${b.text}: ${b.url.replace('{{1}}', buttonValues[i] || '{{1}}')}`)
   return links.length ? `${text}\n\n${links.join('\n')}` : text
 }
 
-/** The `components` array of Meta's template message: body values in variable order, then each URL button's value. */
-export function buildComponents(tpl, values = [], buttonValues = []) {
+/** Arabic name of a media header kind, for previews and labels */
+export const mediaLabel = (kind, isAr = true) => ({
+  image: isAr ? 'صورة' : 'Image', video: isAr ? 'فيديو' : 'Video', document: isAr ? 'ملف PDF' : 'PDF document'
+}[kind] || '')
+
+/** The header component for a media header: media = { type, id | link, filename } */
+export function headerMediaComponent(media) {
+  const value = media.id ? { id: media.id } : { link: media.link }
+  if (media.type === 'document' && media.filename) value.filename = media.filename
+  return { type: 'header', parameters: [{ type: media.type, [media.type]: value }] }
+}
+
+/**
+ * The `components` array of Meta's template message: the media header (if any), body values in variable
+ * order, then each URL button's value.
+ */
+export function buildComponents(tpl, values = [], buttonValues = [], media = null) {
   const components = []
+  if (tpl.headerMedia && media) components.push(headerMediaComponent(media))
   if (tpl.variables.length > 0) {
     components.push({ type: 'body', parameters: tpl.variables.map((_, i) => ({ type: 'text', text: String(values[i] ?? '').trim() })) })
   }

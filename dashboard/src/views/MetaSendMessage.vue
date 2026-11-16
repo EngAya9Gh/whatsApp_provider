@@ -94,6 +94,7 @@
                 {{ unsupportedReason(selectedMeta, isAr) }}
               </div>
               <template v-else>
+                <TemplateHeaderMedia v-if="selectedMeta.headerMedia && channelId" v-model="metaHeaderMedia" :kind="selectedMeta.headerMedia" :channel-id="channelId" :is-ar="isAr" style="margin-bottom: 0.75rem;" />
                 <div v-for="(n, i) in selectedMeta.variables" :key="'v' + n" style="margin-bottom: 0.75rem;">
                   <label>{{ isAr ? 'المتغير' : 'Variable' }} <span dir="ltr" v-text="varToken(n)"></span></label>
                   <input v-model="metaVarValues[i]" required class="form-input" />
@@ -151,6 +152,7 @@ import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { useMetaChannel } from '../composables/useMetaChannel'
 import { normalizeTemplate, buildPreview, buildComponents, varToken, urlPrefix, unsupportedReason } from '../utils/metaTemplate'
+import TemplateHeaderMedia from '../components/TemplateHeaderMedia.vue'
 import { metaErrorText } from '../utils/metaErrors'
 
 const { locale } = useI18n()
@@ -212,6 +214,8 @@ const metaVarValues = ref([])
 const metaButtonValues = ref([])
 
 // The chosen Meta template (selectedTemplateId is "name||language") and what the recipient will read
+// Image / video / PDF of a media-header template: { type, id | link, filename }
+const metaHeaderMedia = ref(null)
 const selectedMeta = computed(() => {
   const [name, language] = (selectedTemplateId.value || '').split('||')
   return metaTemplates.value.find(t => t.name === name && t.language === language) || null
@@ -220,6 +224,7 @@ const metaPreview = computed(() => selectedMeta.value ? buildPreview(selectedMet
 watch(selectedTemplateId, () => {
   metaVarValues.value = (selectedMeta.value?.variables || []).map(() => '')
   metaButtonValues.value = (selectedMeta.value?.buttonVars || []).map(() => '')
+  metaHeaderMedia.value = null
 })
 
 const isMetaChannel = computed(() => {
@@ -393,11 +398,12 @@ const handleSend = async () => {
     } else if (messageType.value === 'meta_template') {
       if (!selectedMeta.value) throw new Error('Please select a Meta template');
       if (!selectedMeta.value.supported) throw new Error(isAr.value ? 'هذا القالب غير مدعوم في هذا النموذج' : 'This template cannot be sent from this form');
+      if (selectedMeta.value.headerMedia && !metaHeaderMedia.value) throw new Error(isAr.value ? 'ارفع ملف الترويسة أو ضع رابطه أولاً' : 'Upload the header file or give its link first');
       res = await axios.post('/api/v1/message/send-meta-template', {
         phone: phone.value,
         templateName: selectedMeta.value.name,
         languageCode: selectedMeta.value.language,
-        components: buildComponents(selectedMeta.value, metaVarValues.value, metaButtonValues.value),
+        components: buildComponents(selectedMeta.value, metaVarValues.value, metaButtonValues.value, metaHeaderMedia.value),
         previewText: metaPreview.value,
         channelId: channelId.value
       }, config)

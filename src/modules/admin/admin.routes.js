@@ -45,6 +45,30 @@ router.post('/system/queues/:name/clean-failed', adminAuth, async (req, res, nex
     next(error);
   }
 });
+// AI usage per account for a month (?month=2026-11): tokens on the shared GEMINI_API_KEY vs their own keys
+router.get('/ai-usage', adminAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await require('../ai/ai.usage').platformUsage(req.query.month) });
+  } catch (error) {
+    next(error);
+  }
+});
+// "Log in as customer": a 30-minute owner session in the customer's dashboard (the customer is not notified)
+router.post('/tenants/:id/impersonate', adminAuth, async (req, res, next) => {
+  try {
+    const data = await require('./impersonation.service').start(req.admin.email, req.params.id, { ip: req.ip, userAgent: req.headers['user-agent'] });
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+router.get('/tenants/:id/impersonations', adminAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await require('./impersonation.service').list(req.params.id) });
+  } catch (error) {
+    next(error);
+  }
+});
 router.get('/tenants', adminAuth, adminController.getTenants.bind(adminController));
 router.get('/tenants/:id', adminAuth, adminController.getTenantById.bind(adminController));
 router.put('/tenants/:id/plan', adminAuth, adminController.updatePlan.bind(adminController));

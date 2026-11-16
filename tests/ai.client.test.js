@@ -14,7 +14,16 @@ inject('axios', {
     return { data: step() };
   }
 });
-inject('@prisma/client', { PrismaClient: class { constructor() { this.tenant = { findUnique: async () => ({ customFeatures: { aiSettings: { geminiKey: 'k' } } }) }; } } });
+// Tenant 'shared' has no key of its own (uses GEMINI_API_KEY); every other tenant has one
+const usageRows = [];
+inject('@prisma/client', {
+  PrismaClient: class {
+    constructor() {
+      this.tenant = { findUnique: async ({ where }) => ({ customFeatures: where.id === 'shared' ? {} : { aiSettings: { geminiKey: 'k' } } }) };
+      this.aiUsage = { create: async ({ data }) => { usageRows.push(data); return data; } };
+    }
+  }
+});
 
 const httpError = (status, message) => Object.assign(new Error(`Request failed with status code ${status}`), { response: { status, data: { error: { message } } } });
 const fail = (status, message) => () => { throw httpError(status, message); };
@@ -78,4 +87,25 @@ test('GEMINI_MODEL / GEMINI_FALLBACK_MODELS / GEMINI_THINKING_LEVEL', async () =
   await client.generate('t', req);
   assert.strictEqual(calls[0].body.generationConfig.thinkingConfig, undefined);
   for (const key of ['GEMINI_MODEL', 'GEMINI_FALLBACK_MODELS', 'GEMINI_THINKING_LEVEL']) delete process.env[key];
+});
+
+test('every Gemini answer records its tokens, the feature, and whether the shared key paid', async () => {
+  const withUsage = (text, usage) => () => ({ ...answer(text)(), usageMetadata: usage });
+  usageRows.length = 0;
+  process.env.GEMINI_API_KEY = 'platform-key';
+  try {
+    reset([withUsage('رد', { promptTokenCount: 1200, candidatesTokenCount: 80, thoughtsTokenCount: 40, totalTokenCount: 1320 })]);
+    await client.generate('shared', { ...req, feature: 'agent_reply' });
+    reset([withUsage('{bad', { promptTokenCount: 300, candidatesTokenCount: 10 }), withUsage('{"ok":true}', { promptTokenCount: 300, candidatesTokenCount: 12 })]);
+    await client.generate('own', { ...req, schema: { type: 'OBJECT' }, feature: 'suggest_reply' });
+    await new Promise(resolve => setImmediate(resolve));
+  } finally {
+    delete process.env.GEMINI_API_KEY;
+  }
+  assert.deepStrictEqual(usageRows.map(r => [r.tenantId, r.feature, r.sharedKey, r.inputTokens, r.outputTokens]), [
+    ['shared', 'agent_reply', true, 1200, 120],
+    ['own', 'suggest_reply', false, 300, 10],
+    ['own', 'suggest_reply', false, 300, 12]
+  ], 'thinking counts as output; an unusable answer is still billed by Google, so it is recorded');
+  assert.strictEqual(usageRows[0].model, 'gemini-3.6-flash');
 });

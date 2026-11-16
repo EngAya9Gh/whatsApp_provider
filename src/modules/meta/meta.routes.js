@@ -168,6 +168,35 @@ router.post('/channel/:channelId/upload-media', canUploadMedia, uploadTmp.single
   }
 });
 
+// Upload the image / video / PDF of a template's media header, for sending (Live Chat, Send Message,
+// campaigns). Returns Meta's media id, usable from this number for 30 days.
+const canSendTemplateMedia = requireAnyPermission('can_send_message', 'can_create_campaigns', 'can_view_live_chat');
+router.post('/channel/:channelId/header-media', canSendTemplateMedia, uploadTmp.single('file'), async (req, res, next) => {
+  const fs = require('fs');
+  const removeTmp = () => { if (req.file?.path) fs.promises.unlink(req.file.path).catch(() => {}); };
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    const metaService = require('./meta.service');
+    const { checkUpload } = require('./meta.templateMedia');
+    const channel = await prisma.whatsAppChannel.findFirst({
+      where: { id: req.params.channelId, tenantId: req.tenant.id, providerType: 'META_CLOUD' }
+    });
+    if (!channel) return res.status(404).json({ success: false, message: 'Meta channel not found' });
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const type = String(req.body.type || '').toLowerCase();
+    checkUpload(type, req.file);
+
+    const mediaId = await metaService.uploadMedia(channel, req.file.path, req.file.mimetype);
+    res.json({ success: true, data: { type, id: mediaId, filename: req.file.originalname, mimetype: req.file.mimetype, size: req.file.size } });
+  } catch (err) {
+    if (err.status === 400) return res.status(400).json({ success: false, message: err.message });
+    next(err.response?.data?.error ? { status: 400, message: `Meta did not accept the file: ${err.response.data.error.message}` } : err);
+  } finally {
+    removeTmp();
+  }
+});
+
 // Meta Auto Responder — Channel-specific auto reply rules
 // ────────────────────────────────────────────────────────────────────────────
 const metaAutoResponderController = require('./meta.autoresponder.controller');

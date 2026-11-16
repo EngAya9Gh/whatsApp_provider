@@ -54,6 +54,8 @@ model Tenant {
   contactGroups    ContactGroup[]
   contacts         Contact[]
   walletTransactions WalletTransaction[]
+  aiUsage          AiUsage[]
+  adminSessions    AdminImpersonation[]
 
   @@map("tenants")
 }
@@ -168,6 +170,7 @@ model Campaign {
   status          String              @default("PENDING")
   campaignType    String              @default("BAILEYS") @map("campaign_type") // BAILEYS or META
   metaCategory    String?             @map("meta_category") // MARKETING, UTILITY, AUTHENTICATION
+  headerMedia     Json?               @map("header_media") // META: { type, id | link, filename } of a media-header template
   createdAt       DateTime            @default(now()) @map("created_at")
   mediaMime       String?             @map("media_mime")
   mediaPath       String?             @map("media_path")
@@ -547,4 +550,42 @@ model WalletTransaction {
   @@index([tenantId, createdAt], map: "wallet_transactions_tenant_id_created_at_idx")
   @@index([referenceType, referenceId], map: "wallet_transactions_reference_idx")
   @@map("wallet_transactions")
+}
+
+// One Gemini request: who made it, for which feature, and how many tokens it used (Google bills tokens).
+// sharedKey = it ran on the platform key (GEMINI_API_KEY), so the platform pays for it.
+model AiUsage {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  feature      String   @db.VarChar(40)
+  model        String   @db.VarChar(80)
+  sharedKey    Boolean  @default(false) @map("shared_key")
+  inputTokens  Int      @default(0) @map("input_tokens")
+  outputTokens Int      @default(0) @map("output_tokens") // the answer plus Gemini's thinking
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt], map: "ai_usage_tenant_id_created_at_idx")
+  @@index([createdAt], map: "ai_usage_created_at_idx")
+  @@map("ai_usage")
+}
+
+// An admin working inside a customer's dashboard ("log in as customer"): who, when, until when, and every
+// change made during the session. The customer is not notified.
+model AdminImpersonation {
+  id         String    @id @default(uuid())
+  tenantId   String    @map("tenant_id")
+  adminEmail String    @map("admin_email") @db.VarChar(191)
+  ip         String?   @db.VarChar(64)
+  userAgent  String?   @map("user_agent") @db.VarChar(255)
+  startedAt  DateTime  @default(now()) @map("started_at")
+  expiresAt  DateTime  @map("expires_at")
+  endedAt    DateTime? @map("ended_at")
+  actions    Json? // [{ at, method, path, status }] of the requests that changed something
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, startedAt], map: "admin_impersonations_tenant_id_started_at_idx")
+  @@map("admin_impersonations")
 }

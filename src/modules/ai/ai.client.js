@@ -47,10 +47,33 @@ const thinkingLevel = () => (process.env.GEMINI_THINKING_LEVEL || 'low').trim().
 // Models that rejected the thinking setting: later requests to them go without it
 const noThinkingSetting = new Set();
 
-/** The tenant's own Gemini key, else the platform key from GEMINI_API_KEY */
-async function resolveApiKey(tenantId) {
+/** The tenant's own Gemini key, else the platform key from GEMINI_API_KEY (shared = the platform pays) */
+async function resolveKey(tenantId) {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } });
-  return tenant?.customFeatures?.aiSettings?.geminiKey || process.env.GEMINI_API_KEY || null;
+  const own = tenant?.customFeatures?.aiSettings?.geminiKey;
+  if (own) return { key: own, shared: false };
+  return { key: process.env.GEMINI_API_KEY || null, shared: true };
+}
+
+async function resolveApiKey(tenantId) {
+  return (await resolveKey(tenantId)).key;
+}
+
+/**
+ * Records the tokens of one Gemini answer (Google bills every answer, even one we could not use).
+ * Never slows down or fails the AI feature.
+ */
+function recordUsage(tenantId, { feature, modelId, shared, usage }) {
+  if (!usage) return;
+  try {
+    const inputTokens = Number(usage.promptTokenCount) || 0;
+    const outputTokens = (Number(usage.candidatesTokenCount) || 0) + (Number(usage.thoughtsTokenCount) || 0);
+    Promise.resolve(prisma.aiUsage.create({
+      data: { tenantId, feature: String(feature || 'other').slice(0, 40), model: String(modelId).slice(0, 80), sharedKey: shared, inputTokens, outputTokens }
+    })).catch(err => logger.warn(`[AI] Could not record usage: ${err.message}`));
+  } catch (err) {
+    logger.warn(`[AI] Could not record usage: ${err.message}`);
+  }
 }
 
 async function isConfigured(tenantId) {
@@ -123,8 +146,8 @@ function readAnswer(data, schema) {
  *  contents — [{ role: 'user' | 'model', text }]
  *  schema   — optional response schema; the reply is then parsed JSON
  */
-async function generate(tenantId, { system, contents, schema = null, temperature = 0.3, maxOutputTokens = 1024 }) {
-  const apiKey = await resolveApiKey(tenantId);
+async function generate(tenantId, { system, contents, schema = null, temperature = 0.3, maxOutputTokens = 1024, feature = 'other' }) {
+  const { key: apiKey, shared } = await resolveKey(tenantId);
   if (!apiKey) throw new AiNotConfiguredError();
 
   const body = {
@@ -143,7 +166,9 @@ async function generate(tenantId, { system, contents, schema = null, temperature
     const remaining = deadline - Date.now();
     if (remaining < MIN_ATTEMPT_MS) break;
     try {
-      return readAnswer(await callModel(apiKey, modelId, body, Math.min(ATTEMPT_TIMEOUT_MS, remaining)), schema);
+      const data = await callModel(apiKey, modelId, body, Math.min(ATTEMPT_TIMEOUT_MS, remaining));
+      recordUsage(tenantId, { feature, modelId, shared, usage: data?.usageMetadata });
+      return readAnswer(data, schema);
     } catch (err) {
       if (!err.retryable) throw err;
       lastError = err;

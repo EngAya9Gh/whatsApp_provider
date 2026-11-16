@@ -36,6 +36,8 @@ import { tenantHasMeta } from '../utils/meta-access'
 
 const routes = [
   { path: '/login', component: Login, meta: { guest: true } },
+  // Admin "log in as customer" landing page (see admin TenantDetail)
+  { path: '/impersonate', component: () => import('../views/Impersonate.vue'), meta: { hideSidebar: true } },
   { path: '/register', component: Register, meta: { guest: true } },
   { path: '/', component: Landing },
   { path: '/privacy', component: PrivacyPolicy, meta: { hideSidebar: true } },

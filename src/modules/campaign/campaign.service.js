@@ -5,6 +5,8 @@ const csv = require('csv-parser');
 const stream = require('stream');
 const { campaignQueue } = require('../../workers/campaign.worker');
 const walletService = require('../wallet/wallet.service');
+const { unitPrice, settle } = require('./campaign.billing');
+const { normalizeHeaderMedia } = require('../meta/meta.templateMedia');
 const logger = require('../../utils/logger');
 
 const fs = require('fs');
@@ -113,8 +115,10 @@ class CampaignService {
     return records;
   }
 
-  async createCampaign({ tenantId, name, message, templateId, templateLanguage, file, image, buttons, interactiveType, startDate, endDate, campaignType, channelId, metaCategory, contactGroupId }) {
+  async createCampaign({ tenantId, name, message, templateId, templateLanguage, file, image, buttons, interactiveType, startDate, endDate, campaignType, channelId, metaCategory, contactGroupId, headerMedia }) {
     const isMeta = campaignType === 'META';
+    // Image / video / PDF of a media-header template, sent to every recipient (checked before anything is charged)
+    const media = isMeta ? normalizeHeaderMedia(headerMedia) : null;
     let records = [];
 
     // 1. Parse phones and variables from file OR Contact Group
@@ -151,26 +155,9 @@ class CampaignService {
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     const settings = await prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } });
     
-    let messagePrice = 0;
-    
-    if (isMeta) {
-      // Get category price (marketing, utility, authentication, service)
-      const category = (metaCategory || 'marketing').toLowerCase();
-      let baseCost = settings?.data?.[`${category}BaseCost`] || 0.0501;
-      let markupPercent = settings?.data?.[`${category}MarkupPercent`] || 20;
-      messagePrice = baseCost + (baseCost * (markupPercent / 100));
-    } else {
-      messagePrice = settings?.data?.qrMessagePrice || 0.05;
-    }
-    
-    const totalCostSar = records.length * messagePrice;
-    
-    // Convert to USD if tenant uses USD
-    let totalCost = totalCostSar;
-    const exchangeRate = settings?.data?.exchangeRateUsdToSar || 3.75;
-    if (tenant.currency === 'USD') {
-      totalCost = totalCostSar / exchangeRate;
-    }
+    // Price per message in the account's currency (see campaign.billing.js for who pays Meta)
+    const messagePrice = unitPrice({ isMeta, category: metaCategory, settings: settings?.data || {}, tenant });
+    const totalCost = Math.round(records.length * messagePrice * 10000) / 10000;
 
     // The charge and its ledger row are one atomic step; it fails when the balance does not cover it
     let charge = null;
@@ -200,6 +187,9 @@ class CampaignService {
           endDate: endDate || null,
           campaignType: campaignType || 'BAILEYS',
           metaCategory: metaCategory || null,
+          ...(media && { headerMedia: media }),
+          totalCost: charge ? totalCost : 0,
+          totalMessages: records.length,
           status: 'PENDING'
         }
       });
@@ -310,7 +300,8 @@ class CampaignService {
           variables: target.variables ? JSON.parse(target.variables) : [],
           templateName: campaign.message,
           templateLanguage: campaign.templateId || 'ar', // templateId stores the language for META
-          metaCategory: campaign.metaCategory
+          metaCategory: campaign.metaCategory,
+          headerMedia: campaign.headerMedia || null
         },
         // Pace is set by the queue's rate limit (META_CAMPAIGN_RATE_PER_SECOND), not by spacing jobs out
         opts: baseDelay > 0 ? { delay: baseDelay } : {}
@@ -345,46 +336,16 @@ class CampaignService {
       if (jobs.length > 0) await campaignQueue.addBulk(jobs);
     }
 
-    // Calculate Pricing for META
-    let totalCost = 0;
+    // The cost was charged when the campaign was created (campaign.billing.js keeps totalCost up to date)
     const totalMessages = campaign.targets.length;
-
-    if (campaign.campaignType === 'META' && campaign.metaCategory) {
-      try {
-        const { getSystemSettings } = require('../admin/admin.service').prototype;
-        const adminService = new (require('../admin/admin.service'))();
-        const settings = await adminService.getSystemSettings();
-        
-        let baseCost = 0;
-        let markup = 0;
-        const cat = campaign.metaCategory.toLowerCase();
-        
-        if (cat === 'utility') {
-          baseCost = settings.utilityBaseCost || 0;
-          markup = settings.utilityMarkupPercent || 0;
-        } else if (cat === 'marketing') {
-          baseCost = settings.marketingBaseCost || 0;
-          markup = settings.marketingMarkupPercent || 0;
-        } else if (cat === 'authentication') {
-          baseCost = settings.authenticationBaseCost || 0;
-          markup = settings.authenticationMarkupPercent || 0;
-        }
-        
-        const costPerMessage = baseCost * (1 + (markup / 100));
-        totalCost = costPerMessage * totalMessages;
-      } catch (e) {
-        console.error('[CampaignService] Failed to calculate total cost', e);
-      }
-    }
 
     // If scheduled for future, set SCHEDULED status. Otherwise RUNNING.
     const newStatus = isScheduled ? 'SCHEDULED' : 'RUNNING';
 
     await prisma.campaign.update({
       where: { id: campaign.id },
-      data: { 
+      data: {
         status: newStatus,
-        totalCost,
         totalMessages
       }
     });
@@ -455,6 +416,10 @@ class CampaignService {
       });
       campaign.status = 'COMPLETED';
     }
+    // Refund the failed messages now instead of waiting for the next sweep
+    if (failed > 0) {
+      await settle(campaign.id).catch(err => logger.warn(`[CampaignBilling] Settling campaign ${campaign.id} failed: ${err.message}`));
+    }
 
     return {
       status: campaign.status,
@@ -505,6 +470,9 @@ class CampaignService {
     if (!campaign) throw { status: 404, message: 'Campaign not found' };
     if (campaign.targets.length === 0) throw { status: 400, message: 'No failed targets found' };
 
+    // Failed messages were refunded: the retry is paid first (fails with INSUFFICIENT_BALANCE when the wallet is short)
+    await settle(campaign.id, { includeFailed: true });
+
     // Update targets to PENDING
     await prisma.campaignTarget.updateMany({
       where: { campaignId: campaign.id, status: 'FAILED' },
@@ -525,22 +493,27 @@ class CampaignService {
           variables: target.variables ? JSON.parse(target.variables) : [],
           templateName: campaign.message,
           templateLanguage: campaign.templateId || null, // templateId stores language for META
-          metaCategory: campaign.metaCategory
+          metaCategory: campaign.metaCategory,
+          headerMedia: campaign.headerMedia || null
         },
         opts: { removeOnComplete: true, removeOnFail: false }
       }));
       if (jobs.length > 0) await metaCampaignQueue.addBulk(jobs);
     } else {
       const jobs = campaign.targets.map(target => ({
-        name: 'send-campaign-msg',
+        name: 'send-campaign-message',
         data: {
+          campaignId: campaign.id,
+          targetId: target.id,
           tenantId,
           phone: target.phone,
           message: campaign.message,
           templateId: campaign.templateId,
           mediaPath: campaign.mediaPath,
           mediaMime: campaign.mediaMime,
-          targetId: target.id
+          buttons: campaign.buttons ? JSON.parse(campaign.buttons) : null,
+          interactiveType: campaign.interactiveType || 'TEXT',
+          channelId: campaign.channelId
         },
         opts: { removeOnComplete: true, removeOnFail: false }
       }));

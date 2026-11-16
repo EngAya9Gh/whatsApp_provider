@@ -59,6 +59,31 @@
         </p>
       </section>
 
+      <!-- This month's AI usage (every AI feature of the account, not only the agent) -->
+      <section v-if="usage" class="card usage">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h2 class="card-title"><i class="fas fa-chart-simple text-[#FF6600] me-1"></i>{{ isAr ? 'استهلاك الذكاء الاصطناعي هذا الشهر' : 'AI usage this month' }}</h2>
+            <p class="card-sub m-0">{{ isAr
+              ? 'كل ميزات الذكاء الاصطناعي في حسابك: الموظف الذكي، اقتراح الرد، الملخصات، واقتراح المرحلة. التوكن ≈ جزء من كلمة، وتشمل قاعدة المعرفة المرسلة مع كل طلب.'
+              : 'Every AI feature of your account: the agent, suggested replies, summaries and stage suggestions. A token is roughly part of a word; it includes the business information sent with each request.' }}</p>
+          </div>
+          <div class="usage-total">
+            <b>{{ fmtNum(usage.requests) }}</b> {{ isAr ? 'طلب' : 'requests' }}
+            <span>·</span>
+            <b>{{ fmtNum(usage.inputTokens + usage.outputTokens) }}</b> {{ isAr ? 'توكن' : 'tokens' }}
+          </div>
+        </div>
+        <div v-if="usage.byFeature.length" class="usage-grid">
+          <div v-for="f in usage.byFeature" :key="f.feature" class="usage-item">
+            <div class="usage-name">{{ featureName(f.feature) }}</div>
+            <div class="usage-num">{{ fmtNum(f.requests) }} <small>{{ isAr ? 'طلب' : 'req.' }}</small></div>
+            <div class="usage-sub">{{ fmtNum(f.inputTokens + f.outputTokens) }} {{ isAr ? 'توكن' : 'tokens' }}</div>
+          </div>
+        </div>
+        <p v-else class="card-sub mt-3 mb-0">{{ isAr ? 'لا استهلاك بعد هذا الشهر.' : 'No usage yet this month.' }}</p>
+      </section>
+
       <div class="grid lg:grid-cols-5 gap-5">
         <!-- Settings -->
         <div class="lg:col-span-3 space-y-5">
@@ -325,7 +350,25 @@ const sendTest = async () => {
   }
 }
 
+// AI usage of this month, per feature
+const usage = ref(null)
+const FEATURE_NAMES = {
+  agent_reply: ['ردود الموظف الذكي', 'AI agent replies'],
+  suggest_reply: ['اقتراح الرد', 'Suggested replies'],
+  chat_summary: ['ملخص المحادثة', 'Chat summaries'],
+  ticket_summary: ['ملخص التذكرة', 'Ticket summaries'],
+  stage_suggestion: ['اقتراح المرحلة', 'Stage suggestions'],
+  other: ['أخرى', 'Other']
+}
+const featureName = (key) => (FEATURE_NAMES[key] || FEATURE_NAMES.other)[isAr.value ? 0 : 1]
+const loadUsage = async () => {
+  try {
+    usage.value = (await axios.get('/api/v1/ai/usage')).data.data
+  } catch { usage.value = null }
+}
+
 onMounted(async () => {
+  loadUsage()
   try {
     const res = await axios.get('/api/v1/ai/agent')
     applyAgent(res.data.data)
@@ -343,6 +386,16 @@ onMounted(async () => {
 .card { background: white; border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px 20px; }
 .card-title { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0 0 4px; }
 .card-sub { font-size: 0.75rem; color: #94a3b8; margin: 0; }
+.usage { margin-bottom: 20px; }
+.usage-total { font-size: 0.85rem; color: #475569; white-space: nowrap; }
+.usage-total b { color: #0f172a; font-size: 1.05rem; }
+.usage-total span { margin: 0 6px; color: #cbd5e1; }
+.usage-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+.usage-item { border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px 12px; background: #fcfcfd; }
+.usage-name { font-size: 0.75rem; font-weight: 700; color: #64748b; }
+.usage-num { font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-top: 2px; }
+.usage-num small { font-size: 0.7rem; font-weight: 600; color: #94a3b8; }
+.usage-sub { font-size: 0.7rem; color: #94a3b8; }
 .lbl { display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 6px; }
 .inp { width: 100%; padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 13.5px; outline: none; background: white; resize: vertical; }
 .inp:focus { border-color: #FF6600; box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.12); }

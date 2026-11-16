@@ -13,6 +13,15 @@ class AIController {
     }
   }
 
+  /** This account's AI usage for a month (?month=2026-11) */
+  async getUsage(req, res, next) {
+    try {
+      res.json({ success: true, data: await require('./ai.usage').tenantUsage(req.tenant.id, req.query.month) });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async summarize(req, res, next) {
     try {
       const summary = await aiService.summarizeConversation(req.tenant.id, req.params.threadId, { refresh: !!req.body?.refresh });

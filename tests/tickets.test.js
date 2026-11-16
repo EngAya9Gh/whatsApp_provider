@@ -27,7 +27,8 @@ const sent = [];
 inject(fromRoot('src/modules/meta/meta.service'), {
   sendText: async (ch, phone, text) => { sent.push({ kind: 'text', phone, text }); return { messages: [{ id: `w${sent.length}` }] }; },
   sendButtons: async (ch, phone, text) => { sent.push({ kind: 'buttons', phone, text }); return { messages: [{ id: `wb${sent.length}` }] }; },
-  sendList: async (ch, phone, title, text) => { sent.push({ kind: 'list', phone, text }); return { messages: [{ id: `wl${sent.length}` }] }; }
+  sendList: async (ch, phone, title, text) => { sent.push({ kind: 'list', phone, text }); return { messages: [{ id: `wl${sent.length}` }] }; },
+  sendTemplate: async (ch, phone, name, lang, components) => { sent.push({ kind: 'template', phone, name, components }); return { messages: [{ id: `wt${sent.length}` }] }; }
 });
 inject(fromRoot('src/modules/billing/billing.service'), { checkLimit: async () => true, incrementUsage: async () => {} });
 const crm = [];
@@ -322,4 +323,25 @@ test('flow step "hand to one agent" really goes to that agent', { skip }, async 
   assert.strictEqual(activeOf((await threadOf('f1'))._id).assignedToId, 'B');
   await flowService.setActive(T, 'ch1', false);
   setTickets({ autoCreateTickets: true });
+});
+
+test('Live Chat: a media-header template goes out with its image; a bad header is refused before anything is sent', { skip }, async () => {
+  const thread = await ChatThread.create({ tenantId: T, channelId: 'ch1', contactPhone: '966500009999', contactName: 'Media' });
+  const before = sent.length;
+  await chatService.sendTemplateMessage(T, thread._id.toString(), {
+    templateName: 'offer', language: 'ar', bodyParams: ['سارة'], previewText: '🖼️ صورة\n\nأهلاً سارة',
+    headerMedia: { type: 'image', id: '555000111' }
+  });
+  const out = sent[sent.length - 1];
+  assert.strictEqual(sent.length, before + 1);
+  assert.strictEqual(out.kind, 'template');
+  assert.deepStrictEqual(out.components, [
+    { type: 'header', parameters: [{ type: 'image', image: { id: '555000111' } }] },
+    { type: 'body', parameters: [{ type: 'text', text: 'سارة' }] }
+  ]);
+
+  await assert.rejects(chatService.sendTemplateMessage(T, thread._id.toString(), {
+    templateName: 'offer', language: 'ar', headerMedia: { type: 'image', link: 'http://insecure.sa/a.png' }
+  }), (e) => e.status === 400);
+  assert.strictEqual(sent.length, before + 1, 'nothing sent');
 });

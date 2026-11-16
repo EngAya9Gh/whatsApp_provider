@@ -27,6 +27,9 @@
       </div>
     </div>
 
+    <!-- ── Setup checklist (new accounts, owner only) ── -->
+    <OnboardingChecklist :is-ar="isAr" />
+
     <!-- ── Loading ── -->
     <div v-if="loading" class="loading-overlay">
       <div class="spinner"></div>
@@ -242,6 +245,7 @@ import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import flatpickr from 'flatpickr'
 import 'flatpickr/dist/flatpickr.css'
+import OnboardingChecklist from '../components/OnboardingChecklist.vue'
 
 // ── Chart refs──
 const lineChartRef = ref(null)

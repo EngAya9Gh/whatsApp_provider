@@ -121,8 +121,16 @@ const resolveToken = async (token) => {
   if (!tenant) throw new AuthError(401, 'Unauthorized: Tenant not found');
   if (!tenant.isActive) throw new AuthError(403, 'Forbidden: Account is disabled');
 
+  // An admin inside the account ("log in as customer"): the session must still be open
+  let impersonation = null;
+  if (decoded.imp) {
+    const session = await require('../modules/admin/impersonation.service').activeSession(decoded.imp);
+    if (!session || session.tenantId !== tenant.id) throw new AuthError(401, 'Unauthorized: Support session ended');
+    impersonation = { id: session.id, by: session.adminEmail, expiresAt: session.expiresAt };
+  }
+
   // الأوونر لا يحتاج permissions — له كل الصلاحيات
-  return { tenant, subUser: null, isSubUser: false, isApiKey: false, userPerms: null, channelId: null };
+  return { tenant, subUser: null, isSubUser: false, isApiKey: false, userPerms: null, channelId: null, impersonation };
 };
 
 const applyIdentity = (req, identity) => {
@@ -132,6 +140,7 @@ const applyIdentity = (req, identity) => {
   req.isSubUser = identity.isSubUser;
   req.isApiKey  = identity.isApiKey;
   req.userPerms = identity.userPerms;
+  req.impersonation = identity.impersonation || undefined;
   if (identity.isSubUser) req.channelId = identity.channelId;
 };
 
@@ -147,6 +156,8 @@ const authMiddleware = async (req, res, next) => {
     }
 
     applyIdentity(req, await resolveToken(token));
+    // Support sessions: no password / API key changes, and every change is listed on the session
+    if (req.impersonation) return require('../modules/admin/impersonation.service').guard(req, res, next);
     next();
   } catch (error) {
     if (error instanceof AuthError) return res.status(error.status).json({ error: error.message });

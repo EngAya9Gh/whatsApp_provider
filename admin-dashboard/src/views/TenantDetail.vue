@@ -14,7 +14,10 @@
         </div>
       </div>
       
-      <div class="flex items-center gap-3" v-if="tenant">
+      <div class="flex items-center gap-3 flex-wrap" v-if="tenant">
+        <button @click="impersonate" :disabled="impersonating || !tenant.isActive" :title="tenant.isActive ? 'Opens the customer dashboard for 30 minutes. The customer is not notified.' : 'Enable the account first'" class="bg-slate-900 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg font-semibold shadow-md transition-all border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+          {{ impersonating ? 'Opening…' : 'Log in as customer (ادخل كهذا العميل)' }}
+        </button>
         <button @click="openPasswordModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 border-none cursor-pointer">
           Reset Password
         </button>
@@ -37,6 +40,26 @@
       <!-- Left Column -->
       <div class="lg:col-span-5 flex flex-col gap-6">
         
+        <!-- Support sessions ("log in as customer") -->
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+          <h3 class="text-lg font-bold text-slate-900 mb-1">Support sessions (جلسات الدخول كعميل)</h3>
+          <p class="text-xs text-slate-500 mb-4">30 minutes each. The password, email and API keys cannot be changed inside. Every change made is listed here; the customer is not notified.</p>
+          <div v-if="sessions.length === 0" class="text-sm text-slate-400">No sessions yet.</div>
+          <div v-for="s in sessions" :key="s.id" class="border-t border-slate-100 py-3 first:border-t-0">
+            <div class="flex items-center justify-between gap-2 text-sm">
+              <span class="font-semibold text-slate-800">{{ s.adminEmail }}</span>
+              <span class="text-xs" :class="sessionOpen(s) ? 'text-green-700 font-bold' : 'text-slate-400'">{{ sessionOpen(s) ? 'Open now' : 'Ended' }}</span>
+            </div>
+            <div class="text-xs text-slate-500 mt-0.5">{{ new Date(s.startedAt).toLocaleString() }} · {{ s.actions.length }} change{{ s.actions.length === 1 ? '' : 's' }}</div>
+            <details v-if="s.actions.length" class="mt-1">
+              <summary class="text-xs text-orange-600 cursor-pointer">Show changes</summary>
+              <ul class="mt-1 space-y-0.5 text-[11px] font-mono text-slate-600 max-h-40 overflow-y-auto">
+                <li v-for="(a, i) in s.actions" :key="i">{{ new Date(a.at).toLocaleTimeString() }} {{ a.method }} {{ a.path }} → {{ a.status }}</li>
+              </ul>
+            </details>
+          </div>
+        </div>
+
         <!-- Account Info Panel -->
         <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <h3 class="text-lg font-bold text-slate-900 mb-5 pb-3 border-b border-slate-100">Account Information</h3>
@@ -100,6 +123,16 @@
             <div class="flex items-center gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
               <input type="checkbox" v-model="settingsForm.deductBalance" id="deductToggle" class="w-5 h-5 text-orange-500 bg-white border-slate-300 rounded focus:ring-orange-500 focus:ring-2 accent-orange-500 cursor-pointer" />
               <label for="deductToggle" class="font-semibold text-slate-700 text-sm cursor-pointer select-none">Deduct Balance (خصم الرصيد) - Enable wallet deduction for campaigns</label>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Who pays Meta's message fees? (من يدفع رسوم Meta؟)</label>
+              <select v-model="metaFeesPaidBy" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg block w-full p-2.5 outline-none">
+                <option value="">Platform default (from Settings)</option>
+                <option value="CUSTOMER">The customer, with their own card in Meta — wallet takes only the markup</option>
+                <option value="PLATFORM">We pay Meta — wallet takes base cost + markup</option>
+              </select>
+              <p class="text-xs text-slate-500 mt-2">Applies to campaigns created from now on. Failed messages are refunded either way.</p>
             </div>
 
             <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
@@ -540,6 +573,20 @@ const loadWalletTx = async (reset = true) => {
   }
 }
 
+// Who pays Meta for this tenant, stored in customFeatures.billing (empty = the platform default)
+const metaFeesPaidBy = computed({
+  get: () => settingsForm.value.customFeatures?.billing?.metaFeesPaidBy || '',
+  set: (value) => {
+    const features = { ...(settingsForm.value.customFeatures || {}) }
+    const billing = { ...(features.billing || {}) }
+    if (value) billing.metaFeesPaidBy = value
+    else delete billing.metaFeesPaidBy
+    if (Object.keys(billing).length) features.billing = billing
+    else delete features.billing
+    settingsForm.value.customFeatures = features
+  }
+})
+
 // What the tenant really has: the plan's features, then this tenant's overrides (the same rule the API applies).
 const planFeatures = computed(() => {
   const plan = dbPlans.value.find(p => p.planCode === tenant.value?.plan)
@@ -921,7 +968,38 @@ const toggleStatus = async () => {
   }
 }
 
-onMounted(() => { fetchTenant(); loadWalletTx(true) })
+// "Log in as customer": opens the customer dashboard in a new tab with a 30-minute support session
+const impersonating = ref(false)
+const sessions = ref([])
+const sessionOpen = (s) => !s.endedAt && new Date(s.expiresAt) > new Date()
+const loadSessions = async () => {
+  try {
+    const res = await axios.get(`/api/admin/tenants/${route.params.id}/impersonations`, { headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` } })
+    sessions.value = res.data.data
+  } catch (err) {
+    console.error('Failed to load support sessions:', err)
+  }
+}
+const impersonate = async () => {
+  // Open the tab first (browsers block tabs opened after an await)
+  const tab = window.open('', '_blank')
+  impersonating.value = true
+  try {
+    const res = await axios.post(`/api/admin/tenants/${route.params.id}/impersonate`, {}, { headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` } })
+    // The token goes in the #fragment, which browsers never send to the server
+    const url = `${window.location.origin}/impersonate#token=${encodeURIComponent(res.data.data.token)}`
+    if (tab) tab.location.href = url
+    else window.location.href = url
+    loadSessions()
+  } catch (err) {
+    if (tab) tab.close()
+    alert(err.response?.data?.message || err.response?.data?.error || 'Could not open the customer dashboard')
+  } finally {
+    impersonating.value = false
+  }
+}
+
+onMounted(() => { fetchTenant(); loadWalletTx(true); loadSessions() })
 </script>
 
 

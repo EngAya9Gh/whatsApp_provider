@@ -19,7 +19,7 @@
                 <span class="hstat-chip">{{ campaigns.length }} {{ isAr ? 'حملة' : 'total' }}</span>
                 <span class="hstat-chip running-chip" v-if="statusCount('RUNNING') > 0">{{ statusCount('RUNNING') }} {{ isAr ? 'جارية' : 'running' }}</span>
                 <span class="hstat-chip sched-chip" v-if="statusCount('SCHEDULED') > 0">{{ statusCount('SCHEDULED') }} {{ isAr ? 'مجدولة' : 'scheduled' }}</span>
-                <span class="hstat-chip cost-chip">${{ totalCostAll }}</span>
+                <span class="hstat-chip cost-chip">{{ totalCostAll }} {{ walletCurrency }}</span>
               </div>
             </div>
             <p class="hero-sub">{{ isAr ? 'إرسال رسائل واتساب رسمية عبر Meta Cloud API' : 'Send via official Meta/WhatsApp API with 100% delivery reliability' }}</p>
@@ -118,7 +118,7 @@
         <div class="cost-row">
           <div class="cost-chip">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            {{ isAr ? 'التكلفة:' : 'Cost:' }} <strong>${{ (campaign.totalCost || 0).toFixed(4) }}</strong>
+            {{ isAr ? 'التكلفة:' : 'Cost:' }} <strong>{{ (campaign.totalCost || 0).toFixed(4) }} {{ walletCurrency }}</strong>
           </div>
         </div>
 
@@ -236,9 +236,15 @@
                   <label class="form-label">{{ isAr ? 'قالب ميتا المعتمد' : 'Approved Meta Template' }}</label>
                   <select v-model="form.templateName" class="form-input">
                     <option value="" disabled>{{ isAr ? '— اختر قالباً —' : '— Select a template —' }}</option>
-                    <option v-for="tpl in metaTemplates" :key="tpl.id" :value="tpl.name">{{ tpl.name }} ({{ tpl.category }})</option>
+                    <option v-for="tpl in metaTemplates" :key="tpl.id" :value="tpl.name" :disabled="!!campaignBlocker(tpl)">{{ tpl.name }} ({{ tpl.category }}){{ campaignBlocker(tpl) ? (isAr ? ' — غير مدعوم في الحملات' : ' — not supported in campaigns') : '' }}</option>
                   </select>
                   <div v-if="metaTemplates.length === 0" class="form-hint warn">{{ isAr ? 'لا توجد قوالب معتمدة.' : 'No approved templates found.' }}</div>
+                  <div v-else-if="metaTemplates.some(t => campaignBlocker(t))" class="form-hint">{{ isAr ? 'القوالب المعطّلة: شرائح، أو رابط زر متغيّر، أو متغيرات بأسماء — لا تُرسل كحملة.' : 'Disabled templates (carousel, dynamic button link, named variables) cannot be sent as a campaign.' }}</div>
+                </div>
+
+                <div v-if="selectedTpl?.headerMedia" class="form-group">
+                  <TemplateHeaderMedia v-model="form.headerMedia" :kind="selectedTpl.headerMedia" :channel-id="activeMetaChannelId" :is-ar="isAr" />
+                  <div class="form-hint">{{ isAr ? 'نفس الملف يصل لكل المستلمين. الملف المرفوع تحتفظ به Meta 30 يوماً، فلحملة مجدولة أبعد من ذلك استخدم رابطاً.' : 'Every recipient gets the same file. Meta keeps an uploaded file for 30 days; for a campaign scheduled later than that, use a link.' }}</div>
                 </div>
 
                 <div class="form-group">
@@ -333,6 +339,8 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { useMetaChannel } from '../composables/useMetaChannel'
+import { normalizeTemplate } from '../utils/metaTemplate'
+import TemplateHeaderMedia from '../components/TemplateHeaderMedia.vue'
 
 const { activeMetaChannelId } = useMetaChannel()
 const campaigns = ref([])
@@ -399,7 +407,20 @@ const filteredCampaigns = computed(() => {
   return list
 })
 
-const form = ref({ name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '' })
+const form = ref({ name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '', headerMedia: null })
+// The chosen template as the senders see it (variables, media header); campaigns send body variables + a media header
+const selectedTpl = computed(() => {
+  const raw = metaTemplates.value.find(t => t.name === form.value.templateName)
+  return raw ? normalizeTemplate(raw) : null
+})
+watch(() => form.value.templateName, () => { form.value.headerMedia = null })
+/** Why a template cannot be sent as a campaign (null = it can) */
+const campaignBlocker = (raw) => {
+  const tpl = normalizeTemplate(raw)
+  if (!tpl.supported) return tpl.unsupportedKind
+  if (tpl.buttonVars.length > 0) return 'buttons'
+  return null
+}
 
 const statusLabel = (status) => {
   const map = { PENDING: isAr.value ? 'مسودة' : 'Draft', RUNNING: isAr.value ? 'جارية' : 'Running', SCHEDULED: isAr.value ? 'مجدولة' : 'Scheduled', COMPLETED: isAr.value ? 'مكتملة' : 'Completed', FAILED: isAr.value ? 'فشلت' : 'Failed' }
@@ -462,19 +483,22 @@ const handleFileUpload = (event) => { form.value.file = event.target.files[0] }
 
 const openModal = () => {
   showCreateModal.value = true
-  form.value = { name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '' }
+  form.value = { name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '', headerMedia: null }
   if (activeMetaChannelId.value) fetchTemplates()
   fetchGroups()
 }
 
 const closeModal = () => {
   showCreateModal.value = false
-  form.value = { name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '' }
+  form.value = { name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '', headerMedia: null }
 }
 
 const createCampaign = async () => {
   if (!form.value.name || !form.value.templateName) {
     showAlert(isAr.value ? 'يرجى ملء الاسم والقالب.' : 'Please fill name and template.', 'error'); return
+  }
+  if (selectedTpl.value?.headerMedia && !form.value.headerMedia) {
+    showAlert(isAr.value ? 'ارفع ملف ترويسة القالب أو ضع رابطه.' : 'Upload the template header file or give its link.', 'error'); return
   }
   if (form.value.audienceSource === 'file' && !form.value.file) {
     showAlert(isAr.value ? 'يرجى رفع ملف.' : 'Please upload a file.', 'error'); return
@@ -510,6 +534,7 @@ const createCampaign = async () => {
       formData.append('contactGroupId', form.value.contactGroupId)
     }
     if (form.value.launchMode === 'schedule') formData.append('startDate', new Date(form.value.scheduledAt).toISOString())
+    if (form.value.headerMedia) formData.append('headerMedia', JSON.stringify(form.value.headerMedia))
   }
 
   try {
@@ -579,8 +604,18 @@ const syncStats = async () => {
   }
 }
 
+// Campaign costs are charged to the wallet in the account's currency (failed messages are refunded)
+const walletCurrency = ref('SAR')
+const fetchWalletCurrency = async () => {
+  try {
+    const res = await axios.get('/api/billing/wallet', { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } })
+    walletCurrency.value = res.data?.data?.currency || 'SAR'
+  } catch { /* keep SAR */ }
+}
+
 onMounted(() => {
   fetchCampaigns()
+  fetchWalletCurrency()
   pollInterval = setInterval(() => { campaigns.value.filter(c => c.status === 'RUNNING').forEach(c => loadStats(c.id)) }, 10000)
 })
 

@@ -21,6 +21,7 @@ inject('@prisma/client', {
 inject(fromRoot('src/models/mongo/CampaignDelivery'), { create: async () => ({}) });
 
 const calls = {};
+const payloads = {};
 const sendTimes = [];
 const metaErr = (status, code, message) => Object.assign(new Error(`Request failed with status code ${status}`), { isAxiosError: true, response: { status, data: { error: { code, message } } } });
 const plan = {
@@ -34,6 +35,7 @@ inject('axios', {
   post: async (url, payload) => {
     const phone = payload.to;
     calls[phone] = (calls[phone] || 0) + 1;
+    payloads[phone] = payload;
     sendTimes.push(Date.now());
     const next = plan[phone]?.shift();
     if (next) throw next;
@@ -101,4 +103,21 @@ test('a campaign: rate limit, retries, permanent failures and Meta throttling', 
   }
   assert.ok(Object.values(perSecond).every(n => n <= 6), `at most the limit per second: ${JSON.stringify(perSecond)}`);
   assert.ok(elapsed >= 3000, `the limit slows the campaign down (${elapsed}ms)`);
+});
+
+test('a media-header template campaign sends the same image to every recipient, before the body values', { skip, timeout: 30000 }, async () => {
+  const headerMedia = { type: 'image', id: '1234567890' };
+  await queue.addBulk(['901', '902'].map(phone => ({
+    name: 'send-meta-campaign-message',
+    data: { campaignId: 'm', targetId: `t${phone}`, tenantId: 'T', channelId: 'ch', phone, variables: ['Sara'], templateName: 'offer', templateLanguage: 'ar', headerMedia }
+  })));
+  for (let i = 0; i < 80 && !(targets.t901?.status && targets.t902?.status); i++) await new Promise(resolve => setTimeout(resolve, 100));
+
+  for (const phone of ['901', '902']) {
+    assert.strictEqual(targets[`t${phone}`].status, 'SENT');
+    assert.deepStrictEqual(payloads[phone].template.components, [
+      { type: 'header', parameters: [{ type: 'image', image: { id: '1234567890' } }] },
+      { type: 'body', parameters: [{ type: 'text', text: 'Sara' }] }
+    ]);
+  }
 });

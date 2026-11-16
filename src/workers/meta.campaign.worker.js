@@ -82,7 +82,7 @@ async function fetchTemplateLang(channel, templateName) {
 }
 
 async function processJob(job) {
-  const { campaignId, targetId, tenantId, channelId, phone, variables, templateName, templateLanguage, metaCategory } = job.data;
+  const { campaignId, targetId, tenantId, channelId, phone, variables, templateName, templateLanguage, metaCategory, headerMedia } = job.data;
   
   try {
     // 1. Fetch the Meta Channel details to get the Access Token & Phone ID
@@ -107,6 +107,8 @@ async function processJob(job) {
     }));
 
     const components = [];
+    // Media-header template: the same image / video / PDF for every recipient
+    if (headerMedia) components.push(require('../modules/meta/meta.templateMedia').headerComponent(headerMedia));
     if (parameters.length > 0) {
       components.push({
         type: 'body',

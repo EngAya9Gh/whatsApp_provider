@@ -173,7 +173,16 @@ async function processStatusUpdate(channelId, tenantId, payload) {
   // Campaign messages: delivered / read tracking
   try {
     const CampaignDelivery = require('../models/mongo/CampaignDelivery');
+    // Meta could not deliver a campaign message it had accepted: the recipient becomes FAILED with Meta's
+    // reason (shown on the campaign page, retried by "Retry failed", refunded by campaign.billing.js)
+    const delivery = status === 'failed' ? await CampaignDelivery.findOne({ wamid, status: 'sent' }).lean() : null;
     await CampaignDelivery.applyStatus(wamid, status);
+    if (delivery?.targetId) {
+      await prisma.campaignTarget.updateMany({
+        where: { id: delivery.targetId, status: 'SENT' },
+        data: { status: 'FAILED', error: updateData.errorMessage || 'Meta could not deliver the message' }
+      });
+    }
   } catch (e) {
     logger.error(`[MetaWebhookWorker] Failed to update campaign delivery status:`, e.message);
   }

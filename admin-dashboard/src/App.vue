@@ -26,6 +26,9 @@
         <router-link to="/system" class="nav-item" active-class="active">
           <span class="nav-icon">🩺</span> {{ currentLang === 'ar' ? 'حالة النظام' : 'System health' }}
         </router-link>
+        <router-link to="/ai-usage" class="nav-item" active-class="active">
+          <span class="nav-icon">🤖</span> {{ currentLang === 'ar' ? 'استهلاك الذكاء الاصطناعي' : 'AI usage' }}
+        </router-link>
       </nav>
 
       <div class="sidebar-footer">

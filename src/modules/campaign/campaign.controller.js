@@ -65,7 +65,8 @@ exports.createCampaign = async (req, res, next) => {
       campaignType: campaignType || 'BAILEYS',
       channelId: resolvedChannelId,
       metaCategory,
-      contactGroupId
+      contactGroupId,
+      headerMedia: campaignType === 'META' ? req.body.headerMedia : undefined
     });
 
     res.status(201).json(result);

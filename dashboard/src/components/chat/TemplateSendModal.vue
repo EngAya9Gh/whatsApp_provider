@@ -43,6 +43,7 @@
         <button type="button" @click="selected = null" class="text-xs font-semibold text-slate-500 hover:text-slate-700 bg-transparent border-none cursor-pointer p-0">
           <i class="fas" :class="isAr ? 'fa-arrow-right' : 'fa-arrow-left'"></i> {{ isAr ? 'رجوع للقوالب' : 'Back to templates' }}
         </button>
+        <TemplateHeaderMedia v-if="selected.headerMedia" v-model="headerMedia" :kind="selected.headerMedia" :channel-id="channelId" :is-ar="isAr" />
         <div v-if="selected.variables.length > 0" class="space-y-3">
           <div v-for="(n, i) in selected.variables" :key="n">
             <label class="block text-xs font-semibold text-slate-600 mb-1">{{ isAr ? 'المتغير' : 'Variable' }} <span dir="ltr" v-text="varToken(n)"></span></label>
@@ -66,7 +67,7 @@
         </div>
         <div class="flex gap-3 pt-2">
           <button type="button" @click="$emit('close')" class="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 bg-white cursor-pointer">{{ isAr ? 'إلغاء' : 'Cancel' }}</button>
-          <button type="submit" :disabled="sending" class="flex-1 bg-[#FF6600] hover:bg-[#E65C00] text-white rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50 border-none cursor-pointer">
+          <button type="submit" :disabled="sending || (selected.headerMedia && !headerMedia)" class="flex-1 bg-[#FF6600] hover:bg-[#E65C00] text-white rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50 border-none cursor-pointer">
             <i class="fas" :class="sending ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>{{ isAr ? 'إرسال' : 'Send' }}
           </button>
         </div>
@@ -81,6 +82,7 @@ import axios from 'axios'
 import Swal from 'sweetalert2'
 import { normalizeTemplate as normalize, buildPreview, varToken, urlPrefix, unsupportedReason } from '../../utils/metaTemplate'
 import { metaErrorText } from '../../utils/metaErrors'
+import TemplateHeaderMedia from '../TemplateHeaderMedia.vue'
 
 const props = defineProps({
   channelId: { type: String, required: true },
@@ -97,6 +99,7 @@ const selected = ref(null)
 const values = ref([])
 const buttonValues = ref([])
 const sending = ref(false)
+const headerMedia = ref(null) // { type, id | link, filename } for a media-header template
 
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
@@ -109,6 +112,7 @@ const choose = (tpl) => {
   selected.value = tpl
   values.value = tpl.variables.map(() => '')
   buttonValues.value = tpl.buttonVars.map(() => '')
+  headerMedia.value = null
 }
 
 const send = async () => {
@@ -119,6 +123,7 @@ const send = async () => {
       language: selected.value.language,
       bodyParams: values.value,
       buttonParams: selected.value.buttonVars.map((b, i) => ({ index: b.index, text: buttonValues.value[i] })),
+      ...(selected.value.headerMedia && { headerMedia: headerMedia.value }),
       previewText: preview.value
     })
     emit('sent', res.data.data)

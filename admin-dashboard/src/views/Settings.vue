@@ -101,6 +101,19 @@
         </h3>
         
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="col-span-full p-4 border border-amber-200 rounded-lg bg-amber-50/60">
+            <label class="block text-sm font-semibold text-slate-800 mb-1">Who pays Meta's message fees? (من يدفع رسوم رسائل Meta؟)</label>
+            <select v-model="form.metaFeesPaidBy" class="w-full md:w-1/2 bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2.5 outline-none">
+              <option value="CUSTOMER">The customer, with their own card in Meta — wallet takes only the markup (العميل ببطاقته في Meta — المحفظة تخصم الهامش فقط)</option>
+              <option value="PLATFORM">We pay Meta (shared credit line) — wallet takes base cost + markup (نحن ندفع لـ Meta — المحفظة تخصم السعر + الهامش)</option>
+            </select>
+            <p class="text-xs text-slate-600 mt-2 leading-relaxed">
+              As a Tech Provider our customers must add their own payment method in Meta, and Meta bills them directly — charging the base cost again from the wallet would make them pay twice.
+              Base costs below are Meta's rates in USD; the wallet charges them in the customer's currency. Failed campaign messages are refunded to the wallet automatically in both modes.
+              Each tenant can override this on its page.
+            </p>
+          </div>
+
           <div class="col-span-full">
             <label class="block text-sm font-semibold text-slate-700 mb-1">Default Tax/VAT Rate (%)</label>
             <input v-model="form.taxRate" type="number" step="0.1" class="w-full md:w-1/4 bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 block p-2.5 outline-none transition-all font-mono" />
@@ -187,6 +200,22 @@
             <p class="text-xs text-slate-500 mt-2">If disabled, campaigns will send without checking or deducting from tenant wallets.</p>
           </div>
           
+          <!-- AI (Gemini) prices, for the AI usage page -->
+          <div class="p-4 border border-slate-100 rounded-lg bg-slate-50/50">
+            <h4 class="font-bold text-slate-800 mb-3 text-sm">AI (Gemini) prices — shared key</h4>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Input, $ per 1M tokens</label>
+                <input v-model="form.aiInputPricePerMillionUsd" type="number" step="0.0001" min="0" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Output + thinking, $ per 1M tokens</label>
+                <input v-model="form.aiOutputPricePerMillionUsd" type="number" step="0.0001" min="0" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">From Google's Gemini price list for the model in use. Only used to estimate the cost on the AI usage page.</p>
+          </div>
+
           <!-- Exchange Rate -->
           <div class="p-4 border border-slate-100 rounded-lg bg-slate-50/50">
             <h4 class="font-bold text-slate-800 mb-3 text-sm">Currency Exchange</h4>
@@ -253,7 +282,10 @@ const form = ref({
   serviceMarkupPercent: 20,
   qrMessagePrice: 0.05,
   exchangeRateUsdToSar: 3.75,
-  enableWalletDeduction: true
+  enableWalletDeduction: true,
+  metaFeesPaidBy: 'CUSTOMER',
+  aiInputPricePerMillionUsd: '',
+  aiOutputPricePerMillionUsd: ''
 })
 
 const fetchSettings = async () => {
@@ -289,6 +321,10 @@ const saveSettings = async () => {
     dataToSave.authenticationMarkupPercent = parseFloat(dataToSave.authenticationMarkupPercent)
     dataToSave.serviceBaseCost = parseFloat(dataToSave.serviceBaseCost)
     dataToSave.serviceMarkupPercent = parseFloat(dataToSave.serviceMarkupPercent)
+    // Empty AI prices stay empty (the AI usage page then shows no cost)
+    for (const k of ['aiInputPricePerMillionUsd', 'aiOutputPricePerMillionUsd']) {
+      dataToSave[k] = dataToSave[k] === '' || dataToSave[k] === null ? null : parseFloat(dataToSave[k])
+    }
 
     await axios.put('/api/admin/settings', dataToSave, {
       headers: { Authorization: `Bearer ${token}` }
