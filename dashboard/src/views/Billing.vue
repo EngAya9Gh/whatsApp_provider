@@ -65,6 +65,9 @@
         <div class="progress-bar-bg">
           <div class="progress-bar-fill" :style="{ width: progressPercentage + '%' }" :class="{ 'warning': progressPercentage > 80, 'danger': progressPercentage >= 100 }"></div>
         </div>
+        <p class="limit-note">{{ isAr
+          ? 'يشمل الرسائل الفردية: ردود المحادثات، صفحة الإرسال، الـ API ورموز التحقق. الحملات المدفوعة من المحفظة لا تُحسب هنا.'
+          : 'Counts single messages: chat replies, the Send Message page, the API and verification codes. Campaigns paid from the wallet are not counted here.' }}</p>
       </div>
       
       <div class="stats-grid">
@@ -377,6 +380,7 @@ h3 span { color: #3b82f6; }
 .addon-quote p { margin: 0 0 0.6rem; line-height: 1.7; }
 .addon-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .addon-msg { font-size: 0.8rem; color: #475569; margin-top: 0.6rem; }
+.limit-note { font-size: 0.75rem; color: #64748b; margin: 0.5rem 0 0; }
 .invite-card { border: 1px solid #fed7aa; }
 .invite-card h3 { margin: 0 0 0.4rem; }
 .invite-sub { color: #64748b; font-size: 0.85rem; margin: 0 0 0.9rem; }

@@ -15,11 +15,29 @@ const connection = new Redis(bullConnection);
 const campaignQueue = new Queue('campaign-queue', { connection });
 
 // Initialize Worker
+// A campaign paid from the wallet does not also use up the plan's monthly message limit. A campaign that was
+// not charged (wallet deduction off for the account) still counts against the limit, as before.
+const paidCampaigns = new Map();
+// Pause after each QR campaign message (anti-ban); QR_CAMPAIGN_GAP_MS changes it (tests)
+const SEND_GAP_MS = Number(process.env.QR_CAMPAIGN_GAP_MS ?? 5000); // campaignId → charged to the wallet?
+async function sendOptions(campaignId) {
+  if (!campaignId) return {};
+  if (!paidCampaigns.has(campaignId)) {
+    const charge = await prisma.walletTransaction.findFirst({
+      where: { referenceType: 'CAMPAIGN', referenceId: campaignId, type: 'CAMPAIGN_CHARGE' }, select: { id: true }
+    });
+    if (paidCampaigns.size > 500) paidCampaigns.clear();
+    paidCampaigns.set(campaignId, !!charge);
+  }
+  return paidCampaigns.get(campaignId) ? { campaign: true } : {};
+}
+
 async function processJob(job) {
-  const { tenantId, phone, message, templateId, buttons, interactiveType, targetId, channelId } = job.data;
+  const { tenantId, phone, message, templateId, buttons, interactiveType, targetId, channelId, campaignId } = job.data;
   let { mediaPath, mediaMime } = job.data;
   
   try {
+    const CAMPAIGN = await sendOptions(campaignId);
     let finalMessage = message;
 
     // 1. Fetch template if templateId is provided
@@ -44,7 +62,7 @@ async function processJob(job) {
       const templateName = message;
       const languageCode = templateId || 'en';
       const components = buttons ? (typeof buttons === 'string' ? JSON.parse(buttons) : buttons) : [];
-      await messageService.sendMetaTemplate(tenantId, phone, templateName, languageCode, components, channelId);
+      await messageService.sendMetaTemplate(tenantId, phone, templateName, languageCode, components, channelId, CAMPAIGN);
     } else if (interactiveType === 'BUTTONS' && buttons) {
       // Parse buttons JSON
       const parsedButtons = typeof buttons === 'string' ? JSON.parse(buttons) : buttons;
@@ -53,14 +71,14 @@ async function processJob(job) {
       if (mediaPath && fs.existsSync(mediaPath)) {
         imageBuffer = fs.readFileSync(mediaPath);
       }
-      await messageService.sendButtonsMessage(tenantId, phone, finalMessage || '', parsedButtons, imageBuffer, channelId);
+      await messageService.sendButtonsMessage(tenantId, phone, finalMessage || '', parsedButtons, imageBuffer, channelId, CAMPAIGN);
     } else if (mediaPath && fs.existsSync(mediaPath)) {
       let type = 'image';
       if (mediaMime && mediaMime.includes('pdf')) type = 'pdf';
-      await messageService.sendMediaMessage(tenantId, phone, type, mediaPath, finalMessage || '', mediaMime, 'campaign-media', channelId);
+      await messageService.sendMediaMessage(tenantId, phone, type, mediaPath, finalMessage || '', mediaMime, 'campaign-media', channelId, CAMPAIGN);
     } else {
       if (!finalMessage) throw new Error('No message content found');
-      await messageService.sendCustomMessage(tenantId, phone, finalMessage, channelId);
+      await messageService.sendCustomMessage(tenantId, phone, finalMessage, channelId, CAMPAIGN);
     }
     
     // Update target status
@@ -72,7 +90,7 @@ async function processJob(job) {
     logger.info(`[Campaign] Sent message to ${phone}`);
     
     // Wait for 5 seconds to simulate delay (Anti-Ban)
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, SEND_GAP_MS));
     
     // Sync client to CRM
     try {
@@ -104,4 +122,4 @@ if (campaignWorker) {
   });
 }
 
-module.exports = { campaignQueue, campaignWorker };
+module.exports = { campaignQueue, campaignWorker, processJob };

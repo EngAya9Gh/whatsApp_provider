@@ -16,7 +16,8 @@ const metaWebhookQueue = new Queue('meta-webhook-queue', {
     attempts: 5,
     backoff: { type: 'exponential', delay: 2000 },
     removeOnComplete: { count: 100 },
-    removeOnFail: { count: 500 }
+    // Failed jobs stay 14 days for System health, then go (old failures no longer look like new problems)
+    removeOnFail: { age: 14 * 24 * 3600, count: 500 }
   }
 });
 

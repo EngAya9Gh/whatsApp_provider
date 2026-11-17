@@ -24,8 +24,10 @@ class MessageService {
     }
   }
 
+  // options.campaign: a campaign message. Campaigns are paid from the wallet, so they do not use up the
+  // plan's monthly message limit (and are not counted in it).
   async sendCustomMessage(tenantId, phone, message, channelId = null, options = {}) {
-    const canSend = await billingService.checkLimit(tenantId);
+    const canSend = options.campaign || await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached. Please upgrade your plan.' };
 
     const channel = await this._getChannel(channelId);
@@ -43,20 +45,20 @@ class MessageService {
       await prisma.messageLog.create({
         data: { tenantId, channelId, phone, messageType: 'CUSTOM', status: 'SENT', metaMessageId, deliveryStatus: metaMessageId ? 'sent' : null }
       });
-      await billingService.incrementUsage(tenantId, 'sent');
+      if (!options.campaign) await billingService.incrementUsage(tenantId, 'sent');
       if (options.record) this._recordInChat(channel, tenantId, phone, { content: message, metaMessageId });
       return { success: true, message: 'Message sent successfully' };
     } catch (error) {
       await prisma.messageLog.create({
         data: { tenantId, channelId, phone, messageType: 'CUSTOM', status: 'FAILED', errorMessage: error.message || 'Sending failed' }
       });
-      await billingService.incrementUsage(tenantId, 'failed');
+      if (!options.campaign) await billingService.incrementUsage(tenantId, 'failed');
       throw error;
     }
   }
 
   async sendMetaTemplate(tenantId, phone, templateName, languageCode, components, channelId, options = {}) {
-    const canSend = await billingService.checkLimit(tenantId);
+    const canSend = options.campaign || await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
     const channel = await this._getChannel(channelId);
@@ -73,20 +75,20 @@ class MessageService {
       await prisma.messageLog.create({
         data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'SENT', metaMessageId, deliveryStatus: 'sent' }
       });
-      await billingService.incrementUsage(tenantId, 'sent');
+      if (!options.campaign) await billingService.incrementUsage(tenantId, 'sent');
       if (options.record) this._recordInChat(channel, tenantId, phone, { type: 'TEMPLATE', content: options.previewText || templateName, metaMessageId });
       return { success: true, message: 'Template sent successfully', metaMessageId };
     } catch (error) {
       await prisma.messageLog.create({
         data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'FAILED', errorMessage: metaErrorText(error) || 'Sending failed' }
       });
-      await billingService.incrementUsage(tenantId, 'failed');
+      if (!options.campaign) await billingService.incrementUsage(tenantId, 'failed');
       throw error;
     }
   }
 
-  async sendMediaMessage(tenantId, phone, type, url, caption, mimetype, fileName, channelId = null) {
-    const canSend = await billingService.checkLimit(tenantId);
+  async sendMediaMessage(tenantId, phone, type, url, caption, mimetype, fileName, channelId = null, options = {}) {
+    const canSend = options.campaign || await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
     const channel = await this._getChannel(channelId);
@@ -100,17 +102,17 @@ class MessageService {
       }
       
       await prisma.messageLog.create({ data: { tenantId, channelId, phone, messageType: 'CUSTOM', status: 'SENT' } });
-      await billingService.incrementUsage(tenantId, 'sent');
+      if (!options.campaign) await billingService.incrementUsage(tenantId, 'sent');
       return { success: true, message: 'Media message sent successfully' };
     } catch (error) {
       await prisma.messageLog.create({ data: { tenantId, channelId, phone, messageType: 'CUSTOM', status: 'FAILED', errorMessage: error.message || 'Failed' } });
-      await billingService.incrementUsage(tenantId, 'failed');
+      if (!options.campaign) await billingService.incrementUsage(tenantId, 'failed');
       throw error;
     }
   }
 
   async sendButtonsMessage(tenantId, phone, text, buttons, imageBuffer, channelId = null, options = {}) {
-    const canSend = await billingService.checkLimit(tenantId);
+    const canSend = options.campaign || await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
     const channel = await this._getChannel(channelId);
@@ -125,12 +127,12 @@ class MessageService {
       }
       
       await prisma.messageLog.create({ data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'SENT' } });
-      await billingService.incrementUsage(tenantId, 'sent');
+      if (!options.campaign) await billingService.incrementUsage(tenantId, 'sent');
       if (options.record) this._recordInChat(channel, tenantId, phone, { type: 'INTERACTIVE', content: text, metaMessageId });
       return { success: true, message: 'Interactive message sent successfully' };
     } catch (error) {
       await prisma.messageLog.create({ data: { tenantId, channelId, phone, messageType: 'INTERACTIVE', status: 'FAILED', errorMessage: error.message || 'Failed' } });
-      await billingService.incrementUsage(tenantId, 'failed');
+      if (!options.campaign) await billingService.incrementUsage(tenantId, 'failed');
       throw error;
     }
   }

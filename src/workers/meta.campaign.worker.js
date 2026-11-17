@@ -22,7 +22,8 @@ const metaCampaignQueue = new Queue('meta-campaign-queue', {
     attempts: MAX_ATTEMPTS,
     backoff: { type: 'exponential', delay: 30 * 1000 }, // 30s, 1m, 2m
     removeOnComplete: { count: 1000 },
-    removeOnFail: { count: 5000 }
+    // The campaign page keeps each recipient's error; the failed job itself goes after 14 days
+    removeOnFail: { age: 14 * 24 * 3600, count: 5000 }
   }
 });
 

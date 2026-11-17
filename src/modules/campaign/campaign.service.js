@@ -328,7 +328,7 @@ class CampaignService {
           },
           opts: {
             removeOnComplete: true,
-            removeOnFail: false,
+            removeOnFail: { age: 14 * 24 * 3600 },
             delay: baseDelay + (index * randomDelay)
           }
         };
@@ -496,7 +496,7 @@ class CampaignService {
           metaCategory: campaign.metaCategory,
           headerMedia: campaign.headerMedia || null
         },
-        opts: { removeOnComplete: true, removeOnFail: false }
+        opts: { removeOnComplete: true, removeOnFail: { age: 14 * 24 * 3600 } }
       }));
       if (jobs.length > 0) await metaCampaignQueue.addBulk(jobs);
     } else {
@@ -515,7 +515,7 @@ class CampaignService {
           interactiveType: campaign.interactiveType || 'TEXT',
           channelId: campaign.channelId
         },
-        opts: { removeOnComplete: true, removeOnFail: false }
+        opts: { removeOnComplete: true, removeOnFail: { age: 14 * 24 * 3600 } }
       }));
       if (jobs.length > 0) await campaignQueue.addBulk(jobs);
     }
