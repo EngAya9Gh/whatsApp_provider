@@ -153,7 +153,9 @@
       <!-- Team -->
       <section class="card">
         <h2 class="card-title">{{ isAr ? 'أداء الفريق' : 'Team performance' }}</h2>
-        <p class="card-sub">{{ isAr ? 'زمن الرد وعدد الرسائل لكل موظف يُحسبان من رسائله المرسلة بعد هذا التحديث.' : 'Per-agent response time and message counts come from messages sent after this update.' }}</p>
+        <p class="card-sub">{{ isAr
+          ? 'زمن الرد: من أول رسالة للعميل بلا رد (أو من لحظة تحويل السير أو الموظف الذكي له) حتى أول رد يكتبه الموظف. ردود السير والموظف الذكي والملاحظات الداخلية لا تُحسب، وردود صاحب الحساب لا تُنسب لموظف.'
+          : 'Response time: from the first unanswered customer message (or the moment a flow or the AI agent handed the chat over) to the first reply the agent writes. Flow and AI agent replies and team notes do not count, and the account owner\'s replies are not credited to an agent.' }}</p>
         <div v-if="data.agents.length === 0" class="text-sm text-slate-400 text-center py-6">{{ isAr ? 'لا يوجد موظفون' : 'No team members' }}</div>
         <div v-else class="overflow-x-auto">
           <table class="data-table">

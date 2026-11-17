@@ -11,6 +11,14 @@ const ChatMessage = require('../../models/mongo/ChatMessage');
 
 // The channel fields the conversation list shows (and uses to tell Meta from QR conversations)
 const CHANNEL_FIELDS = { id: true, phoneNumber: true, name: true, displayPhoneNumber: true, providerType: true };
+// Messages written by a WhatsApp flow (see ChatMessage.source)
+const FLOW_SOURCES = ['FLOW', 'FLOW_AI', 'FLOW_HANDOFF'];
+
+/** Name of a conversation after a customer message: the team's own name wins over the WhatsApp profile name */
+function inboundName(thread, profileName) {
+  if (thread.nameEditedAt && thread.contactName) return thread.contactName;
+  return profileName || thread.contactName;
+}
 
 class ChatService {
   async getQuickReplies(tenantId) {
@@ -306,6 +314,7 @@ class ChatService {
         isInternal: payload.isInternal || false,
         senderId: payload.senderId || null,
         isAutomated: !!payload.isAutomated,
+        source: payload.isAutomated && FLOW_SOURCES.includes(payload.source) ? payload.source : null,
         mentions: payload.isInternal && Array.isArray(payload.mentions)
           ? [...new Set(payload.mentions.map(String))].slice(0, 20)
           : []
@@ -405,17 +414,24 @@ class ChatService {
       thread = await ChatThread.findOneAndUpdate(
         { _id: thread._id },
         {
-          $set: { lastMessageAt: new Date(), lastInboundAt: new Date(), contactName: contactName || thread.contactName },
+          $set: { lastMessageAt: new Date(), lastInboundAt: new Date(), contactName: inboundName(thread, contactName) },
           $inc: { unreadCount: 1 }
         },
         { returnDocument: 'after' }
       );
     } else {
+      // A customer the business already saved in its contacts keeps that name, not their WhatsApp profile name
+      let saved = null;
+      try {
+        saved = await prisma.contact.findFirst({ where: { tenantId, phone: contactPhone }, select: { name: true } });
+      } catch (e) { /* the WhatsApp profile name is fine then */ }
+      const savedName = saved?.name && saved.name !== contactPhone ? saved.name : null;
       thread = await ChatThread.create({
         tenantId,
         channelId,
         contactPhone,
-        contactName: contactName || contactPhone,
+        contactName: savedName || contactName || contactPhone,
+        nameEditedAt: savedName ? new Date() : null,
         lastMessageAt: new Date(),
         lastInboundAt: new Date(),
         unreadCount: 1
@@ -542,9 +558,9 @@ class ChatService {
 
   /**
    * Send an interactive choice message (reply buttons for up to 3 options, a list for more).
-   * payload: { body, options: [{ id, title }], buttonLabel }
+   * payload: { body, options: [{ id, title }], buttonLabel, source ('FLOW' when a flow asks) }
    */
-  async sendInteractiveMessage(tenantId, threadId, { body, options, buttonLabel }) {
+  async sendInteractiveMessage(tenantId, threadId, { body, options, buttonLabel, source }) {
     const thread = await ChatThread.findOne({ _id: threadId, tenantId });
     if (!thread) throw { status: 404, message: 'Thread not found' };
     const channel = await prisma.whatsAppChannel.findUnique({ where: { id: thread.channelId } });
@@ -578,7 +594,8 @@ class ChatService {
       status,
       metaMessageId: metaResponse?.messages?.[0]?.id || null,
       ticketId: activeTicket ? activeTicket.id : null,
-      isAutomated: true
+      isAutomated: true,
+      source: FLOW_SOURCES.includes(source) ? source : null
     });
     await ChatThread.updateOne({ _id: thread._id }, { $set: { lastMessageAt: new Date() } });
 
@@ -668,3 +685,4 @@ class ChatService {
 }
 
 module.exports = new ChatService();
+module.exports.inboundName = inboundName;

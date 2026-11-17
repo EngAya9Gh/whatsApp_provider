@@ -5,6 +5,8 @@ const ChatThreadSchema = new mongoose.Schema({
   channelId: { type: String, required: true, index: true },
   contactPhone: { type: String, required: true },
   contactName: { type: String },
+  // Set when someone on the team renamed the customer: their WhatsApp profile name no longer replaces it
+  nameEditedAt: { type: Date, default: null },
   crmClientId: { type: String },
   crmSyncedAt: { type: Date },
   lastMessageAt: { type: Date, default: Date.now },

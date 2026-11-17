@@ -290,6 +290,16 @@
                 <span v-else-if="msg.source === 'META_AI' && !msg.isInternal" class="source-badge" :title="isAr ? 'رد بوت Meta (Business Agent)' : 'Reply by Meta Business Agent'">
                   🤖 {{ isAr ? 'بوت Meta' : 'Meta bot' }}
                 </span>
+                <!-- Who answered: the AI agent step, a flow step, or another automation (not a person) -->
+                <span v-else-if="msg.source === 'FLOW_AI' && !msg.isInternal" class="source-badge" :title="isAr ? 'رد الموظف الذكي في سير الواتساب' : 'Reply by the AI agent of the chat flow'">
+                  🤖 {{ isAr ? 'الموظف الذكي' : 'AI agent' }}
+                </span>
+                <span v-else-if="msg.source === 'FLOW' && !msg.isInternal" class="source-badge" :title="isAr ? 'رسالة من سير الواتساب' : 'Message from the chat flow'">
+                  <i class="fas fa-bolt"></i> {{ isAr ? 'السير' : 'Flow' }}
+                </span>
+                <span v-else-if="msg.isAutomated && !msg.isInternal && msg.direction === 'OUTBOUND'" class="source-badge" :title="isAr ? 'رسالة آلية (رد تلقائي، رسالة خارج الدوام…)' : 'Automatic message (auto reply, away message…)'">
+                  <i class="fas fa-robot"></i> {{ isAr ? 'آلي' : 'Automatic' }}
+                </span>
                 <span v-if="msg.type === 'TEMPLATE'" class="template-badge">
                   <i class="fas fa-file-lines"></i> {{ isAr ? 'قالب' : 'Template' }}
                 </span>
@@ -1289,7 +1299,7 @@ const saveContactName = async () => {
     showRenameModal.value = false
   } catch (err) {
     console.error('Rename error:', err)
-    alert('حدث خطأ أثناء تعديل الاسم')
+    alert(`${isAr.value ? 'تعذّر حفظ الاسم' : 'Could not save the name'}: ${err.response?.data?.error?.message || err.message}`)
   } finally {
     savingName.value = false
   }
@@ -1540,6 +1550,11 @@ onMounted(() => {
       if (updatedThread.tagIds !== undefined) threads.value[idx].tagIds = updatedThread.tagIds
       if (updatedThread.stageId !== undefined) threads.value[idx].stageId = updatedThread.stageId
       if (updatedThread.metaAi !== undefined) threads.value[idx].metaAi = updatedThread.metaAi
+      // Renamed here or by a teammate (a customer's own WhatsApp name never replaces a name the team set)
+      if (updatedThread.contactName) {
+        threads.value[idx].contactName = updatedThread.contactName
+        if (selectedThread.value?.id === threads.value[idx].id) selectedThread.value.contactName = updatedThread.contactName
+      }
       // Another teammate decided on the AI suggestion
       if (updatedThread.aiSuggestion === null && selectedThread.value?.id === threads.value[idx].id) aiSuggestion.value = null
 

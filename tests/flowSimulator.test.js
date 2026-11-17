@@ -236,3 +236,36 @@ test('start over for a number: digits only, and says whether the flow is live', 
   await assert.rejects(flowService.restartForNumber('T', 'ch', '123'), (err) => err.status === 400);
   await assert.rejects(flowService.restartForNumber('T', 'other', '966500000001'), (err) => err.status === 404);
 });
+
+test('real engine: flow messages are marked, and a hand-off leaves one note that starts the team\'s clock', async () => {
+  allowRealEngine = true;
+  flowDoc = { _id: 'F1', isActive: true, published: { version: 3, nodes: MENU.nodes, edges: MENU.edges } };
+  activeTicket = { id: 'tk', assignedToId: 'A1' };
+  const notes = () => calls.filter(c => c[0] === 'sendMessage' && c[3].isInternal);
+
+  // "A person" from the menu → hand-off step: one note
+  await engine.handleInbound('T', 'ch', { _id: 'th1', flowState: { flowId: 'F1', version: 3, nodeId: 'ask' } }, { text: '2' });
+  assert.deepStrictEqual(notes().map(c => c[3].source), ['FLOW_HANDOFF']);
+  assert.strictEqual(notes()[0][3].isAutomated, true);
+
+  // The AI agent hands off (reply limit) → its own note is the marker, the hand-off step adds none
+  calls.length = 0;
+  await engine.handleInbound('T', 'ch', { _id: 'th1', flowState: { flowId: 'F1', version: 3, nodeId: 'ai', turns: 5 } }, { text: 'hi' });
+  assert.strictEqual(notes().length, 1);
+  assert.match(notes()[0][3].content, /الأقصى \(5 ردود\)/);
+  assert.strictEqual(notes()[0][3].source, 'FLOW_HANDOFF');
+
+  // A message step and a question are marked as the flow's
+  calls.length = 0;
+  await engine.handleInbound('T', 'ch', { _id: 'th1', flowState: { flowId: 'F1', version: 3, nodeId: 'ask' } }, { text: 'الأسعار', interactiveId: 'F:ask:p' });
+  const text = calls.find(c => c[0] === 'sendMessage' && !c[3].isInternal);
+  assert.strictEqual(text[3].source, 'FLOW');
+  assert.strictEqual(notes().length, 0, 'the end step without hand-off writes no note');
+});
+
+test('publishing ignores a half-written step that nothing leads to', async () => {
+  const loose = { nodes: [...MENU.nodes, n('draft', 'tag', { action: 'ADD', tagId: '' })], edges: MENU.edges };
+  assert.deepStrictEqual(await flowService.problemsToFix('T', loose), []);
+  const linked = { nodes: loose.nodes, edges: [...MENU.edges.filter(x => x.sourceHandle !== 'opt-h'), e('ask', 'draft', 'opt-h')] };
+  assert.deepStrictEqual(await flowService.problemsToFix('T', linked), [{ nodeId: 'draft', message: 'Choose a tag' }]);
+});

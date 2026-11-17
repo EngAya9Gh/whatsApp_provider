@@ -148,7 +148,7 @@ class FlowEngine {
         case 'ai_agent':
           return this._aiTurn(ctx, node, null);
         case 'assign':
-          await this._assign(ctx, d);
+          await this._handOff(ctx, d);
           return this._finish(ctx, false);
         case 'end':
           return this._finish(ctx, d.handoff !== false);
@@ -208,18 +208,24 @@ class FlowEngine {
 
     if (result.reply) await this._sendText(ctx, result.reply, { ai: true });
     if (result.handoff) {
-      await this._note(ctx, `🤖 حوّل الموظف الذكي المحادثة لفريقك${result.reason ? `: ${result.reason}` : ''}`);
+      await this._note(ctx, `🤖 حوّل الموظف الذكي المحادثة لفريقك${result.reason ? `: ${result.reason}` : ''}`, { handoff: true });
       return this._run(ctx, this._next(ctx.graph, node.id, 'handoff'));
     }
     await this._setState(ctx, node.id, 0, { turns: turns + 1 });
     return null;
   }
 
-  /** Internal note for the team (not sent to the customer) */
-  async _note(ctx, text) {
+  /**
+   * Internal note for the team (not sent to the customer). A hand-off note also marks when the customer
+   * starts waiting for a person: the team's response time counts from there, not from the bot's turn.
+   */
+  async _note(ctx, text, meta = {}) {
+    if (meta.handoff) ctx.handedOff = true;
     try {
       const chatService = require('../chat/chat.service');
-      await chatService.sendMessage(ctx.tenantId, ctx.threadId, { content: text, type: 'text', isInternal: true, isAutomated: true });
+      await chatService.sendMessage(ctx.tenantId, ctx.threadId, {
+        content: text, type: 'text', isInternal: true, isAutomated: true, source: meta.handoff ? 'FLOW_HANDOFF' : null
+      });
     } catch (err) {
       logger.warn(`[FlowEngine] Could not add note: ${err.message}`);
     }
@@ -239,14 +245,25 @@ class FlowEngine {
   /** Ends the session; with handoff the conversation goes to the channel's team */
   async _finish(ctx, handoff) {
     await this._setState(ctx, null);
-    if (handoff) await this._assign(ctx, { mode: 'TEAM' });
+    if (handoff) await this._handOff(ctx, { mode: 'TEAM' });
     return null;
   }
 
-  // eslint-disable-next-line no-unused-vars
+  /** The flow gives the conversation to a person: one note for the team (unless the AI agent just wrote one), then routing */
+  async _handOff(ctx, d) {
+    if (!ctx.handedOff) await this._handoffNote(ctx, d);
+    await this._assign(ctx, d);
+  }
+
+  async _handoffNote(ctx, d) {
+    await this._note(ctx, d.mode === 'AGENT' && d.agentId
+      ? '⚡ انتهى السير وحوّل المحادثة لموظف محدد'
+      : '⚡ انتهى السير وحوّل المحادثة لفريقك', { handoff: true });
+  }
+
   async _sendText(ctx, text, meta = {}) {
     const chatService = require('../chat/chat.service');
-    await chatService.sendMessage(ctx.tenantId, ctx.threadId, { content: text, type: 'text', isAutomated: true });
+    await chatService.sendMessage(ctx.tenantId, ctx.threadId, { content: text, type: 'text', isAutomated: true, source: meta.ai ? 'FLOW_AI' : 'FLOW' });
   }
 
   async _ask(ctx, node, attempts) {
@@ -255,7 +272,8 @@ class FlowEngine {
     await chatService.sendInteractiveMessage(ctx.tenantId, ctx.threadId, {
       body: d.text,
       buttonLabel: d.buttonLabel || 'الخيارات',
-      options: (d.options || []).map(o => ({ id: optionReplyId(node.id, o.id), title: o.title }))
+      options: (d.options || []).map(o => ({ id: optionReplyId(node.id, o.id), title: o.title })),
+      source: 'FLOW'
     });
     await this._setState(ctx, node.id, attempts);
   }

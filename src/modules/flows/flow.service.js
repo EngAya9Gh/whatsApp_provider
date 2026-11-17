@@ -60,7 +60,30 @@ function sanitize({ nodes, edges }) {
   return { nodes: cleanNodes, edges: cleanEdges };
 }
 
-/** Returns a list of { nodeId, message } problems that block publishing */
+/** Steps a customer can reach from the start step */
+function reachable({ nodes, edges }) {
+  const start = nodes.find(n => n.type === 'trigger');
+  const seen = new Set();
+  const queue = start ? [start.id] : [];
+  while (queue.length) {
+    const id = queue.shift();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const e of edges) if (e.source === id && !seen.has(e.target)) queue.push(e.target);
+  }
+  return seen;
+}
+
+/**
+ * Problems that stop publishing or testing. A step no line leads to never runs, so a half-written one
+ * left on the canvas does not block (the editor marks it "Not connected").
+ */
+async function problemsToFix(tenantId, graph) {
+  const reach = reachable(graph);
+  return (await validate(tenantId, graph)).filter(p => !p.nodeId || reach.has(p.nodeId));
+}
+
+/** Returns a list of { nodeId, message } problems in every step */
 async function validate(tenantId, { nodes, edges }) {
   const errors = [];
   const add = (nodeId, message) => errors.push({ nodeId, message });
@@ -204,7 +227,7 @@ class FlowService {
     await this._channel(tenantId, channelId);
     const flow = await ChatFlow.findOne({ tenantId, channelId });
     const draft = flow ? sanitize(flow.draft) : defaultDraft();
-    const errors = await validate(tenantId, draft);
+    const errors = await problemsToFix(tenantId, draft);
     if (errors.length > 0) throw { status: 422, message: 'The flow has problems to fix before publishing', errors };
 
     const updated = await ChatFlow.findOneAndUpdate(
@@ -278,6 +301,8 @@ class FlowService {
 
 module.exports = new FlowService();
 module.exports.validate = validate;
+module.exports.problemsToFix = problemsToFix;
+module.exports.reachable = reachable;
 module.exports.sanitize = sanitize;
 module.exports.outputHandles = outputHandles;
 module.exports.defaultDraft = defaultDraft;

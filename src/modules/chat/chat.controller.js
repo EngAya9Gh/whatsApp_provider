@@ -2,6 +2,8 @@ const chatService = require('./chat.service');
 const { memberKey } = require('../../middleware/auth.middleware');
 const accessService = require('../workforce/access.service');
 const logger = require('../../utils/logger');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 class ChatController {
   async getQuickReplies(req, res, next) {
@@ -85,47 +87,27 @@ class ChatController {
 
   async renameThread(req, res, next) {
     try {
-      const { name } = req.body;
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
+      const name = String(req.body?.name || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+      if (!name) return res.status(400).json({ error: { message: 'Write a name' } });
       const ChatThread = require('../../models/mongo/ChatThread');
 
-      // Find the thread in MongoDB
-      const thread = await ChatThread.findOne({
-        _id: req.params.threadId,
-        tenantId: req.tenant.id
-      });
+      const thread = await ChatThread.findOneAndUpdate(
+        { _id: req.params.threadId, tenantId: req.tenant.id },
+        // nameEditedAt: the customer's WhatsApp profile name no longer replaces this one on their next message
+        { $set: { contactName: name, nameEditedAt: new Date() } },
+        { returnDocument: 'after' }
+      ).lean();
+      if (!thread) return res.status(404).json({ error: { message: 'Thread not found' } });
 
-      if (!thread) {
-        return res.status(404).json({ success: false, message: 'Thread not found' });
-      }
-
-      // Update thread
-      await ChatThread.updateOne(
-        { _id: thread._id },
-        { $set: { contactName: name } }
-      );
-
-      // Update contact if exists, or create a new one to persist this name
-      const existingContact = await prisma.contact.findFirst({
-        where: { tenantId: req.tenant.id, phone: thread.contactPhone }
-      });
-
+      // Same name in Contacts (created there when the number is not saved yet)
+      const existingContact = await prisma.contact.findFirst({ where: { tenantId: req.tenant.id, phone: thread.contactPhone } });
       if (existingContact) {
-        await prisma.contact.update({
-          where: { id: existingContact.id },
-          data: { name: name }
-        });
+        await prisma.contact.update({ where: { id: existingContact.id }, data: { name } });
       } else {
-        await prisma.contact.create({
-          data: {
-            tenantId: req.tenant.id,
-            phone: thread.contactPhone,
-            name: name
-          }
-        });
+        await prisma.contact.create({ data: { tenantId: req.tenant.id, phone: thread.contactPhone, name } });
       }
 
+      require('../../services/socket.service').emitToTenant(req.tenant.id, 'thread_updated', { id: String(thread._id), contactName: name });
       res.json({ success: true, contactName: name });
     } catch (error) {
       next(error);

@@ -36,7 +36,8 @@ const median = (list) => {
   const mid = Math.floor(s.length / 2);
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 };
-const minutes = (ms) => (ms === null ? null : round(ms / 60000));
+// Two decimals (under a second) so short response times show in seconds
+const minutes = (ms) => (ms === null ? null : round(ms / 60000, 2));
 const hours = (ms) => (ms === null ? null : round(ms / 3600000));
 
 /** Every local date ("YYYY-MM-DD") of the period, oldest first */
@@ -57,21 +58,31 @@ function addToHeatmap(heatmap, timezone, date) {
 }
 
 /**
- * Human response times: from the first unanswered customer message in a conversation
- * to the next reply written by the team (internal notes and automations do not count).
+ * Human response times: from the first unanswered customer message in a conversation to the next reply
+ * written by the team (internal notes and automations do not count).
+ * While a WhatsApp flow or its AI agent is answering, the customer is not waiting for the team; when the
+ * flow hands the chat to a person (its hand-off note), the wait starts at that moment.
+ * Returns { pairs: [{ ms, senderId, at }], waiting: Map(threadId → time the customer started waiting) }
  */
 function responseTimes(messagesAsc) {
-  const waiting = new Map();
+  const waits = new Map(); // threadId → { at, handoff }
   const pairs = [];
   for (const m of messagesAsc) {
     const key = String(m.threadId);
+    const wait = waits.get(key);
     if (m.direction === 'INBOUND') {
-      if (!m.isRating && !waiting.has(key)) waiting.set(key, m.createdAt);
-    } else if (!m.isInternal && !m.isAutomated && waiting.has(key)) {
-      pairs.push({ ms: m.createdAt - waiting.get(key), senderId: m.senderId || null, at: m.createdAt });
-      waiting.delete(key);
+      if (!m.isRating && !wait) waits.set(key, { at: m.createdAt, handoff: false });
+    } else if (m.source === 'FLOW_HANDOFF') {
+      if (!wait?.handoff) waits.set(key, { at: m.createdAt, handoff: true });
+    } else if (m.source === 'FLOW' || m.source === 'FLOW_AI') {
+      // The flow answered; a message it sends after handing off does not cancel the wait for a person
+      if (wait && !wait.handoff) waits.delete(key);
+    } else if (!m.isInternal && !m.isAutomated && wait) {
+      pairs.push({ ms: m.createdAt - wait.at, senderId: m.senderId || null, at: m.createdAt });
+      waits.delete(key);
     }
   }
+  const waiting = new Map([...waits].map(([key, w]) => [key, w.at]));
   return { pairs, waiting };
 }
 
@@ -101,7 +112,7 @@ class AnalyticsService {
       { $limit: MAX_ROWS },
       {
         $project: {
-          threadId: 1, direction: 1, type: 1, status: 1, isInternal: 1, isAutomated: 1, senderId: 1, createdAt: 1,
+          threadId: 1, direction: 1, type: 1, status: 1, isInternal: 1, isAutomated: 1, senderId: 1, source: 1, createdAt: 1,
           isRating: { $regexMatch: { input: { $ifNull: ['$content', ''] }, regex: '^\\[العميل قام بتقييم' } }
         }
       }

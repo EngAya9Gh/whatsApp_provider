@@ -76,7 +76,7 @@ class ContactService {
         const ChatThread = require('../../models/mongo/ChatThread');
         await ChatThread.updateMany(
           { tenantId, contactPhone: contact.phone },
-          { $set: { contactName: contact.name } }
+          { $set: { contactName: contact.name, nameEditedAt: new Date() } }
         );
       } catch (err) {
         // Ignore or log
@@ -131,7 +131,7 @@ class ContactService {
         const ChatThread = require('../../models/mongo/ChatThread');
         await ChatThread.updateMany(
           { tenantId, contactPhone: updated.phone },
-          { $set: { contactName: updated.name } }
+          { $set: { contactName: updated.name, nameEditedAt: new Date() } }
         );
       } catch (err) {
         // Ignore or log

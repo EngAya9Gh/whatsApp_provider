@@ -9,20 +9,6 @@ const flowService = require('./flow.service');
 const MAX_HISTORY = 30;
 const MAX_TEXT = 4096;
 
-/** Steps a customer can reach from the start step */
-function reachable(graph) {
-  const start = graph.nodes.find(n => n.type === 'trigger');
-  const seen = new Set();
-  const queue = start ? [start.id] : [];
-  while (queue.length) {
-    const id = queue.shift();
-    if (seen.has(id)) continue;
-    seen.add(id);
-    for (const e of graph.edges) if (e.source === id && !seen.has(e.target)) queue.push(e.target);
-  }
-  return seen;
-}
-
 const int = (v, max) => Math.min(Math.max(parseInt(v, 10) || 0, 0), max);
 
 function cleanState(state) {
@@ -45,9 +31,8 @@ class FlowSimulator extends FlowEngine {
    */
   async run(tenantId, channelId, payload = {}) {
     const graph = flowService.sanitize({ nodes: payload.nodes, edges: payload.edges });
-    // Only what the customer can reach has to be ready; a loose half-written step does not block the test
-    const reach = reachable(graph);
-    const problems = (await flowService.validate(tenantId, graph)).filter(p => !p.nodeId || reach.has(p.nodeId));
+    // Same check as publishing: only what the customer can reach has to be ready
+    const problems = await flowService.problemsToFix(tenantId, graph);
     if (problems.length) throw { status: 422, message: 'Fix these steps before testing', errors: problems };
 
     const input = {
@@ -140,9 +125,13 @@ class FlowSimulator extends FlowEngine {
     await this._setState(ctx, node.id, attempts);
   }
 
-  async _note(ctx, text) {
+  async _note(ctx, text, meta = {}) {
+    if (meta.handoff) ctx.handedOff = true;
     ctx.sim.out.push({ kind: 'note', text });
   }
+
+  // The test chat shows the hand-off as its own line ("assign"), so no extra note
+  async _handoffNote() {}
 
   async _applyTag(ctx, d) {
     const remove = d.action === 'REMOVE';
@@ -180,4 +169,3 @@ class FlowSimulator extends FlowEngine {
 }
 
 module.exports = new FlowSimulator();
-module.exports.reachable = reachable;
