@@ -402,6 +402,20 @@ const freeSpot = (pos, ignoreId = null) => {
   return p
 }
 
+/** Moves the canvas (same zoom) when a new step landed outside the visible part */
+const revealNode = async (id) => {
+  await nextTick()
+  const node = nodes.value.find(n => n.id === id)
+  if (!node || !flowInstance || !canvasEl.value) return
+  const { width, height } = canvasEl.value.getBoundingClientRect()
+  const topLeft = flowInstance.project({ x: 0, y: 70 }) // below the toolbar
+  const bottomRight = flowInstance.project({ x: width, y: height })
+  const w = node.dimensions?.width || 250
+  const h = node.dimensions?.height || 140
+  const inside = node.position.x >= topLeft.x && node.position.y >= topLeft.y && node.position.x + w <= bottomRight.x && node.position.y + h <= bottomRight.y
+  if (!inside) flowInstance.setCenter(node.position.x + w / 2, node.position.y + h / 2, { zoom: flowInstance.getViewport().zoom, duration: 300 })
+}
+
 const addNode = (type) => {
   const base = selectedNode.value || [...nodes.value].sort((a, b) => b.position.y - a.position.y)[0]
   // Continue the path from that step when its single output is free
@@ -415,6 +429,7 @@ const addNode = (type) => {
     : { x: 250, y: 100 })
   nodes.value = [...nodes.value, { id, type, position, data: FLOW_NODE_TYPES[type].defaults() }]
   selectedId.value = id
+  revealNode(id)
 }
 
 /** Adds a step connected to one output (the "+" of that output, or a line dropped on empty space) */
@@ -436,6 +451,7 @@ const addNodeFrom = (sourceId, handle, type, at = null) => {
   removeEdgesFrom(sourceId, handle)
   edges.value = [...edges.value, { id: `e-${sourceId}-${handle}-${id}`, source: sourceId, target: id, sourceHandle: handle, targetHandle: 'in' }]
   selectedId.value = id
+  if (!at) revealNode(id)
 }
 
 const deleteNode = (id) => {
@@ -455,6 +471,7 @@ const duplicateNode = (id) => {
   const copy = { id: newNodeId(node.type), type: node.type, position: freeSpot({ x: node.position.x + 40, y: node.position.y + 40 }), data }
   nodes.value = [...nodes.value, copy]
   selectedId.value = copy.id
+  revealNode(copy.id)
 }
 
 // ─── Step picker ──────────────────────────────────────────────

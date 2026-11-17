@@ -226,6 +226,7 @@ import GlobalMetaSelector from './components/GlobalMetaSelector.vue'
 const router = useRouter()
 const route = useRoute()
 const { locale } = useI18n()
+const isAr = computed(() => locale.value === 'ar')
 const currentLang = ref(locale.value)
 const tenant = ref({})
 
