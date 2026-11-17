@@ -250,6 +250,27 @@ class FlowService {
     return formatFlow(updated, channelId);
   }
 
+  /**
+   * For testing on a real phone: the next message from this number starts the published flow from the
+   * beginning, without waiting for the silence period and even if the conversation is assigned.
+   */
+  async restartForNumber(tenantId, channelId, phone) {
+    await this._channel(tenantId, channelId);
+    const digits = String(phone || '').replace(/\D/g, '').replace(/^00/, '');
+    if (digits.length < 8 || digits.length > 15) throw { status: 400, message: 'Write the full number with the country code' };
+    const ChatThread = require('../../models/mongo/ChatThread');
+    const [flow, thread] = await Promise.all([
+      ChatFlow.findOne({ tenantId, channelId }).select('isActive published.version').lean(),
+      ChatThread.findOneAndUpdate(
+        { tenantId, channelId, contactPhone: digits },
+        { $set: { flowState: { restart: true, at: new Date() } } },
+        { returnDocument: 'after', projection: { _id: 1 } }
+      ).lean()
+    ]);
+    // A number that never wrote starts the flow with its first message anyway
+    return { phone: digits, found: !!thread, live: !!flow?.isActive && flow?.published?.version > 0 };
+  }
+
   async isFlowActive(tenantId, channelId) {
     return !!(await ChatFlow.exists({ tenantId, channelId, isActive: true, 'published.version': { $gt: 0 } }));
   }

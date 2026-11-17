@@ -17,5 +17,7 @@ router.put('/:channelId/draft', canManage, bind('saveDraft'));
 router.post('/:channelId/publish', canManage, bind('publish'));
 router.post('/:channelId/discard', canManage, bind('discard'));
 router.put('/:channelId/active', canManage, bind('setActive'));
+router.post('/:channelId/test', canManage, bind('test'));
+router.post('/:channelId/restart', canManage, bind('restart'));
 
 module.exports = router;

@@ -46,11 +46,47 @@
     <div v-else-if="loadError" class="flex-1 flex items-center justify-center text-slate-500">{{ loadError }}</div>
 
     <div v-else class="workspace">
-      <div class="canvas" dir="ltr">
+      <div ref="canvasEl" class="canvas" dir="ltr">
+        <!-- Canvas toolbar -->
+        <div class="toolbar" :dir="isAr ? 'rtl' : 'ltr'">
+          <button type="button" class="tb-btn primary" @click="openToolbarMenu">
+            <i class="fas fa-plus"></i><span>{{ isAr ? 'إضافة خطوة' : 'Add step' }}</span>
+          </button>
+          <button type="button" class="tb-btn test" :class="{ on: testing }" @click="toggleTesting">
+            <i class="fas fa-play"></i><span>{{ isAr ? 'جرّب السير' : 'Test' }}</span>
+          </button>
+          <span class="tb-sep"></span>
+          <button type="button" class="tb-btn icon" :disabled="!canUndo" :title="isAr ? 'تراجع (Ctrl+Z)' : 'Undo (Ctrl+Z)'" @click="undo">
+            <i class="fas fa-rotate-left"></i><span>{{ isAr ? 'تراجع' : 'Undo' }}</span>
+          </button>
+          <button type="button" class="tb-btn icon" :title="isAr ? 'رتّب الخطوات تلقائياً تحت بعضها' : 'Lay the steps out neatly'" @click="tidy">
+            <i class="fas fa-wand-magic-sparkles"></i><span>{{ isAr ? 'ترتيب' : 'Tidy up' }}</span>
+          </button>
+          <button type="button" class="tb-btn icon" :class="{ on: showTips }" :title="isAr ? 'طريقة الاستخدام' : 'How to use'" @click="showTips = !showTips">
+            <i class="fas fa-circle-question"></i>
+          </button>
+        </div>
+
+        <!-- How to use the canvas -->
+        <div v-if="showTips" class="tips" :dir="isAr ? 'rtl' : 'ltr'">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-bold text-slate-800 text-sm"><i class="fas fa-hand-pointer text-[#FF6600]"></i> {{ isAr ? 'كيف تتحكم باللوحة' : 'How to use the canvas' }}</span>
+            <button type="button" class="tips-close" @click="closeTips">{{ isAr ? 'فهمت' : 'Got it' }}</button>
+          </div>
+          <ul>
+            <li><span class="tip-ico plus"><i class="fas fa-plus"></i></span>{{ isAr ? 'اضغط «+» بجانب أي مخرج لإضافة الخطوة التالية موصولة مباشرة.' : 'Click "+" next to any output to add the next step, already connected.' }}</li>
+            <li><span class="tip-ico"><i class="fas fa-circle-dot"></i></span>{{ isAr ? 'للتوصيل اسحب من النقطة الصغيرة وأفلتها على أي خطوة. أفلتها في مكان فارغ لتضيف خطوة هناك.' : 'To connect, drag from a small dot and drop it on any step. Drop it on empty space to add a step there.' }}</li>
+            <li><span class="tip-ico del"><i class="fas fa-xmark"></i></span>{{ isAr ? 'لحذف خط اضغط ✕ في منتصفه. لحذف خطوة مرّر الماوس عليها واضغط سلة المهملات، أو حددها واضغط Delete.' : 'To remove a line click the ✕ in its middle. To delete a step hover it and click the bin, or select it and press Delete.' }}</li>
+            <li><span class="tip-ico"><i class="fas fa-rotate-left"></i></span>{{ isAr ? 'أخطأت؟ اضغط «تراجع» أو Ctrl+Z.' : 'Made a mistake? Click "Undo" or press Ctrl+Z.' }}</li>
+            <li><span class="tip-ico test"><i class="fas fa-play"></i></span>{{ isAr ? '«جرّب السير» يشغّل المسودة فوراً كأنك عميل، بدون نشر وبدون انتظار ساعات.' : '"Test" runs the draft right away as if you were a customer: no publishing, no waiting hours.' }}</li>
+          </ul>
+        </div>
+
         <VueFlow
           v-model:nodes="nodes"
           v-model:edges="edges"
           :node-types="nodeTypes"
+          :edge-types="edgeTypes"
           :default-edge-options="defaultEdgeOptions"
           :is-valid-connection="isValidConnection"
           :delete-key-code="['Backspace', 'Delete']"
@@ -59,9 +95,13 @@
           fit-view-on-init
           @pane-ready="(instance) => (flowInstance = instance)"
           @connect="onConnect"
+          @connect-start="onConnectStart"
+          @connect-end="onConnectEnd"
           @node-click="({ node }) => (selectedId = node.id)"
           @pane-click="selectedId = null"
           @nodes-change="onNodesChange"
+          @edge-mouse-enter="({ edge }) => (hoveredEdge = edge.id)"
+          @edge-mouse-leave="hoveredEdge = null"
         >
           <Background :gap="18" pattern-color="#e2e8f0" />
           <Controls position="bottom-left" />
@@ -79,11 +119,31 @@
           :agents="agents"
           :team-name="teamName"
           :errors="errorsByNode[selectedNode.id] || []"
+          :back-label="testing ? (isAr ? 'رجوع للتجربة' : 'Back to the test') : (isAr ? 'الخطوات' : 'Steps')"
           @close="selectedId = null"
           @delete="deleteNode(selectedNode.id)"
+          @test="startTesting"
           @option-removed="(optId) => removeEdgesFrom(selectedNode.id, `opt-${optId}`)"
         />
-        <div v-else class="palette">
+        <FlowTester
+          v-if="testing"
+          v-show="!selectedNode"
+          :channel-id="channelId"
+          :is-ar="isAr"
+          :get-graph="clean"
+          :tag-map="tagMap"
+          :stage-map="stageMap"
+          :agent-map="agentMap"
+          :has-ai="nodes.some(n => n.type === 'ai_agent')"
+          :live="isActive && publishedVersion > 0"
+          :has-draft-changes="hasDraftChanges"
+          :silence-hours="Number(nodes.find(n => n.type === 'trigger')?.data?.inactivityHours) || 24"
+          @close="stopTesting"
+          @live="onTestProgress"
+          @problems="(list) => (problems = list)"
+          @focus="focusNode"
+        />
+        <div v-if="!selectedNode && !testing" class="palette">
           <button type="button" class="templates-card" @click="showTemplates = true">
             <span class="palette-icon" style="background: #FF6600"><i class="fas fa-shapes"></i></span>
             <span class="flex-1 text-start">
@@ -95,7 +155,7 @@
 
           <h3 class="font-bold text-slate-800">{{ isAr ? 'الخطوات' : 'Steps' }}</h3>
           <p class="text-xs text-slate-500 mt-1 mb-4">
-            {{ isAr ? 'انقر خطوة لإضافتها أسفل الخطوة المحددة. اسحب من النقاط الصغيرة لتوصيل الخطوات.' : 'Click a step to add it below the selected one. Drag from the small dots to connect steps.' }}
+            {{ isAr ? 'انقر خطوة لإضافتها في آخر السير، أو اضغط «+» بجانب أي مخرج على اللوحة لتضيفها بعده مباشرة.' : 'Click a step to add it at the end, or click "+" next to any output on the canvas to add it right after.' }}
           </p>
           <div class="space-y-2">
             <button v-for="(meta, type) in addableTypes" :key="type" type="button" class="palette-item" @click="addNode(type)">
@@ -117,6 +177,18 @@
         </div>
       </aside>
     </div>
+
+    <StepMenu
+      v-if="stepMenu"
+      :x="stepMenu.x"
+      :y="stepMenu.y"
+      :is-ar="isAr"
+      :title="stepMenu.title"
+      :show-templates="!stepMenu.source"
+      @pick="pickStep"
+      @templates="stepMenu = null; showTemplates = true"
+      @close="stepMenu = null"
+    />
 
     <FlowTemplates
       v-if="showTemplates"
@@ -145,8 +217,12 @@ import '@vue-flow/controls/dist/style.css'
 import FlowNode from '../components/flows/FlowNode.vue'
 import NodeSettings from '../components/flows/NodeSettings.vue'
 import FlowTemplates from '../components/flows/FlowTemplates.vue'
-import { FLOW_NODE_TYPES, outputHandles } from '../data/flowNodes'
+import FlowEdge from '../components/flows/FlowEdge.vue'
+import StepMenu from '../components/flows/StepMenu.vue'
+import FlowTester from '../components/flows/FlowTester.vue'
+import { FLOW_NODE_TYPES, outputHandles, newOptionId } from '../data/flowNodes'
 import { findTag, pickInterestedStage } from '../data/flowTemplates'
+import { layoutFlow, reachableFrom } from '../data/flowLayout'
 
 const { locale } = useI18n()
 const isAr = computed(() => locale.value === 'ar')
@@ -177,10 +253,26 @@ const aiReady = ref(null) // Gemini key + business info; null when unknown
 const showTemplates = ref(false)
 const applyingTemplate = ref(false)
 let flowInstance = null
+const canvasEl = ref(null)
+
+const hoveredEdge = ref(null)
+const stepMenu = ref(null) // { x, y, title, source: { nodeId, handle } | null, at: flow position | null }
+const testing = ref(false)
+const liveNodeId = ref(null) // step the test conversation waits on
+const visitedIds = ref(new Set()) // steps the last test message went through
+const testedEdges = ref(new Set())
+
+const TIPS_KEY = 'wakeel.flowTips.v1'
+const showTips = ref((() => { try { return !localStorage.getItem(TIPS_KEY) } catch { return true } })())
+const closeTips = () => {
+  showTips.value = false
+  try { localStorage.setItem(TIPS_KEY, '1') } catch { /* private mode */ }
+}
 
 const nodeTypes = Object.fromEntries(Object.keys(FLOW_NODE_TYPES).map(t => [t, markRaw(FlowNode)]))
+const edgeTypes = { flow: markRaw(FlowEdge) }
 const addableTypes = Object.fromEntries(Object.entries(FLOW_NODE_TYPES).filter(([, m]) => m.addable !== false))
-const defaultEdgeOptions = { type: 'smoothstep', markerEnd: MarkerType.ArrowClosed, style: { strokeWidth: 2, stroke: '#94a3b8' } }
+const defaultEdgeOptions = { type: 'flow', markerEnd: MarkerType.ArrowClosed, style: { strokeWidth: 2, stroke: '#94a3b8' } }
 
 const channelLabel = computed(() => (channel.value ? (channel.value.name ? `${channel.value.name} · ` : '') + (channel.value.displayPhoneNumber || channel.value.phoneNumber || '') : ''))
 const selectedNode = computed(() => nodes.value.find(n => n.id === selectedId.value) || null)
@@ -222,12 +314,29 @@ const errorsByNode = computed(() => {
   return map
 })
 
+const tagMap = computed(() => Object.fromEntries(tags.value.map(t => [t.id, t])))
+const stageMap = computed(() => Object.fromEntries(stages.value.map(s => [s.id, s])))
+const agentMap = computed(() => Object.fromEntries(agents.value.map(a => [a.id, a])))
+// Steps a customer can reach, and outputs that already have a line (no "+" on those)
+const reachable = computed(() => reachableFrom(nodes.value, edges.value))
+const connectedHandles = computed(() => new Set(edges.value.map(e => `${e.source}:${e.sourceHandle || 'out'}`)))
+
 provide('flowCtx', {
   isAr,
   errorsByNode,
-  tagMap: computed(() => Object.fromEntries(tags.value.map(t => [t.id, t]))),
-  stageMap: computed(() => Object.fromEntries(stages.value.map(s => [s.id, s]))),
-  agentMap: computed(() => Object.fromEntries(agents.value.map(a => [a.id, a])))
+  tagMap,
+  stageMap,
+  agentMap,
+  reachable,
+  connectedHandles,
+  liveNodeId,
+  visitedIds,
+  testedEdges,
+  hoveredEdge,
+  removeEdge: (id) => removeEdge(id),
+  deleteNode: (id) => deleteNode(id),
+  duplicateNode: (id) => duplicateNode(id),
+  openStepMenu: (req) => openStepMenu(req)
 })
 
 // ─── Graph editing ────────────────────────────────────────────
@@ -241,25 +350,91 @@ const removeEdgesFrom = (nodeId, handle) => {
   edges.value = edges.value.filter(e => !(e.source === nodeId && (e.sourceHandle || 'out') === handle))
 }
 
+const removeEdge = (id) => {
+  edges.value = edges.value.filter(e => e.id !== id)
+  hoveredEdge.value = null
+}
+
 // One connection per output: a new one replaces the old
+let connectMade = false
 const onConnect = (c) => {
+  connectMade = true
   if (!isValidConnection(c)) return
   const handle = c.sourceHandle || 'out'
   removeEdgesFrom(c.source, handle)
   edges.value = [...edges.value, { id: `e-${c.source}-${handle}-${c.target}`, source: c.source, target: c.target, sourceHandle: handle, targetHandle: 'in' }]
 }
 
+// A line dropped on a step's body connects to it; dropped on empty space, it offers a new step there
+let connectFrom = null
+const onConnectStart = ({ nodeId, handleId, handleType }) => {
+  connectMade = false
+  connectFrom = handleType === 'source' && nodeId ? { nodeId, handle: handleId || 'out' } : null
+}
+const onConnectEnd = (event) => {
+  const from = connectFrom
+  connectFrom = null
+  if (!from || connectMade || !event) return
+  const point = event.changedTouches?.[0] || event
+  if (typeof point.clientX !== 'number') return
+  const under = document.elementFromPoint(point.clientX, point.clientY)
+  const nodeEl = under?.closest?.('.vue-flow__node')
+  if (nodeEl) {
+    onConnect({ source: from.nodeId, sourceHandle: from.handle, target: nodeEl.getAttribute('data-id') })
+    return
+  }
+  if (!under?.closest?.('.vue-flow__pane') || !flowInstance || !canvasEl.value) return
+  const rect = canvasEl.value.getBoundingClientRect()
+  const at = flowInstance.project({ x: point.clientX - rect.left, y: point.clientY - rect.top })
+  stepMenu.value = { x: point.clientX + 8, y: point.clientY - 16, source: from, at, title: isAr.value ? 'أضف خطوة هنا' : 'Add a step here' }
+}
+
+const newNodeId = (type) => `${type}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
+
+/** Moves a new step down until it does not cover another one */
+const freeSpot = (pos, ignoreId = null) => {
+  const p = { ...pos }
+  for (let i = 0; i < 40; i++) {
+    const hit = nodes.value.some(n => n.id !== ignoreId && Math.abs(n.position.x - p.x) < 260 && Math.abs(n.position.y - p.y) < (n.dimensions?.height || 120) + 20)
+    if (!hit) break
+    p.y += 60
+  }
+  return p
+}
+
 const addNode = (type) => {
   const base = selectedNode.value || [...nodes.value].sort((a, b) => b.position.y - a.position.y)[0]
-  const id = `${type}-${Date.now().toString(36)}`
-  const position = base
-    ? { x: base.position.x, y: base.position.y + (base.dimensions?.height || 120) + 70 }
-    : { x: 250, y: 100 }
-  nodes.value = [...nodes.value, { id, type, position, data: FLOW_NODE_TYPES[type].defaults() }]
-  // Continue the path from the selected step when its single output is free
-  if (base && outputHandles(base).includes('out') && !edges.value.some(e => e.source === base.id && (e.sourceHandle || 'out') === 'out')) {
-    edges.value = [...edges.value, { id: `e-${base.id}-out-${id}`, source: base.id, target: id, sourceHandle: 'out', targetHandle: 'in' }]
+  // Continue the path from that step when its single output is free
+  if (base && outputHandles(base).includes('out') && !connectedHandles.value.has(`${base.id}:out`)) {
+    addNodeFrom(base.id, 'out', type)
+    return
   }
+  const id = newNodeId(type)
+  const position = freeSpot(base
+    ? { x: base.position.x, y: base.position.y + (base.dimensions?.height || 120) + 70 }
+    : { x: 250, y: 100 })
+  nodes.value = [...nodes.value, { id, type, position, data: FLOW_NODE_TYPES[type].defaults() }]
+  selectedId.value = id
+}
+
+/** Adds a step connected to one output (the "+" of that output, or a line dropped on empty space) */
+const addNodeFrom = (sourceId, handle, type, at = null) => {
+  const source = nodes.value.find(n => n.id === sourceId)
+  if (!source) return
+  const id = newNodeId(type)
+  let position
+  if (at) {
+    position = { x: Math.round(at.x - 125), y: Math.round(at.y) }
+  } else {
+    // Branches side by side under their step, in the order of the outputs
+    const outs = outputHandles(source)
+    const idx = Math.max(0, outs.indexOf(handle))
+    const spread = outs.length > 1 ? (idx - (outs.length - 1) / 2) * 290 : 0
+    position = freeSpot({ x: Math.round(source.position.x + spread), y: Math.round(source.position.y + (source.dimensions?.height || 140) + 80) })
+  }
+  nodes.value = [...nodes.value, { id, type, position, data: FLOW_NODE_TYPES[type].defaults() }]
+  removeEdgesFrom(sourceId, handle)
+  edges.value = [...edges.value, { id: `e-${sourceId}-${handle}-${id}`, source: sourceId, target: id, sourceHandle: handle, targetHandle: 'in' }]
   selectedId.value = id
 }
 
@@ -268,7 +443,116 @@ const deleteNode = (id) => {
   if (!node || node.type === 'trigger') return
   nodes.value = nodes.value.filter(n => n.id !== id)
   edges.value = edges.value.filter(e => e.source !== id && e.target !== id)
+  if (selectedId.value === id) selectedId.value = null
+}
+
+const duplicateNode = (id) => {
+  const node = nodes.value.find(n => n.id === id)
+  if (!node || node.type === 'trigger') return
+  const data = JSON.parse(JSON.stringify(node.data || {}))
+  // Each option is an output of its own step, so the copy gets new ones
+  if (Array.isArray(data.options)) data.options = data.options.map(o => ({ ...o, id: newOptionId() }))
+  const copy = { id: newNodeId(node.type), type: node.type, position: freeSpot({ x: node.position.x + 40, y: node.position.y + 40 }), data }
+  nodes.value = [...nodes.value, copy]
+  selectedId.value = copy.id
+}
+
+// ─── Step picker ──────────────────────────────────────────────
+const openStepMenu = ({ nodeId, handle, event }) => {
+  const r = event.currentTarget?.getBoundingClientRect?.() || { right: event.clientX, left: event.clientX, top: event.clientY }
+  stepMenu.value = {
+    x: isAr.value ? r.left - 298 : r.right + 8,
+    y: r.top - 20,
+    source: { nodeId, handle },
+    at: null,
+    title: isAr.value ? 'ماذا يحدث بعدها؟' : 'What happens next?'
+  }
+}
+const openToolbarMenu = (event) => {
+  const r = event.currentTarget.getBoundingClientRect()
+  stepMenu.value = { x: isAr.value ? r.right - 290 : r.left, y: r.bottom + 6, source: null, at: null, title: '' }
+}
+const pickStep = (type) => {
+  const menu = stepMenu.value
+  stepMenu.value = null
+  if (!menu) return
+  if (menu.source) addNodeFrom(menu.source.nodeId, menu.source.handle, type, menu.at)
+  else addNode(type)
+}
+
+// ─── Tidy up ──────────────────────────────────────────────────
+const plain = (g) => ({
+  nodes: g.nodes.map(n => ({ id: n.id, type: n.type, position: n.position, data: n.data, deletable: n.type !== 'trigger' })),
+  edges: g.edges.map(e => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle || 'out', targetHandle: 'in' }))
+})
+const tidy = async () => {
+  const positions = layoutFlow(nodes.value, edges.value)
+  nodes.value = nodes.value.map(n => ({ id: n.id, type: n.type, position: positions[n.id] || n.position, data: n.data, deletable: n.type !== 'trigger' }))
+  await nextTick()
+  setTimeout(() => flowInstance?.fitView({ padding: 0.15, duration: 300 }), 60)
+}
+
+// ─── Undo ─────────────────────────────────────────────────────
+// Every pause in editing (moving, typing, deleting…) leaves a point to go back to
+const undoStack = []
+const canUndo = ref(false)
+let burstStart = null
+let undoTimer = null
+let restoring = false
+const pushUndo = (snap) => {
+  undoStack.push(snap)
+  if (undoStack.length > 50) undoStack.shift()
+  canUndo.value = true
+}
+const flushUndo = () => {
+  clearTimeout(undoTimer)
+  if (burstStart !== null && burstStart !== snapshot.value) pushUndo(burstStart)
+  burstStart = null
+}
+const undo = async () => {
+  flushUndo()
+  const prev = undoStack.pop()
+  canUndo.value = undoStack.length > 0
+  if (!prev) return
+  restoring = true
+  const g = plain(JSON.parse(prev))
+  nodes.value = g.nodes
+  edges.value = g.edges
+  if (selectedId.value && !g.nodes.some(n => n.id === selectedId.value)) selectedId.value = null
+  await nextTick()
+  restoring = false
+}
+const onKeydown = (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return
+  const el = document.activeElement
+  if (el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable)) return // the field's own undo
+  e.preventDefault()
+  undo()
+}
+
+// ─── Test chat ────────────────────────────────────────────────
+const startTesting = () => {
+  testing.value = true
   selectedId.value = null
+}
+const stopTesting = () => {
+  testing.value = false
+  onTestProgress({ nodeId: null, steps: [] })
+}
+const toggleTesting = () => (testing.value && !selectedNode.value ? stopTesting() : startTesting())
+const onTestProgress = ({ nodeId, steps }) => {
+  liveNodeId.value = nodeId
+  visitedIds.value = new Set(steps)
+  const used = new Set()
+  for (let i = 0; i + 1 < steps.length; i++) {
+    const edge = edges.value.find(e => e.source === steps[i] && e.target === steps[i + 1])
+    if (edge) used.add(edge.id)
+  }
+  testedEdges.value = used
+}
+const focusNode = (id) => {
+  selectedId.value = id
+  flowInstance?.fitView({ nodes: [id], maxZoom: 1, padding: 0.6, duration: 300 })
 }
 
 const onNodesChange = (changes) => {
@@ -365,8 +649,14 @@ const saveDraft = async () => {
   }
 }
 
-watch(snapshot, (value) => {
-  if (loading.value || applying || value === lastSaved) return
+watch(snapshot, (value, old) => {
+  if (loading.value || applying) return
+  if (!restoring) {
+    if (burstStart === null) burstStart = old
+    clearTimeout(undoTimer)
+    undoTimer = setTimeout(flushUndo, 600)
+  }
+  if (value === lastSaved) return
   clearTimeout(saveTimer)
   saveTimer = setTimeout(saveDraft, 1000)
 })
@@ -457,6 +747,9 @@ const discard = async () => {
   problems.value = []
   selectedId.value = null
   await applyFlow(res.data.data)
+  undoStack.length = 0
+  burstStart = null
+  canUndo.value = false
 }
 
 const setActive = async (value) => {
@@ -474,6 +767,7 @@ const toggleActive = () => setActive(!isActive.value)
 
 // ─── Load ─────────────────────────────────────────────────────
 onMounted(async () => {
+  window.addEventListener('keydown', onKeydown)
   try {
     const [flowRes, tagsRes, stagesRes, teamRes, teamsRes] = await Promise.all([
       axios.get(`/api/v1/flows/${channelId}`),
@@ -508,6 +802,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  clearTimeout(undoTimer)
   // Do not lose the last edits when leaving the page
   if (snapshot.value !== lastSaved) saveDraft()
 })
@@ -532,7 +828,25 @@ onBeforeUnmount(() => {
 .publish-btn { background: #FF6600; color: white; border: none; border-radius: 10px; padding: 8px 16px; font-weight: 700; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
 .publish-btn:disabled { opacity: 0.6; }
 .workspace { flex: 1; display: flex; min-height: 0; }
-.canvas { flex: 1; min-width: 0; background: #fafbfc; }
+.canvas { flex: 1; min-width: 0; background: #fafbfc; position: relative; }
+.toolbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; align-items: center; gap: 4px; padding: 5px; background: white; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); max-width: calc(100% - 24px); overflow-x: auto; }
+.tb-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 10px; border: none; background: transparent; color: #475569; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.tb-btn:hover:not(:disabled) { background: #f1f5f9; color: #0f172a; }
+.tb-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.tb-btn.primary { background: #FF6600; color: white; }
+.tb-btn.primary:hover { background: #ea580c; color: white; }
+.tb-btn.test { color: #4f46e5; }
+.tb-btn.test.on, .tb-btn.test:hover { background: #eef2ff; color: #4338ca; }
+.tb-btn.icon.on { background: #fff7ed; color: #c2410c; }
+.tb-sep { width: 1px; height: 20px; background: #e2e8f0; margin: 0 2px; }
+.tips { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 9; width: min(460px, calc(100% - 24px)); background: white; border: 1px solid #fed7aa; border-radius: 14px; padding: 12px 14px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12); }
+.tips ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.tips li { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.6; color: #334155; }
+.tip-ico { width: 20px; height: 20px; border-radius: 6px; background: #f1f5f9; color: #64748b; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; flex-shrink: 0; margin-top: 1px; }
+.tip-ico.plus { background: #ecfdf5; color: #059669; }
+.tip-ico.del { background: #fee2e2; color: #dc2626; }
+.tip-ico.test { background: #eef2ff; color: #4f46e5; }
+.tips-close { border: none; background: #FF6600; color: white; font-weight: 700; font-size: 12px; padding: 5px 12px; border-radius: 8px; cursor: pointer; }
 .panel { width: 340px; border-inline-start: 1px solid #f1f5f9; background: white; overflow-y: auto; }
 .palette { padding: 16px; }
 .templates-btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 10px; border: 1px solid #fed7aa; background: #fff7ed; color: #c2410c; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
@@ -546,6 +860,7 @@ onBeforeUnmount(() => {
 .problem { display: block; width: 100%; text-align: start; background: none; border: none; color: #b91c1c; font-size: 12px; padding: 4px 0; cursor: pointer; text-decoration: underline; text-decoration-color: #fecaca; }
 @media (max-width: 640px) {
   .templates-btn span { display: none; }
+  .tb-btn.icon span { display: none; }
 }
 @media (max-width: 900px) {
   .workspace { flex-direction: column; }

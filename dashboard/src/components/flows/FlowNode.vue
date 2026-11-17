@@ -1,5 +1,21 @@
 <template>
-  <div class="fnode" :class="{ selected, invalid: errors.length > 0 }" :dir="ctx.isAr.value ? 'rtl' : 'ltr'" :style="{ '--accent': meta.color }">
+  <div
+    class="fnode"
+    :class="{ selected, invalid: errors.length > 0, loose: isLoose, live: isLive, visited: isVisited && !isLive }"
+    :dir="ctx.isAr.value ? 'rtl' : 'ltr'"
+    :style="{ '--accent': meta.color }"
+  >
+    <!-- Quick actions (hover or selected) -->
+    <div v-if="type !== 'trigger'" class="fnode-tools nodrag nopan">
+      <button type="button" :title="ctx.isAr.value ? 'نسخ الخطوة' : 'Duplicate'" @click.stop="ctx.duplicateNode(id)"><i class="far fa-copy"></i></button>
+      <button type="button" class="danger" :title="ctx.isAr.value ? 'حذف الخطوة' : 'Delete step'" @click.stop="ctx.deleteNode(id)"><i class="fas fa-trash"></i></button>
+    </div>
+
+    <div v-if="isLive" class="fnode-badge live-badge"><i class="fas fa-hourglass-half"></i> {{ ctx.isAr.value ? 'التجربة واقفة هنا' : 'Test is waiting here' }}</div>
+    <div v-else-if="isLoose" class="fnode-badge loose-badge" :title="ctx.isAr.value ? 'لا يوجد خط يوصل لهذه الخطوة من البداية، فلن يصلها أي عميل' : 'No line leads here from the start, so no customer will reach it'">
+      <i class="fas fa-link-slash"></i> {{ ctx.isAr.value ? 'غير موصولة' : 'Not connected' }}
+    </div>
+
     <Handle v-if="type !== 'trigger'" id="in" type="target" :position="Position.Top" class="fhandle" />
 
     <div class="fnode-head">
@@ -43,35 +59,32 @@
       </template>
     </div>
 
-    <!-- Branch outputs -->
-    <div v-if="type === 'question'" class="fnode-branches">
-      <div v-for="(opt, i) in data.options || []" :key="opt.id" class="branch">
-        <span class="branch-num">{{ i + 1 }}</span>
-        <span class="branch-text">{{ opt.title || (ctx.isAr.value ? 'خيار' : 'Option') }}</span>
-        <Handle :id="`opt-${opt.id}`" type="source" :position="sidePosition" class="fhandle" />
-      </div>
-      <div class="branch muted">
-        <span class="branch-text">{{ ctx.isAr.value ? 'رد آخر' : 'Other reply' }}</span>
-        <Handle id="fallback" type="source" :position="sidePosition" class="fhandle" />
-      </div>
-    </div>
-    <div v-else-if="type === 'condition'" class="fnode-branches">
-      <div class="branch yes">
-        <span class="branch-text">{{ ctx.isAr.value ? 'نعم' : 'Yes' }}</span>
-        <Handle id="yes" type="source" :position="sidePosition" class="fhandle" />
-      </div>
-      <div class="branch no">
-        <span class="branch-text">{{ ctx.isAr.value ? 'لا' : 'No' }}</span>
-        <Handle id="no" type="source" :position="sidePosition" class="fhandle" />
+    <!-- Branch outputs: a "+" on every free output adds the next step already connected -->
+    <div v-if="branches.length" class="fnode-branches">
+      <div v-for="b in branches" :key="b.handle" class="branch" :class="b.tone">
+        <span v-if="b.num" class="branch-num">{{ b.num }}</span>
+        <span class="branch-text">{{ b.label }}</span>
+        <Handle :id="b.handle" type="source" :position="sidePosition" class="fhandle" />
+        <button
+          v-if="!isConnected(b.handle)"
+          type="button"
+          class="add-out side nodrag nopan"
+          :class="ctx.isAr.value ? 'at-left' : 'at-right'"
+          :title="freeHint"
+          @click.stop="(e) => ctx.openStepMenu({ nodeId: id, handle: b.handle, event: e })"
+        ><i class="fas fa-plus"></i></button>
       </div>
     </div>
-    <div v-else-if="type === 'ai_agent'" class="fnode-branches">
-      <div class="branch muted">
-        <span class="branch-text">{{ ctx.isAr.value ? 'عند التحويل لموظف' : 'On hand-off' }}</span>
-        <Handle id="handoff" type="source" :position="sidePosition" class="fhandle" />
-      </div>
-    </div>
-    <Handle v-else-if="type !== 'assign' && type !== 'end'" id="out" type="source" :position="Position.Bottom" class="fhandle" />
+    <template v-else-if="type !== 'assign' && type !== 'end'">
+      <Handle id="out" type="source" :position="Position.Bottom" class="fhandle" />
+      <button
+        v-if="!isConnected('out')"
+        type="button"
+        class="add-out bottom nodrag nopan"
+        :title="ctx.isAr.value ? 'أضف الخطوة التالية' : 'Add the next step'"
+        @click.stop="(e) => ctx.openStepMenu({ nodeId: id, handle: 'out', event: e })"
+      ><i class="fas fa-plus"></i></button>
+    </template>
   </div>
 </template>
 
@@ -87,7 +100,7 @@ const props = defineProps({
   selected: { type: Boolean, default: false }
 })
 
-// Provided by FlowEditor: { isAr, errorsByNode, tagMap, stageMap, agentMap }
+// Provided by FlowEditor (see the flowCtx object there)
 const ctx = inject('flowCtx')
 
 const meta = computed(() => FLOW_NODE_TYPES[props.type] || FLOW_NODE_TYPES.message)
@@ -95,6 +108,33 @@ const errors = computed(() => ctx.errorsByNode.value[props.id] || [])
 const placeholder = computed(() => (ctx.isAr.value ? 'اكتب النص من لوحة الإعدادات…' : 'Write the text in the settings panel…'))
 // Branch handles sit at the end of each row (left in Arabic)
 const sidePosition = computed(() => (ctx.isAr.value ? Position.Left : Position.Right))
+
+const isLoose = computed(() => props.type !== 'trigger' && !ctx.reachable.value.has(props.id))
+const isLive = computed(() => ctx.liveNodeId.value === props.id)
+const isVisited = computed(() => ctx.visitedIds.value.has(props.id))
+const isConnected = (handle) => ctx.connectedHandles.value.has(`${props.id}:${handle}`)
+
+const freeHint = computed(() => (ctx.isAr.value
+  ? 'غير موصول: إذا وصل العميل هنا ينتهي السير ويحوّل للفريق. اضغط لإضافة خطوة.'
+  : 'Not connected: a customer who gets here ends the flow and goes to the team. Click to add a step.'))
+
+const branches = computed(() => {
+  const ar = ctx.isAr.value
+  if (props.type === 'question') {
+    return [
+      ...(props.data.options || []).map((opt, i) => ({ handle: `opt-${opt.id}`, num: i + 1, label: opt.title || (ar ? 'خيار' : 'Option') })),
+      { handle: 'fallback', label: ar ? 'رد آخر' : 'Other reply', tone: 'muted' }
+    ]
+  }
+  if (props.type === 'condition') {
+    return [
+      { handle: 'yes', label: ar ? 'نعم' : 'Yes', tone: 'yes' },
+      { handle: 'no', label: ar ? 'لا' : 'No', tone: 'no' }
+    ]
+  }
+  if (props.type === 'ai_agent') return [{ handle: 'handoff', label: ar ? 'عند التحويل لموظف' : 'On hand-off', tone: 'muted' }]
+  return []
+})
 
 const conditionSummary = computed(() => {
   const check = CONDITION_CHECKS.find(c => c.key === props.data.check)
@@ -117,10 +157,37 @@ const conditionSummary = computed(() => {
   font-size: 12px;
   color: #334155;
   position: relative;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
 }
 .fnode.selected { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
 .fnode.invalid { border-color: #d03b3b; }
+.fnode.loose { border-style: dashed; opacity: 0.8; }
+.fnode.loose.selected { opacity: 1; }
+.fnode.visited { border-color: #a5b4fc; }
+.fnode.live { border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25); animation: pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(99, 102, 241, 0.12); } }
+
+.fnode-tools {
+  position: absolute; top: -32px; inset-inline-end: 0;
+  display: flex; gap: 4px; opacity: 0; pointer-events: none; transition: opacity 0.12s;
+}
+.fnode:hover .fnode-tools, .fnode.selected .fnode-tools { opacity: 1; pointer-events: all; }
+.fnode-tools button {
+  width: 26px; height: 26px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; color: #64748b;
+  font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+}
+.fnode-tools button:hover { color: #0f172a; border-color: #cbd5e1; }
+.fnode-tools button.danger:hover { background: #ef4444; border-color: #ef4444; color: white; }
+
+.fnode-badge {
+  position: absolute; top: -11px; inset-inline-start: 10px;
+  font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.loose-badge { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+.live-badge { background: #6366f1; color: white; }
+
 .fnode-head {
   display: flex;
   align-items: center;
@@ -168,5 +235,19 @@ const conditionSummary = computed(() => {
   font-size: 10px; display: flex; align-items: center; justify-content: center;
 }
 .branch-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fhandle { width: 10px; height: 10px; background: white; border: 2px solid var(--accent); }
+.fhandle { width: 12px; height: 12px; background: white; border: 2px solid var(--accent); }
+.fhandle:hover { background: var(--accent); }
+
+/* "+" next to a free output */
+.add-out {
+  position: absolute; width: 20px; height: 20px; border-radius: 999px; padding: 0;
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 70%, white); background: white; color: var(--accent);
+  font-size: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+.add-out:hover { background: var(--accent); color: white; border-style: solid; transform: scale(1.15); }
+.add-out.side { top: 50%; margin-top: -10px; }
+.add-out.side.at-left { left: -34px; }
+.add-out.side.at-right { right: -34px; }
+.add-out.bottom { bottom: -36px; left: 50%; margin-left: -10px; }
 </style>

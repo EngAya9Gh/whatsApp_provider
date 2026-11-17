@@ -31,9 +31,9 @@ class FlowEngine {
       if (state && state.flowId === flow._id.toString() && state.version === flow.published.version && state.nodeId) return true;
       const trigger = flow.published.nodes.find(n => n.type === 'trigger');
       if (!trigger) return false;
-      const silenceMs = (Number(trigger.data?.inactivityHours) || 24) * 60 * 60 * 1000;
-      const previous = input.previousInboundAt ? new Date(input.previousInboundAt).getTime() : null;
-      if (previous && Date.now() - previous < silenceMs) return false;
+      // "Start over for this number" (flow editor): the next message starts the flow right away
+      if (state?.restart) return true;
+      if (!this._silentLongEnough(trigger, input)) return false;
       return !(await this._isAssigned(tenantId, thread._id.toString()));
     } catch (err) {
       logger.error(`[FlowEngine] wouldHandle failed: ${err.message}`);
@@ -71,10 +71,10 @@ class FlowEngine {
       // 2. Otherwise start only for a conversation that is new or was silent long enough
       const trigger = graph.nodes.find(n => n.type === 'trigger');
       if (!trigger) return false;
-      const silenceMs = (Number(trigger.data?.inactivityHours) || 24) * 60 * 60 * 1000;
-      const previous = input.previousInboundAt ? new Date(input.previousInboundAt).getTime() : null;
-      if (previous && Date.now() - previous < silenceMs) return false;
-      if (await this._isAssigned(tenantId, ctx.threadId)) return false;
+      if (!state?.restart) {
+        if (!this._silentLongEnough(trigger, input)) return false;
+        if (await this._isAssigned(tenantId, ctx.threadId)) return false;
+      }
 
       await this._setState(ctx, null);
       await this._run(ctx, this._next(graph, trigger.id, 'out'));
@@ -83,6 +83,13 @@ class FlowEngine {
       logger.error(`[FlowEngine] Failed on thread ${thread._id}: ${err.message}`);
       return false;
     }
+  }
+
+  /** New customer, or the previous customer message is older than the start step's silence period */
+  _silentLongEnough(trigger, input) {
+    const silenceMs = (Number(trigger.data?.inactivityHours) || 24) * 60 * 60 * 1000;
+    const previous = input.previousInboundAt ? new Date(input.previousInboundAt).getTime() : null;
+    return !previous || Date.now() - previous >= silenceMs;
   }
 
   async _answerQuestion(ctx, question, state) {
@@ -117,6 +124,7 @@ class FlowEngine {
       const node = ctx.graph.nodes.find(n => n.id === nodeId);
       if (!node) return this._finish(ctx, true);
       const d = node.data || {};
+      this._onStep(ctx, node);
 
       switch (node.type) {
         case 'message':
@@ -133,12 +141,10 @@ class FlowEngine {
           await this._applyTag(ctx, d);
           nodeId = this._next(ctx.graph, node.id, 'out');
           break;
-        case 'stage': {
-          const chatStageService = require('../chat/chat.stage.service');
-          await chatStageService.setThreadStage(ctx.tenantId, ctx.threadId, d.stageId, 'FLOW');
+        case 'stage':
+          await this._setStage(ctx, d);
           nodeId = this._next(ctx.graph, node.id, 'out');
           break;
-        }
         case 'ai_agent':
           return this._aiTurn(ctx, node, null);
         case 'assign':
@@ -150,8 +156,28 @@ class FlowEngine {
           nodeId = this._next(ctx.graph, node.id, 'out');
       }
     }
-    logger.warn(`[FlowEngine] Step limit reached on thread ${ctx.threadId} (loop in flow?)`);
+    this._onLoop(ctx);
     return this._finish(ctx, true);
+  }
+
+  /** Called for every step the flow runs (the flow editor's test chat shows them) */
+  _onStep() {}
+
+  _onLoop(ctx) {
+    logger.warn(`[FlowEngine] Step limit reached on thread ${ctx.threadId} (loop in flow?)`);
+  }
+
+  /** Last messages of the conversation, oldest first, for the AI agent */
+  async _history(ctx) {
+    return (await ChatMessage.find({ threadId: ctx.threadId, isInternal: { $ne: true } })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean()).reverse();
+  }
+
+  async _setStage(ctx, d) {
+    const chatStageService = require('../chat/chat.stage.service');
+    await chatStageService.setThreadStage(ctx.tenantId, ctx.threadId, d.stageId, 'FLOW');
   }
 
   /**
@@ -167,10 +193,7 @@ class FlowEngine {
     if (turns >= maxTurns) {
       result = { reply: '', handoff: true, reason: `وصل الموظف الذكي للحد الأقصى (${maxTurns} ردود)` };
     } else {
-      const history = (await ChatMessage.find({ threadId: ctx.threadId, isInternal: { $ne: true } })
-        .sort({ createdAt: -1 })
-        .limit(20)
-        .lean()).reverse();
+      const history = await this._history(ctx);
       try {
         result = await aiAgentService.reply(ctx.tenantId, history);
       } catch (err) {
@@ -183,7 +206,7 @@ class FlowEngine {
       }
     }
 
-    if (result.reply) await this._sendText(ctx, result.reply);
+    if (result.reply) await this._sendText(ctx, result.reply, { ai: true });
     if (result.handoff) {
       await this._note(ctx, `🤖 حوّل الموظف الذكي المحادثة لفريقك${result.reason ? `: ${result.reason}` : ''}`);
       return this._run(ctx, this._next(ctx.graph, node.id, 'handoff'));
@@ -220,7 +243,8 @@ class FlowEngine {
     return null;
   }
 
-  async _sendText(ctx, text) {
+  // eslint-disable-next-line no-unused-vars
+  async _sendText(ctx, text, meta = {}) {
     const chatService = require('../chat/chat.service');
     await chatService.sendMessage(ctx.tenantId, ctx.threadId, { content: text, type: 'text', isAutomated: true });
   }
@@ -309,4 +333,5 @@ class FlowEngine {
 }
 
 module.exports = new FlowEngine();
+module.exports.FlowEngine = FlowEngine;
 module.exports.optionReplyId = optionReplyId;

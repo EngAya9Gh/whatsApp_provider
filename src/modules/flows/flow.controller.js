@@ -45,6 +45,28 @@ class FlowController {
     }
   }
 
+  /** Test chat of the editor: runs the draft without sending anything */
+  async test(req, res, next) {
+    try {
+      await flowService._channel(req.tenant.id, req.params.channelId);
+      const simulator = require('./flow.simulator');
+      res.json({ success: true, data: await simulator.run(req.tenant.id, req.params.channelId, req.body) });
+    } catch (error) {
+      if (error && error.errors) {
+        return res.status(error.status || 422).json({ error: { message: error.message, errors: error.errors } });
+      }
+      next(error);
+    }
+  }
+
+  async restart(req, res, next) {
+    try {
+      res.json({ success: true, data: await flowService.restartForNumber(req.tenant.id, req.params.channelId, req.body.phone) });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async setActive(req, res, next) {
     try {
       res.json({ success: true, data: await flowService.setActive(req.tenant.id, req.params.channelId, req.body.isActive) });

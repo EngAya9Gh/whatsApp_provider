@@ -3,6 +3,7 @@
     <div class="settings-head">
       <button type="button" class="back" @click="$emit('close')" :title="isAr ? 'رجوع' : 'Back'">
         <i class="fas" :class="isAr ? 'fa-arrow-right' : 'fa-arrow-left'"></i>
+        <span v-if="backLabel">{{ backLabel }}</span>
       </button>
       <span class="head-icon" :style="{ background: meta.color }"><i :class="meta.icon"></i></span>
       <div class="flex-1 min-w-0">
@@ -28,7 +29,22 @@
           <input v-model.number="node.data.inactivityHours" type="number" min="1" max="720" class="inp w-24" />
           <span class="text-sm text-slate-600">{{ isAr ? 'ساعة' : 'hours' }}</span>
         </div>
+        <div class="example">
+          <div class="font-bold mb-1"><i class="fas fa-clock"></i> {{ isAr ? 'مثال بالمدة الحالية' : 'Example with this period' }}</div>
+          <ul>
+            <li>{{ isAr ? 'عميل يراسلك لأول مرة ← يبدأ السير فوراً.' : 'A customer writes for the first time → the flow starts right away.' }}</li>
+            <li>{{ isAr ? `آخر رسالة منه قبل ${hours} ساعة أو أكثر ← رسالته التالية تبدأ السير من أوله.` : `Their last message was ${hours}h ago or more → their next message starts the flow from the top.` }}</li>
+            <li>{{ isAr ? `راسلك قبل أقل من ${hours} ساعة ← لا يبدأ، وتبقى المحادثة مع فريقك.` : `They wrote less than ${hours}h ago → it does not start; the chat stays with your team.` }}</li>
+          </ul>
+        </div>
         <p class="hint">{{ isAr ? 'لا يبدأ إذا كانت المحادثة مسندة لموظف. وعندما يكتب موظف للعميل يتوقف السير فوراً.' : 'It does not start on conversations assigned to an agent, and stops as soon as a person writes.' }}</p>
+        <button type="button" class="test-now" @click="$emit('test')">
+          <i class="fas fa-play"></i>
+          <span class="text-start">
+            <span class="block font-bold">{{ isAr ? 'جرّب السير الآن بدون انتظار' : 'Test the flow now, no waiting' }}</span>
+            <span class="block text-[11px] font-normal opacity-80">{{ isAr ? 'محادثة تجريبية هنا تشغّل المسودة فوراً، ولا يصل شيء للعملاء.' : 'A test chat here runs the draft at once; nothing reaches customers.' }}</span>
+          </span>
+        </button>
       </template>
 
       <!-- Message -->
@@ -200,9 +216,11 @@ const props = defineProps({
   stages: { type: Array, default: () => [] },
   agents: { type: Array, default: () => [] },
   teamName: { type: String, default: '' },
-  errors: { type: Array, default: () => [] }
+  errors: { type: Array, default: () => [] },
+  backLabel: { type: String, default: '' }
 })
-const emit = defineEmits(['close', 'delete', 'option-removed'])
+const emit = defineEmits(['close', 'delete', 'option-removed', 'test'])
+const hours = computed(() => Number(props.node.data?.inactivityHours) || 24)
 
 const meta = computed(() => FLOW_NODE_TYPES[props.node.type] || FLOW_NODE_TYPES.message)
 const options = computed(() => props.node.data.options || [])
@@ -226,7 +244,13 @@ const removeOption = (optionId) => {
 <style scoped>
 .settings { display: flex; flex-direction: column; height: 100%; }
 .settings-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
-.back { width: 30px; height: 30px; border-radius: 8px; border: none; background: #f8fafc; color: #64748b; cursor: pointer; }
+.back { height: 30px; min-width: 30px; padding: 0 9px; border-radius: 8px; border: none; background: #f8fafc; color: #64748b; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.back:hover { background: #f1f5f9; color: #0f172a; }
+.example { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #f5f3ff; border: 1px solid #ddd6fe; color: #4c1d95; font-size: 12px; line-height: 1.7; }
+.example ul { margin: 0; padding-inline-start: 16px; list-style: disc; }
+.test-now { width: 100%; margin-top: 14px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-size: 12.5px; cursor: pointer; }
+.test-now:hover { background: #e0e7ff; }
+.test-now > i { width: 28px; height: 28px; border-radius: 8px; background: #6366f1; color: white; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
 .head-icon { width: 32px; height: 32px; border-radius: 10px; color: white; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
 .errors { margin: 12px 16px 0; padding: 10px 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; color: #b91c1c; font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
 .settings-body { padding: 16px; overflow-y: auto; flex: 1; }
