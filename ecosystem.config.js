@@ -1,8 +1,8 @@
 // PM2: the API and the background worker as two processes (names match the GitHub deploy workflow).
-// Switch once on the server:
-//   pm2 delete whatsapp-api && pm2 start ecosystem.config.js && pm2 save
-// After that every deploy restarts both. To go back to one process:
-//   pm2 delete whatsapp-api whatsapp-worker && pm2 start src/server.js --name whatsapp-api && pm2 save
+// Every deploy runs `pm2 startOrRestart ecosystem.config.js --update-env`, which starts the worker the first
+// time and restarts both after that. Check with `pm2 ls` (two processes) and the admin System health page.
+// To go back to one process: in the deploy, replace that line with `pm2 restart whatsapp-api`, then on the
+// server: pm2 delete whatsapp-worker && pm2 restart whatsapp-api --update-env && pm2 save
 module.exports = {
   apps: [
     {

@@ -35,8 +35,9 @@ cd ..
 
 # 6. Restart (the worker process only if it was started from ecosystem.config.js)
 echo "Restarting Backend Server..."
-pm2 restart whatsapp-api || pm2 start src/server.js --name whatsapp-api
-if pm2 describe whatsapp-worker > /dev/null 2>&1; then pm2 restart whatsapp-worker; fi
+# The API and the background worker as two processes (ecosystem.config.js): starts what is missing,
+# restarts the rest with its PROCESS_ROLE
+pm2 startOrRestart ecosystem.config.js --update-env
 pm2 save
 
 echo "Deployment Complete! ✅"

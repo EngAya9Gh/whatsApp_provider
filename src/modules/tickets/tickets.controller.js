@@ -158,19 +158,24 @@ class TicketsController {
       const threadId = String(req.body?.threadId || '');
       // The account owner is not a team member: tickets can only be assigned to team members
       if (!req.isSubUser || !req.subUser) return res.json({ success: true, data: { claimed: false, reason: 'OWNER' } });
-      if (await ticketsService.claimMode(tenantId) !== 'OPEN') return res.json({ success: true, data: { claimed: false, reason: 'SETTING' } });
 
       const ticket = await ticketsService.getActiveTicket(tenantId, threadId);
       if (!ticket) return res.json({ success: true, data: { claimed: false, reason: 'NO_TICKET' } });
+
+      // While the flow / AI agent is answering, the chat is not the team's yet: opening it only watches
+      const ChatThread = require('../../models/mongo/ChatThread');
+      const thread = await ChatThread.findOne({ _id: threadId, tenantId }).select('flowState').lean().catch(() => null);
+      const botAnswering = !!thread?.flowState?.nodeId;
+      // Opening time is measured whatever the take-on setting is
+      if (!botAnswering) await ticketsService.markOpened(ticket.id, req.subUser.id);
+
       if (ticket.assignedToId) {
         const mine = ticket.assignedToId === req.subUser.id;
         const name = mine ? req.subUser.name : (await prisma.subUser.findFirst({ where: { id: ticket.assignedToId, tenantId }, select: { name: true } }))?.name || null;
         return res.json({ success: true, data: { claimed: false, reason: mine ? 'MINE' : 'TAKEN', ticket, assignee: { id: ticket.assignedToId, name } } });
       }
-
-      const ChatThread = require('../../models/mongo/ChatThread');
-      const thread = await ChatThread.findOne({ _id: threadId, tenantId }).select('flowState').lean().catch(() => null);
-      if (thread?.flowState?.nodeId) return res.json({ success: true, data: { claimed: false, reason: 'FLOW', ticket } });
+      if (await ticketsService.claimMode(tenantId) !== 'OPEN') return res.json({ success: true, data: { claimed: false, reason: 'SETTING' } });
+      if (botAnswering) return res.json({ success: true, data: { claimed: false, reason: 'FLOW', ticket } });
 
       const result = await ticketsService.claimTicket(tenantId, ticket.id, req.subUser.id, 'OPEN');
       res.json({ success: true, data: { ...result, reason: result.claimed ? undefined : 'TAKEN' } });

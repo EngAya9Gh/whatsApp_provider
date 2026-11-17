@@ -13,6 +13,9 @@ const ChatMessage = require('../../models/mongo/ChatMessage');
 const CHANNEL_FIELDS = { id: true, phoneNumber: true, name: true, displayPhoneNumber: true, providerType: true };
 // Messages written by a WhatsApp flow (see ChatMessage.source)
 const FLOW_SOURCES = ['FLOW', 'FLOW_AI', 'FLOW_HANDOFF'];
+// Campaign messages added to a conversation when the customer replies: at most this many, this recent
+const CAMPAIGN_CHAT_DAYS = 30;
+const CAMPAIGN_CHAT_MAX = 10;
 
 /** Name of a conversation after a customer message: the team's own name wins over the WhatsApp profile name */
 function inboundName(thread, profileName) {
@@ -151,6 +154,52 @@ class ChatService {
     } catch (error) {
       logger.warn(`[ChatService] Could not record an outbound message in the conversation: ${error.message}`);
       return null;
+    }
+  }
+
+  /**
+   * Campaigns do not open conversations in Live Chat (a campaign to thousands would flood it). When a
+   * customer replies, the campaign messages they got in the last CAMPAIGN_CHAT_DAYS days and that are not
+   * in their conversation yet are added at the time they were sent, so the team sees what they answer.
+   * Never throws: the customer's message matters more.
+   */
+  async attachCampaignMessages(tenantId, channelId, thread) {
+    try {
+      const CampaignDelivery = require('../../models/mongo/CampaignDelivery');
+      const since = new Date(Date.now() - CAMPAIGN_CHAT_DAYS * 24 * 60 * 60 * 1000);
+      const deliveries = await CampaignDelivery.find({
+        tenantId, channelId, phone: thread.contactPhone, inChatAt: null, createdAt: { $gte: since }
+      }).sort({ createdAt: -1 }).limit(CAMPAIGN_CHAT_MAX).lean();
+      if (!deliveries.length) return [];
+      deliveries.reverse(); // oldest first
+
+      const known = new Set((await ChatMessage.find({ threadId: thread._id, metaMessageId: { $in: deliveries.map(d => d.wamid) } })
+        .select('metaMessageId').lean()).map(m => m.metaMessageId));
+      const docs = deliveries.filter(d => !known.has(d.wamid)).map(d => ({
+        threadId: thread._id,
+        direction: 'OUTBOUND',
+        type: 'TEMPLATE',
+        content: d.preview || d.campaignName || 'Campaign message',
+        status: d.status === 'failed' ? 'FAILED' : String(d.status || 'sent').toUpperCase(),
+        metaMessageId: d.wamid,
+        isAutomated: true,
+        source: 'CAMPAIGN',
+        campaignName: d.campaignName || null,
+        createdAt: d.createdAt,
+        updatedAt: d.createdAt
+      }));
+      const added = docs.length ? await ChatMessage.insertMany(docs, { ordered: false }) : [];
+      await CampaignDelivery.updateMany({ _id: { $in: deliveries.map(d => d._id) } }, { $set: { inChatAt: new Date() } });
+
+      for (const message of added) {
+        const msgData = message.toObject();
+        msgData.id = msgData._id.toString();
+        socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
+      }
+      return added;
+    } catch (error) {
+      logger.warn(`[ChatService] Could not add the campaign messages to the conversation: ${error.message}`);
+      return [];
     }
   }
 
@@ -305,6 +354,8 @@ class ChatService {
       // from a running flow makes the ticket the team's at that moment.
       if (activeTicket && !payload.isInternal && !payload.isAutomated) {
         if (thread.flowState) await ticketsService.markReady(activeTicket.id);
+        // Replying means they opened it (they may have had the chat open before it became the team's)
+        if (payload.senderId) await ticketsService.markOpened(activeTicket.id, payload.senderId);
         await ticketsService.markFirstResponse(activeTicket.id);
       }
 
@@ -408,6 +459,10 @@ class ChatService {
       } else if (msg.interactive.type === 'list_reply') {
         content = msg.interactive.list_reply.title;
       }
+    } else if (msg.type === 'button') {
+      // A quick-reply button of a template (a campaign's buttons) was tapped
+      type = 'INTERACTIVE';
+      content = msg.button?.text || msg.button?.payload || '';
     } else {
       content = `[Unsupported message type: ${msg.type}]`;
     }
@@ -445,6 +500,9 @@ class ChatService {
         unreadCount: 1
       });
     }
+
+    // The campaign messages this customer got (and is likely answering) go in before their reply
+    await this.attachCampaignMessages(tenantId, channelId, thread);
 
     // Put conversations that never had a customer stage into the entry stage (if enabled)
     const chatStageService = require('./chat.stage.service');

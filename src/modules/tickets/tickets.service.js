@@ -404,6 +404,21 @@ class TicketsService {
     }
   }
 
+  /**
+   * First time a team member looked at the ticket once it was the team's (opened the conversation, or
+   * replied). Recorded whatever the take-on setting is, so the reports always have the opening time.
+   */
+  async markOpened(ticketId, subUserId) {
+    try {
+      await prisma.ticket.updateMany({
+        where: { id: ticketId, firstOpenedAt: null, readyAt: { not: null } },
+        data: { firstOpenedAt: new Date(), firstOpenedById: subUserId || null }
+      });
+    } catch (err) {
+      logger.warn(`[TicketsService] Could not record the opening time: ${err.message}`);
+    }
+  }
+
   /** First reply a person wrote to the customer on this ticket */
   async markFirstResponse(ticketId) {
     try {

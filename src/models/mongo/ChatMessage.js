@@ -20,8 +20,10 @@ const ChatMessageSchema = new mongoose.Schema({
   // 'BUSINESS_APP' = sent from the customer's WhatsApp Business app, 'HISTORY' = imported old chat,
   // 'STANDBY' / 'META_AI' = Meta Business Agent. WhatsApp flows: 'FLOW' (a step's message),
   // 'FLOW_AI' (the AI agent step's reply), 'FLOW_HANDOFF' (team note: the flow handed the chat to a person,
-  // which is when the team's response time starts)
+  // which is when the team's response time starts). 'CAMPAIGN' = a campaign message, added to the
+  // conversation when the customer replied (campaignName says which campaign)
   source: { type: String, default: null },
+  campaignName: { type: String, default: null },
   // Internal notes: team members mentioned with @ (member keys: 'owner' or sub-user id)
   mentions: { type: [String], default: [] }
 }, {

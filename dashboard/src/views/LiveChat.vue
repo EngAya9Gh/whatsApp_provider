@@ -294,6 +294,10 @@
                 <span v-else-if="msg.source === 'META_AI' && !msg.isInternal" class="source-badge" :title="isAr ? 'رد بوت Meta (Business Agent)' : 'Reply by Meta Business Agent'">
                   🤖 {{ isAr ? 'بوت Meta' : 'Meta bot' }}
                 </span>
+                <!-- A campaign message, added to the conversation when the customer replied -->
+                <span v-else-if="msg.source === 'CAMPAIGN'" class="source-badge" :title="isAr ? 'رسالة حملة أرسلت لهذا العميل، تظهر هنا لأنه رد' : 'A campaign message this customer got; shown because they replied'">
+                  <i class="fas fa-bullhorn"></i> {{ isAr ? 'حملة' : 'Campaign' }}<template v-if="msg.campaignName">: {{ msg.campaignName }}</template>
+                </span>
                 <!-- Who answered: the AI agent step, a flow step, or another automation (not a person) -->
                 <span v-else-if="msg.source === 'FLOW_AI' && !msg.isInternal" class="source-badge" :title="isAr ? 'رد الموظف الذكي في سير الواتساب' : 'Reply by the AI agent of the chat flow'">
                   🤖 {{ isAr ? 'الموظف الذكي' : 'AI agent' }}
@@ -304,7 +308,7 @@
                 <span v-else-if="msg.isAutomated && !msg.isInternal && msg.direction === 'OUTBOUND'" class="source-badge" :title="isAr ? 'رسالة آلية (رد تلقائي، رسالة خارج الدوام…)' : 'Automatic message (auto reply, away message…)'">
                   <i class="fas fa-robot"></i> {{ isAr ? 'آلي' : 'Automatic' }}
                 </span>
-                <span v-if="msg.type === 'TEMPLATE'" class="template-badge">
+                <span v-if="msg.type === 'TEMPLATE' && msg.source !== 'CAMPAIGN'" class="template-badge">
                   <i class="fas fa-file-lines"></i> {{ isAr ? 'قالب' : 'Template' }}
                 </span>
                 <span v-if="msg.isInternal || msg.type === 'INTERNAL_NOTE'" class="internal-meta-badge" title="مرئية لفريق العمل فقط ولم ترسل للعميل">
@@ -1185,10 +1189,12 @@ const selectThread = async (thread) => {
 /**
  * A team member opening a conversation takes its unassigned ticket (ticket setting "when they open it").
  * The server decides atomically, so when two people open it at the same moment only one gets it.
+ * Assigned tickets are reported too: the first opening is the ticket's opening time in the reports.
  */
 const claimOnOpen = async (thread) => {
   const ticket = activeTicket.value
-  if (!mySubUserId || !ticket || ticket.assignedToId || !['OPEN', 'PENDING'].includes(ticket.status)) return
+  if (!mySubUserId || !ticket || !['OPEN', 'PENDING'].includes(ticket.status)) return
+  const lookedFree = !ticket.assignedToId
   try {
     const res = await axios.post('/api/v1/tickets/claim-on-open', { threadId: thread.id })
     const data = res.data.data || {}
@@ -1197,7 +1203,7 @@ const claimOnOpen = async (thread) => {
     const toast = { toast: true, position: 'top-end', showConfirmButton: false, timer: 2600 }
     if (data.claimed) {
       Swal.fire({ ...toast, icon: 'success', title: isAr.value ? `استلمت التذكرة ${data.ticket?.ticketNumber || ''}` : `You took ticket ${data.ticket?.ticketNumber || ''}` })
-    } else if (data.reason === 'TAKEN') {
+    } else if (data.reason === 'TAKEN' && lookedFree) {
       Swal.fire({ ...toast, icon: 'info', title: isAr.value ? `استلمها ${data.assignee?.name || 'زميل'} قبلك` : `${data.assignee?.name || 'A colleague'} took it first` })
     }
   } catch (err) {

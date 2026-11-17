@@ -1,6 +1,7 @@
 // Taking tickets: opening a conversation gives its unassigned ticket to that team member, two people
 // opening it together cannot both get it, automatic routing never overwrites someone who already took it,
-// and the pick-up time is recorded once. Prisma and Mongo are in-memory test doubles.
+// the pick-up time is recorded once, and the first opening is timed whatever the setting. Prisma and Mongo
+// are in-memory test doubles.
 const { test, beforeEach } = require('node:test');
 const assert = require('node:assert');
 const { inject, fromRoot } = require('./helpers/env');
@@ -132,6 +133,31 @@ test('opening does not take it: the owner, the "first reply" setting, or while t
   tickets[0].status = 'CLOSED';
   threadFlowState = null;
   assert.strictEqual((await call(asMember('A'))).data.reason, 'NO_TICKET');
+});
+
+test('opening is timed whatever the setting, also when routing already gave the ticket away', async () => {
+  settings = { claimOn: 'REPLY' };
+  tickets[0].assignedToId = 'B'; // routed
+  threadFlowState = { nodeId: 'ai' };
+  await call(asMember('A'));
+  assert.strictEqual(tickets[0].firstOpenedAt ?? null, null, 'not while the bot is answering');
+
+  threadFlowState = null;
+  const first = await call(asMember('A'));
+  assert.strictEqual(first.data.reason, 'TAKEN');
+  assert.ok(tickets[0].firstOpenedAt instanceof Date);
+  assert.strictEqual(tickets[0].firstOpenedById, 'A');
+
+  const openedAt = tickets[0].firstOpenedAt;
+  await call(asMember('B'));
+  assert.strictEqual(tickets[0].firstOpenedAt, openedAt, 'only the first opening counts');
+  assert.strictEqual(tickets[0].firstOpenedById, 'A');
+});
+
+test('a ticket that is not the team\'s yet is not timed', async () => {
+  tickets[0].readyAt = null; // created while a flow was answering, not handed over yet
+  await call(asMember('A'));
+  assert.strictEqual(tickets[0].firstOpenedAt ?? null, null);
 });
 
 test('the setting defaults to "when they open it" and saves only known values', () => {

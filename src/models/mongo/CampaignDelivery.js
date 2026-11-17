@@ -7,11 +7,19 @@ const CampaignDeliverySchema = new mongoose.Schema({
   tenantId: { type: String, required: true, index: true },
   campaignId: { type: String, required: true, index: true },
   targetId: { type: String, required: true },
-  status: { type: String, enum: ['sent', 'delivered', 'read', 'failed'], default: 'sent' }
+  status: { type: String, enum: ['sent', 'delivered', 'read', 'failed'], default: 'sent' },
+  // For Live Chat: campaigns do not open conversations, but when the customer replies, the campaign
+  // messages they got are added to the conversation (chat.service attachCampaignMessages)
+  channelId: { type: String, default: null },
+  phone: { type: String, default: null }, // digits only, like ChatThread.contactPhone
+  preview: { type: String, default: null }, // the template text as the customer received it
+  campaignName: { type: String, default: null },
+  inChatAt: { type: Date, default: null } // when it was added to the conversation
 }, {
   timestamps: true,
   collection: 'campaign_deliveries'
 });
+CampaignDeliverySchema.index({ tenantId: 1, channelId: 1, phone: 1, inChatAt: 1 });
 
 // Status only moves forward (sent → delivered → read); failed replaces anything but read
 CampaignDeliverySchema.statics.applyStatus = function (wamid, status) {

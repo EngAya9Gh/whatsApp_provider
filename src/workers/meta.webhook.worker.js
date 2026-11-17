@@ -64,10 +64,15 @@ async function processIncomingMessage(channelId, tenantId, payload) {
     if (t === 'button_reply') { buttonId = msg.interactive.button_reply.id; buttonText = msg.interactive.button_reply.title; }
     else if (t === 'list_reply') { buttonId = msg.interactive.list_reply.id; buttonText = msg.interactive.list_reply.title; }
     else if (t === 'nfm_reply') { buttonId = 'FLOW_SUBMIT'; buttonText = msg.interactive.nfm_reply.response_json || 'Flow Submitted'; }
-    if (buttonId) {
-      const target = await prisma.campaignTarget.findFirst({ where: { phone: { contains: from }, campaign: { tenantId } }, orderBy: { id: 'desc' } }).catch(() => null);
-      await prisma.buttonInteraction.create({ data: { tenantId, campaignId: target ? target.campaignId : 'UNKNOWN', campaignTargetId: target?.id || null, phone: from, buttonId, buttonText, interactionType: 'BUTTON' } }).catch(() => {});
-    }
+  }
+  if (msg.type === 'button') {
+    // A template's quick-reply button (the buttons of a Meta campaign)
+    buttonId = msg.button?.payload || msg.button?.text || null;
+    buttonText = msg.button?.text || msg.button?.payload || null;
+  }
+  if (buttonId) {
+    const target = await prisma.campaignTarget.findFirst({ where: { phone: { contains: from }, campaign: { tenantId } }, orderBy: { id: 'desc' } }).catch(() => null);
+    await prisma.buttonInteraction.create({ data: { tenantId, campaignId: target ? target.campaignId : 'UNKNOWN', campaignTargetId: target?.id || null, phone: from, buttonId, buttonText, interactionType: 'BUTTON' } }).catch(() => {});
   } else if (msg.type === 'text') {
     incomingText = msg.text.body;
     const target = await prisma.campaignTarget.findFirst({ where: { phone: { contains: from }, campaign: { tenantId } }, orderBy: { id: 'desc' } }).catch(() => null);

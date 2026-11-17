@@ -49,9 +49,11 @@
       <section class="card">
         <h2 class="card-title">{{ isAr ? 'السرعة' : 'Speed' }}</h2>
         <p class="card-sub">{{ isAr
-          ? 'يبدأ العدّ عندما تصبح التذكرة للفريق: عند فتحها، أو لحظة تحويل السير أو الموظف الذكي لها. الوقت الذي كان البوت يرد فيه لا يُحسب.'
-          : 'The clock starts when the ticket becomes the team\'s: when it opens, or when a flow or the AI agent hands it over. Time the bot was answering does not count.' }}</p>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          ? 'يبدأ العدّ عندما تصبح التذكرة للفريق: عند فتحها، أو لحظة تحويل السير أو الموظف الذكي لها. الوقت الذي كان البوت يرد فيه لا يُحسب. الأوقات الثلاثة تُحسب دائماً مهما كان إعداد الاستلام.'
+          : 'The clock starts when the ticket becomes the team\'s: when it opens, or when a flow or the AI agent hands it over. Time the bot was answering does not count. All three times are measured whatever the take-on setting is.' }}</p>
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+          <StatTile :label="isAr ? 'متوسط مدة الفتح' : 'Avg. time to open'" icon="far fa-eye" :value="fmt.duration(s.avgOpenMinutes)" :delta="s.openChange" :up-is-good="false"
+            :hint="s.medianOpenMinutes !== null ? (isAr ? `الوسيط ${fmt.duration(s.medianOpenMinutes)} · ${s.openedByTeamCount} تذكرة` : `median ${fmt.duration(s.medianOpenMinutes)} · ${s.openedByTeamCount} tickets`) : (isAr ? 'حتى يفتح المحادثة أول موظف' : 'until a team member first opens the chat')" />
           <StatTile :label="isAr ? 'متوسط مدة الاستلام' : 'Avg. pick-up time'" icon="fas fa-hand" :value="fmt.duration(s.avgPickupMinutes)" :delta="s.pickupChange" :up-is-good="false"
             :hint="s.medianPickupMinutes !== null ? (isAr ? `الوسيط ${fmt.duration(s.medianPickupMinutes)} · ${s.pickedCount} تذكرة` : `median ${fmt.duration(s.medianPickupMinutes)} · ${s.pickedCount} tickets`) : (isAr ? 'حتى يستلمها موظف' : 'until a team member takes it')" />
           <StatTile :label="isAr ? 'متوسط أول رد' : 'Avg. first reply'" icon="far fa-clock" :value="fmt.duration(s.avgFirstReplyMinutes)" :delta="s.firstReplyChange" :up-is-good="false"
@@ -95,6 +97,7 @@
                 <th>{{ isAr ? 'استلم' : 'Taken' }}</th>
                 <th>{{ isAr ? 'منها بالفتح' : 'By opening' }}</th>
                 <th>{{ isAr ? 'أغلق' : 'Closed' }}</th>
+                <th :title="isAr ? 'للتذاكر التي كان أول من فتحها' : 'For the tickets they were first to open'">{{ isAr ? 'مدة الفتح' : 'Time to open' }}</th>
                 <th>{{ isAr ? 'مدة الاستلام' : 'Pick-up' }}</th>
                 <th>{{ isAr ? 'أول رد' : 'First reply' }}</th>
                 <th>{{ isAr ? 'زمن الحل' : 'Resolution' }}</th>
@@ -113,6 +116,7 @@
                 <td>{{ fmt.num(a.taken) }}</td>
                 <td>{{ fmt.num(a.takenByOpening) }}</td>
                 <td>{{ fmt.num(a.closed) }}</td>
+                <td>{{ fmt.duration(a.avgOpenMinutes) }}</td>
                 <td>{{ fmt.duration(a.avgPickupMinutes) }}</td>
                 <td>{{ fmt.duration(a.avgFirstReplyMinutes) }}</td>
                 <td>{{ fmt.durationHours(a.avgResolutionHours) }}</td>

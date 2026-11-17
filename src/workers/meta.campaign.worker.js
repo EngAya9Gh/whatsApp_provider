@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const { bullConnection } = require('../config/redis');
 const { runsBackground } = require('../config/processRole');
 const { metaErrorInfo, metaErrorText } = require('../modules/meta/meta.errors');
+const { templatePreview } = require('../modules/campaign/campaign.preview');
 
 const prisma = new PrismaClient();
 const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || 'v21.0';
@@ -41,43 +42,71 @@ function classifyError(err) {
   return 'PERMANENT';
 }
 
-// Template language per channel + template, so a campaign does not ask Meta once per recipient
-const langCache = new Map();
-const LANG_CACHE_MS = 10 * 60 * 1000;
+// The approved versions (language + components) of a template per channel, so a campaign does not ask
+// Meta once per recipient
+const templateCache = new Map();
+const TEMPLATE_CACHE_MS = 10 * 60 * 1000;
+
+async function getTemplates(channel, templateName) {
+  const key = `${channel.id}:${templateName}`;
+  const cached = templateCache.get(key);
+  if (cached && cached.until > Date.now()) return cached.templates;
+  const templates = await fetchTemplates(channel, templateName);
+  templateCache.set(key, { templates, until: Date.now() + TEMPLATE_CACHE_MS });
+  return templates;
+}
+
+/** The approved versions of a template on Meta ([] when Meta cannot be asked) */
+async function fetchTemplates(channel, templateName) {
+  try {
+    if (!channel.metaWabaId || !channel.metaAccessToken) return [];
+    const res = await axios.get(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${channel.metaWabaId}/message_templates`,
+      {
+        params: { name: templateName, fields: 'name,language,status,components', limit: 20 },
+        headers: { Authorization: `Bearer ${channel.metaAccessToken}` }
+      }
+    );
+    return (res.data?.data || []).filter(t => t.name === templateName && t.status === 'APPROVED');
+  } catch (e) {
+    logger.warn(`[MetaCampaign] Failed to fetch template "${templateName}": ${e.message}`);
+    return [];
+  }
+}
 
 /**
  * Fetches the correct language code for a given template name from Meta API.
  * This avoids mismatches between what we store and what Meta actually has.
  */
 async function getTemplateLang(channel, templateName) {
-  const key = `${channel.id}:${templateName}`;
-  const cached = langCache.get(key);
-  if (cached && cached.until > Date.now()) return cached.lang;
-  const lang = await fetchTemplateLang(channel, templateName);
-  langCache.set(key, { lang, until: Date.now() + LANG_CACHE_MS });
-  return lang;
+  const lang = (await getTemplates(channel, templateName))[0]?.language;
+  if (lang) {
+    logger.info(`[MetaCampaign] Template "${templateName}" language: ${lang}`);
+    return lang;
+  }
+  logger.warn(`[MetaCampaign] Could not find approved template "${templateName}" in Meta, defaulting to 'ar'`);
+  return 'ar';
 }
 
-async function fetchTemplateLang(channel, templateName) {
+// Campaign names for the conversation badge
+const nameCache = new Map();
+async function campaignName(campaignId) {
+  if (!nameCache.has(campaignId)) {
+    if (nameCache.size > 500) nameCache.clear();
+    const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { name: true } }).catch(() => null);
+    nameCache.set(campaignId, campaign?.name || null);
+  }
+  return nameCache.get(campaignId);
+}
+
+/** What Live Chat shows if the customer replies: the template text with this recipient's values */
+async function chatPreview(channel, templateName, langCode, variables) {
   try {
-    if (!channel.metaWabaId || !channel.metaAccessToken) return 'ar';
-    const res = await axios.get(
-      `https://graph.facebook.com/${GRAPH_API_VERSION}/${channel.metaWabaId}/message_templates`,
-      {
-        params: { name: templateName, fields: 'name,language,status', limit: 5 },
-        headers: { Authorization: `Bearer ${channel.metaAccessToken}` }
-      }
-    );
-    const tpl = (res.data?.data || []).find(t => t.name === templateName && t.status === 'APPROVED');
-    if (tpl?.language) {
-      logger.info(`[MetaCampaign] Template "${templateName}" language: ${tpl.language}`);
-      return tpl.language;
-    }
-    logger.warn(`[MetaCampaign] Could not find approved template "${templateName}" in Meta, defaulting to 'ar'`);
-    return 'ar';
+    const versions = await getTemplates(channel, templateName);
+    const template = versions.find(t => t.language === langCode) || versions[0];
+    return templatePreview(template?.components, variables) || null;
   } catch (e) {
-    logger.warn(`[MetaCampaign] Failed to fetch template language: ${e.message}, defaulting to 'ar'`);
-    return 'ar';
+    return null;
   }
 }
 
@@ -147,10 +176,17 @@ async function processJob(job) {
     });
 
     // Track delivered / read for campaign analytics (Meta status webhooks update it by wamid)
+    // …and what to add to the Live Chat conversation if the customer replies
     if (wamid) {
       const CampaignDelivery = require('../models/mongo/CampaignDelivery');
-      await CampaignDelivery.create({ wamid, tenantId, campaignId, targetId, status: 'sent' })
-        .catch(e => logger.warn(`[MetaCampaign] Could not record delivery tracking: ${e.message}`));
+      const [preview, name] = await Promise.all([
+        chatPreview(channel, templateName, langCode, variables),
+        campaignName(campaignId).catch(() => null)
+      ]);
+      await CampaignDelivery.create({
+        wamid, tenantId, campaignId, targetId, status: 'sent',
+        channelId, phone: String(phone).replace(/\D/g, ''), preview, campaignName: name
+      }).catch(e => logger.warn(`[MetaCampaign] Could not record delivery tracking: ${e.message}`));
     }
 
     logger.info(`[MetaCampaign] Message sent to ${phone} for campaign ${campaignId}. WAMID: ${wamid}`);

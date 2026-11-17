@@ -408,6 +408,10 @@ model Ticket {
   // How it was first taken: OPEN (opened the chat), REPLY (first reply), ROUTING (team rules),
   // MANUAL (someone assigned it), SELF ("take" button), FLOW (a flow's hand-off to one agent)
   assignedVia     String?   @map("assigned_via") @db.VarChar(10)
+  // First time a team member looked at it after it was ready (opened the chat, or replied), whatever the
+  // "take on open / on first reply" setting: opening time = firstOpenedAt - readyAt
+  firstOpenedAt   DateTime? @map("first_opened_at")
+  firstOpenedById String?   @map("first_opened_by_id")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 

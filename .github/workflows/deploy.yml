@@ -112,7 +112,7 @@ jobs:
             cd ..
 
             echo "7. Restarting Node.js Server..."
-            pm2 restart whatsapp-api || pm2 start src/server.js --name whatsapp-api
-            # Background worker process, if it was started from ecosystem.config.js
-            if pm2 describe whatsapp-worker > /dev/null 2>&1; then pm2 restart whatsapp-worker; fi
+            # The API and the background worker as two processes (ecosystem.config.js): starts what is missing,
+            # restarts the rest with its PROCESS_ROLE. Safe on every deploy, so it stays here.
+            pm2 startOrRestart ecosystem.config.js --update-env
             pm2 save

@@ -91,6 +91,7 @@ const VIA_KEYS = ['OPEN', 'REPLY', 'ROUTING', 'MANUAL', 'SELF', 'FLOW'];
 const PEOPLE_PICKUPS = ['OPEN', 'REPLY', 'SELF', 'MANUAL'];
 const pickupMs = (t) => (t.firstAssignedAt && t.readyAt ? Math.max(0, t.firstAssignedAt - t.readyAt) : null);
 const firstReplyMs = (t) => (t.firstResponseAt ? Math.max(0, t.firstResponseAt - (t.readyAt || t.createdAt)) : null);
+const openMs = (t) => (t.firstOpenedAt && t.readyAt ? Math.max(0, t.firstOpenedAt - t.readyAt) : null);
 
 class AnalyticsService {
   // ═══════════════════════════════════════════════════════════
@@ -406,6 +407,8 @@ class AnalyticsService {
   // Tickets: how fast they are taken and answered, and by whom
   // ═══════════════════════════════════════════════════════════
   /**
+   * opening      ready → a team member first opened the conversation (or replied), whatever the
+   *              take-on setting, and also when routing had already assigned it
    * pick-up      ready (opened, or handed over by a flow) → first taken by a team member
    *              (opening the chat, first reply, "take", or assigned by hand; automatic routing is instant
    *              and is shown in "how tickets were taken" instead)
@@ -425,12 +428,12 @@ class AnalyticsService {
     const scope = { tenantId, channelId: { in: channelIds } };
     const select = {
       id: true, status: true, createdAt: true, resolvedAt: true, rating: true, assignedToId: true, categoryId: true,
-      readyAt: true, firstAssignedAt: true, assignedVia: true, firstResponseAt: true
+      readyAt: true, firstAssignedAt: true, assignedVia: true, firstResponseAt: true, firstOpenedAt: true, firstOpenedById: true
     };
 
     const [tickets, active, members, onShift, categories] = await Promise.all([
       prisma.ticket.findMany({
-        where: { ...scope, OR: [{ createdAt: { gte: prevStart } }, { resolvedAt: { gte: prevStart } }, { firstAssignedAt: { gte: prevStart } }, { firstResponseAt: { gte: prevStart } }] },
+        where: { ...scope, OR: [{ createdAt: { gte: prevStart } }, { resolvedAt: { gte: prevStart } }, { firstAssignedAt: { gte: prevStart } }, { firstOpenedAt: { gte: prevStart } }, { firstResponseAt: { gte: prevStart } }] },
         select,
         take: MAX_ROWS
       }),
@@ -445,10 +448,14 @@ class AnalyticsService {
       const closed = list.filter(t => between(t.resolvedAt, from, to));
       const picked = list.filter(t => between(t.firstAssignedAt, from, to) && PEOPLE_PICKUPS.includes(t.assignedVia)).map(pickupMs).filter(ms => ms !== null);
       const replied = list.filter(t => between(t.firstResponseAt, from, to)).map(firstReplyMs).filter(ms => ms !== null);
+      const looked = list.filter(t => between(t.firstOpenedAt, from, to)).map(openMs).filter(ms => ms !== null);
       const rated = closed.filter(t => t.rating);
       return {
         opened: opened.length,
         closed: closed.length,
+        openedByTeamCount: looked.length,
+        avgOpenMinutes: minutes(avg(looked)),
+        medianOpenMinutes: minutes(median(looked)),
         pickedCount: picked.length,
         avgPickupMinutes: minutes(avg(picked)),
         medianPickupMinutes: minutes(median(picked)),
@@ -475,6 +482,8 @@ class AnalyticsService {
     const agents = members.map(member => {
       const mine = tickets.filter(t => t.assignedToId === member.id);
       const s = statsOf(mine, start, end);
+      // Opening is theirs when they were the first to open it, whoever got the ticket
+      const looked = tickets.filter(t => t.firstOpenedById === member.id && between(t.firstOpenedAt, start, end)).map(openMs).filter(ms => ms !== null);
       return {
         id: member.id,
         name: member.name,
@@ -483,6 +492,8 @@ class AnalyticsService {
         openNow: active.filter(t => t.assignedToId === member.id).length,
         taken: mine.filter(t => between(t.firstAssignedAt, start, end)).length,
         takenByOpening: mine.filter(t => between(t.firstAssignedAt, start, end) && t.assignedVia === 'OPEN').length,
+        openedFirst: looked.length,
+        avgOpenMinutes: minutes(avg(looked)),
         closed: s.closed,
         avgPickupMinutes: s.avgPickupMinutes,
         avgFirstReplyMinutes: s.avgFirstReplyMinutes,
@@ -513,6 +524,7 @@ class AnalyticsService {
         ...cur,
         openedChange: delta(cur.opened, prev.opened),
         closedChange: delta(cur.closed, prev.closed),
+        openChange: delta(cur.avgOpenMinutes, prev.avgOpenMinutes),
         pickupChange: delta(cur.avgPickupMinutes, prev.avgPickupMinutes),
         firstReplyChange: delta(cur.avgFirstReplyMinutes, prev.avgFirstReplyMinutes),
         resolutionChange: delta(cur.avgResolutionHours, prev.avgResolutionHours),
@@ -526,7 +538,7 @@ class AnalyticsService {
       byCategory,
       daily: Object.values(daily),
       // Pick-up times exist for tickets handled after this report was added
-      tracked: tickets.some(t => t.firstAssignedAt) || active.some(t => t.firstAssignedAt),
+      tracked: [...tickets, ...active].some(t => t.firstAssignedAt || t.firstOpenedAt),
       truncated: tickets.length >= MAX_ROWS
     };
   }
@@ -635,5 +647,5 @@ class AnalyticsService {
 
 module.exports = new AnalyticsService();
 module.exports.responseTimes = responseTimes;
-module.exports.ticketTiming = { pickupMs, firstReplyMs };
+module.exports.ticketTiming = { pickupMs, firstReplyMs, openMs };
 module.exports.dateKeys = dateKeys;

@@ -77,8 +77,8 @@
           </label>
         </div>
         <p class="note"><i class="fas fa-circle-info"></i>{{ isAr
-          ? 'ينطبق على أعضاء الفريق فقط؛ صاحب الحساب لا تُسند له تذاكر. وتُحسب «مدة الاستلام» في تحليلات التذاكر من لحظة جاهزية التذكرة (أو تحويل السير لها) حتى استلامها.'
-          : 'Applies to team members only; the account owner is not assigned tickets. "Pick-up time" in ticket analytics runs from when the ticket was ready (or the flow handed it over) until it was taken.' }}</p>
+          ? 'هذا الإعداد يحدد لحظة انتقال التذكرة إلى الموظف فقط، ولا يغيّر ما يُقاس: تحليلات التذاكر تحسب دائماً «مدة الفتح» (حتى يفتحها أول موظف) و«مدة الاستلام» و«أول رد»، كلها من لحظة جاهزية التذكرة أو تحويل السير لها. ينطبق على أعضاء الفريق فقط؛ صاحب الحساب لا تُسند له تذاكر.'
+          : 'This only sets the moment the ticket becomes the agent\'s; it does not change what is measured. Ticket analytics always measures "time to open" (until a team member first opens it), "pick-up time" and "first reply", all from when the ticket was ready or the flow handed it over. Applies to team members only; the account owner is not assigned tickets.' }}</p>
       </section>
 
       <!-- 3. Customer writes again after a close -->
