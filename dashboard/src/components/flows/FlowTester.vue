@@ -44,6 +44,7 @@
             <span v-if="m.retry" class="retry-label">{{ isAr ? 'أعاد السؤال: الرد لم يطابق أي خيار' : 'Asked again: the reply matched no option' }}</span>
             {{ m.text }}
           </div>
+          <a v-if="m.url" :href="m.url" target="_blank" rel="noopener noreferrer" class="wa-btn wa-link"><i class="fas fa-arrow-up-right-from-square"></i> {{ m.buttonText }}</a>
           <template v-if="m.options">
             <template v-if="m.options.length <= 3">
               <button v-for="o in m.options" :key="o.id" type="button" class="wa-btn" :disabled="!isLastQuestion(i) || sending" @click="send({ text: o.title, interactiveId: o.id })">{{ o.title }}</button>
@@ -152,6 +153,7 @@ function toMessage(r) {
   switch (r.kind) {
     case 'text': return { from: 'bot', text: r.text, ai: r.ai }
     case 'question': return { from: 'bot', text: r.text, options: r.options, buttonLabel: r.buttonLabel, retry: r.retry, open: false }
+    case 'link': return { from: 'bot', text: r.text, url: r.url, buttonText: r.buttonText }
     case 'note': return { from: 'sys', tone: 'note', icon: 'fas fa-note-sticky', text: ar(`ملاحظة داخلية للفريق: ${r.text}`, `Team note: ${r.text}`) }
     case 'tag': {
       const name = props.tagMap[r.tagId]?.name || '—'
@@ -275,6 +277,7 @@ defineExpose({ reset })
 .retry-label { display: block; font-size: 10.5px; font-weight: 700; color: #b45309; margin-bottom: 2px; }
 .wa-btn { background: white; border: none; border-radius: 10px; padding: 6px 10px; font-size: 12px; color: #0a7cff; font-weight: 600; text-align: center; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06); cursor: pointer; }
 .wa-btn:disabled { color: #94a3b8; cursor: default; }
+.wa-link { text-decoration: none; display: block; }
 .wa-btn:not(:disabled):hover { background: #f0f7ff; }
 .wa-list { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06); display: flex; flex-direction: column; }
 .wa-list button { border: none; background: none; padding: 7px 10px; font-size: 12px; text-align: start; border-bottom: 1px solid #f1f5f9; cursor: pointer; color: #111827; }

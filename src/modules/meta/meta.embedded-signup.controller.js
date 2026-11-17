@@ -139,6 +139,16 @@ exports.exchangeCode = async (req, res, next) => {
       ? { isCoexistence: true, coexOnboardedAt: new Date(), coexHistoryMonths: coexistence.normalizeHistoryMonths(history_months), coexSync: coexistence.initialCoexSync() }
       : { isCoexistence: false };
 
+    // A new number must fit the plan's numbers + bought add-ons (no limit unless the admin set one)
+    if (!existing) {
+      try {
+        await require('../billing/addon.service').assertCanAdd(tenantId, 'NUMBERS');
+      } catch (limitErr) {
+        if (limitErr.code === 'LIMIT_REACHED') return res.status(402).json({ success: false, code: limitErr.code, message: limitErr.message });
+        throw limitErr;
+      }
+    }
+
     const channel = existing
       ? await prisma.whatsAppChannel.update({
           where: { id: existing.id },

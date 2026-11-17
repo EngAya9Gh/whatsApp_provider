@@ -37,6 +37,11 @@
       <template v-else-if="type === 'question'">
         <div class="clamp mb">{{ data.text || placeholder }}</div>
       </template>
+      <template v-else-if="type === 'link'">
+        <div class="clamp">{{ data.text || placeholder }}</div>
+        <div class="link-btn" dir="auto"><i class="fas fa-arrow-up-right-from-square"></i> {{ data.buttonText || (ctx.isAr.value ? 'نص الزر' : 'Button text') }}</div>
+        <div class="link-url" dir="ltr">{{ linkHost }}</div>
+      </template>
       <template v-else-if="type === 'condition'">{{ conditionSummary }}</template>
       <template v-else-if="type === 'tag'">
         {{ data.action === 'REMOVE' ? (ctx.isAr.value ? 'إزالة' : 'Remove') : (ctx.isAr.value ? 'إضافة' : 'Add') }}
@@ -136,6 +141,10 @@ const branches = computed(() => {
   return []
 })
 
+const linkHost = computed(() => {
+  try { return new URL(props.data.url).hostname || '' } catch { return '' }
+})
+
 const conditionSummary = computed(() => {
   const check = CONDITION_CHECKS.find(c => c.key === props.data.check)
   if (!check) return '—'
@@ -214,6 +223,9 @@ const conditionSummary = computed(() => {
 .fnode-body strong { color: #0f172a; }
 .sample { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 4px; padding: 1px 7px; border-radius: 999px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
 .sample i { font-size: 9px; }
+.link-btn { margin-top: 6px; padding: 5px 8px; border-radius: 8px; background: #ecfeff; color: #0e7490; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.link-btn i { font-size: 10px; }
+.link-url { margin-top: 3px; font-size: 10.5px; color: #94a3b8; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .mb { margin-bottom: 2px; }
 .fnode-branches { border-top: 1px solid #f1f5f9; padding: 4px 0; }

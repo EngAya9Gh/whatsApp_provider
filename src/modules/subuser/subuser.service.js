@@ -150,6 +150,8 @@ class SubUserService {
 
     const existing = await prisma.subUser.findUnique({ where: { email } });
     if (existing) throw { status: 409, message: 'Email already in use' };
+    // Team members included in the plan + bought add-ons (no limit unless the admin set one)
+    await require('../billing/addon.service').assertCanAdd(tenantId, 'USERS');
 
     // التحقق من أن الـ channel تابع لنفس الـ tenant
     if (channelId) {
@@ -239,6 +241,9 @@ class SubUserService {
       });
       if (!channel) throw { status: 400, message: 'Channel not found or does not belong to this account' };
     }
+
+    // Turning a disabled member back on uses a seat again
+    if (data.isActive === true && existing.isActive === false) await require('../billing/addon.service').assertCanAdd(tenantId, 'USERS');
 
     const updateData = {};
     if (data.name !== undefined)        updateData.name = data.name;

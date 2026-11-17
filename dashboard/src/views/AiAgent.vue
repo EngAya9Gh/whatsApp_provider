@@ -74,6 +74,19 @@
             <b>{{ fmtNum(usage.inputTokens + usage.outputTokens) }}</b> {{ isAr ? 'توكن' : 'tokens' }}
           </div>
         </div>
+        <div v-if="usage.quota && !usage.quota.ownKey && usage.quota.limit !== null" class="quota">
+          <div class="quota-row">
+            <span>{{ isAr ? 'حصتك الشهرية من الذكاء الاصطناعي' : 'Your monthly AI quota' }}</span>
+            <b>{{ fmtNum(usage.quota.used) }} / {{ fmtNum(usage.quota.limit) }} {{ isAr ? 'توكن' : 'tokens' }}</b>
+          </div>
+          <div class="quota-bar"><span :class="usage.quota.percent >= 100 ? 'full' : usage.quota.percent >= 80 ? 'warn' : 'ok'" :style="{ width: usage.quota.percent + '%' }"></span></div>
+          <p v-if="usage.quota.percent >= 80" class="quota-note" :class="{ full: usage.quota.percent >= 100 }">
+            {{ usage.quota.percent >= 100
+              ? (isAr ? 'انتهت الحصة: الموظف الذكي يحوّل المحادثات لفريقك حتى بداية الشهر. أضف مفتاح Gemini خاصاً بك من الإعدادات ليعمل بلا حد.' : 'Quota used up: the agent hands chats to your team until next month. Add your own Gemini key in Settings to keep it running.')
+              : (isAr ? 'اقتربت من نهاية الحصة.' : 'You are close to the end of your quota.') }}
+          </p>
+        </div>
+        <p v-else-if="usage.quota?.ownKey" class="card-sub mt-2 mb-0"><i class="fas fa-key text-[#16a34a]"></i> {{ isAr ? 'تستخدم مفتاح Gemini الخاص بك: لا حد من جهتنا (الاستهلاك على حسابك في Google).' : 'You use your own Gemini key: no limit from us (billed by Google).' }}</p>
         <div v-if="usage.byFeature.length" class="usage-grid">
           <div v-for="f in usage.byFeature" :key="f.feature" class="usage-item">
             <div class="usage-name">{{ featureName(f.feature) }}</div>
@@ -390,6 +403,16 @@ onMounted(async () => {
 .usage-total { font-size: 0.85rem; color: #475569; white-space: nowrap; }
 .usage-total b { color: #0f172a; font-size: 1.05rem; }
 .usage-total span { margin: 0 6px; color: #cbd5e1; }
+.quota { margin-top: 14px; }
+.quota-row { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; color: #475569; flex-wrap: wrap; }
+.quota-row b { color: #0f172a; }
+.quota-bar { height: 8px; background: #f1f5f9; border-radius: 999px; overflow: hidden; margin-top: 6px; }
+.quota-bar span { display: block; height: 100%; border-radius: 999px; }
+.quota-bar .ok { background: #16a34a; }
+.quota-bar .warn { background: #f59e0b; }
+.quota-bar .full { background: #dc2626; }
+.quota-note { font-size: 0.75rem; color: #b45309; margin: 6px 0 0; }
+.quota-note.full { color: #b91c1c; }
 .usage-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
 .usage-item { border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px 12px; background: #fcfcfd; }
 .usage-name { font-size: 0.75rem; font-weight: 700; color: #64748b; }

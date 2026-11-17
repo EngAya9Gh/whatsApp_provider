@@ -149,6 +149,15 @@ function readAnswer(data, schema) {
 async function generate(tenantId, { system, contents, schema = null, temperature = 0.3, maxOutputTokens = 1024, feature = 'other' }) {
   const { key: apiKey, shared } = await resolveKey(tenantId);
   if (!apiKey) throw new AiNotConfiguredError();
+  // The platform key has a monthly quota per plan / account (ai.quota.js). If the check itself fails, AI still works.
+  if (shared) {
+    try {
+      await require('./ai.quota').assertWithinQuota(tenantId);
+    } catch (err) {
+      if (err.code === 'AI_QUOTA_EXCEEDED') throw err;
+      logger.warn(`[AI] Quota check failed, letting the request through: ${err.message}`);
+    }
+  }
 
   const body = {
     contents: contents.map(c => ({ role: c.role, parts: [{ text: c.text }] })),

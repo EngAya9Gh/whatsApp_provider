@@ -6,7 +6,8 @@ const TYPES = {
   ADMIN_DEDUCTION: 'ADMIN_DEDUCTION',   // money removed by an admin
   ADMIN_SET: 'ADMIN_SET',               // balance set to a value by an admin
   CAMPAIGN_CHARGE: 'CAMPAIGN_CHARGE',   // campaign cost, charged when the campaign is created
-  REFUND: 'REFUND'                      // a charge handed back
+  REFUND: 'REFUND',                     // a charge handed back
+  REFERRAL_REWARD: 'REFERRAL_REWARD'    // an invited account paid its first invoice (referral.service.js)
 };
 
 const round = (n) => Math.round(n * 10000) / 10000;

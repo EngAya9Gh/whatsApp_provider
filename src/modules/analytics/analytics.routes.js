@@ -23,5 +23,7 @@ router.use(requirePermission('can_view_analytics'));
 
 router.get('/meta', requireAnyFeature(META_FEATURES, 'Meta'), analyticsController.getMeta.bind(analyticsController));
 router.get('/qr', requireAnyFeature(QR_FEATURES, 'QR'), analyticsController.getQr.bind(analyticsController));
+// Tickets live in Live Chat on Meta numbers
+router.get('/tickets', requireAnyFeature(['LIVE_CHAT', ...META_FEATURES], 'ticket'), analyticsController.getTickets.bind(analyticsController));
 
 module.exports = router;

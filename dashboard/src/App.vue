@@ -49,6 +49,12 @@
           <span v-if="teamUnread > 0" class="nav-count">{{ teamUnread > 99 ? '99+' : teamUnread }}</span>
         </router-link>
 
+        <router-link v-if="!isSubUser || subUserPerms?.can_view_live_chat" to="/tasks" class="nav-item" active-class="active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span class="nav-text">{{ isAr ? 'المهام' : 'Tasks' }}</span>
+          <span v-if="taskBadge.open > 0" class="nav-count" :style="taskBadge.overdue ? 'background:#dc2626' : ''" :title="taskBadge.overdue ? (isAr ? `${taskBadge.overdue} متأخرة` : `${taskBadge.overdue} late`) : ''">{{ taskBadge.open > 99 ? '99+' : taskBadge.open }}</span>
+        </router-link>
+
         <router-link v-if="!isSubUser || subUserPerms?.can_manage_contacts" to="/contacts" class="nav-item" active-class="active">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
           <span class="nav-text">{{ isAr ? 'جهات الاتصال' : 'Contacts' }}</span>
@@ -65,11 +71,15 @@
         </router-link>
 
         <!-- TICKETS -->
-        <template v-if="!isSubUser || subUserPerms?.can_view_live_chat || subUserPerms?.can_manage_settings">
+        <template v-if="!isSubUser || subUserPerms?.can_view_live_chat || subUserPerms?.can_manage_settings || subUserPerms?.can_view_analytics">
           <div class="nav-section-title mt-4">{{ isAr ? 'التذاكر' : 'Tickets' }}</div>
           <router-link v-if="!isSubUser || subUserPerms?.can_view_live_chat" to="/tickets" class="nav-item" active-class="active">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5v2"/><path d="M15 11v2"/><path d="M15 17v2"/><path d="M5 5h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7a2 2 0 0 1 2-2z"/></svg>
             <span class="nav-text">{{ isAr ? 'كل التذاكر' : 'All Tickets' }}</span>
+          </router-link>
+          <router-link v-if="!isSubUser || subUserPerms?.can_view_analytics" to="/analytics/tickets" class="nav-item" active-class="active">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+            <span class="nav-text">{{ isAr ? 'تحليلات التذاكر' : 'Ticket Analytics' }}</span>
           </router-link>
           <router-link v-if="!isSubUser || subUserPerms?.can_manage_settings" to="/ticket-categories" class="nav-item" active-class="active">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
@@ -290,6 +300,15 @@ const logout = () => {
   window.location.href = '/login'
 }
 
+// ─── My open tasks badge (red when some are late) ──────────────
+const taskBadge = ref({ open: 0, overdue: 0 })
+const fetchTaskBadge = async () => {
+  if (!localStorage.getItem('token')) return
+  try { taskBadge.value = (await axios.get('/api/v1/tasks/summary')).data.data } catch { /* best-effort */ }
+}
+window.addEventListener('tasks-updated', fetchTaskBadge)
+setInterval(fetchTaskBadge, 5 * 60 * 1000)
+
 // ─── Team chat unread badge ───────────────────────────────────
 const teamUnread = ref(0)
 let unreadTimer = null
@@ -323,6 +342,7 @@ onMounted(async () => {
         localStorage.setItem('tenant', JSON.stringify(res.data.data))
         loadTenant()
         startTeamBadge()
+        fetchTaskBadge()
       }
     } catch (e) {
       if (e.response && e.response.status === 401) {

@@ -48,9 +48,12 @@ async function tenantUsage(tenantId, month) {
     .map(feature => ({ feature, ...totals(rows.filter(r => r.feature === feature || (feature === 'other' && !FEATURES.includes(r.feature)))) }))
     .filter(f => f.requests > 0);
   const shared = totals(rows.filter(r => r.sharedKey));
+  // The quota is monthly: only shown for the current month
+  const quota = range.month === monthRange().month ? await require('./ai.quota').quotaFor(tenantId) : null;
   return {
     month: range.month,
     ...totals(rows),
+    quota,
     byFeature,
     shared: { ...shared, estimatedCostUsd: costOf(p, shared.inputTokens, shared.outputTokens) }
   };
@@ -68,11 +71,14 @@ async function platformUsage(month) {
   const p = await prices();
   const ids = [...new Set(rows.map(r => r.tenantId))];
   const tenants = ids.length
-    ? await prisma.tenant.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, email: true, plan: true } })
+    ? await prisma.tenant.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, email: true, plan: true, customFeatures: true } })
     : [];
+  const quota = require('./ai.quota');
+  const plans = await quota.planQuotas();
+  const current = range.month === monthRange().month;
   const byId = new Map(tenants.map(t => [t.id, t]));
 
-  const list = ids.map(id => {
+  const list = (await Promise.all(ids.map(async id => {
     const mine = rows.filter(r => r.tenantId === id);
     const shared = totals(mine.filter(r => r.sharedKey));
     const own = totals(mine.filter(r => !r.sharedKey));
@@ -83,15 +89,17 @@ async function platformUsage(month) {
       email: t?.email || null,
       plan: t?.plan || null,
       shared: { ...shared, estimatedCostUsd: costOf(p, shared.inputTokens, shared.outputTokens) },
-      own
+      own,
+      quota: current && t ? await quota.quotaFor(id, { tenant: t, plans }) : null
     };
-  }).sort((a, b) => (b.shared.inputTokens + b.shared.outputTokens) - (a.shared.inputTokens + a.shared.outputTokens)
+  }))).sort((a, b) => (b.shared.inputTokens + b.shared.outputTokens) - (a.shared.inputTokens + a.shared.outputTokens)
     || (b.own.requests - a.own.requests));
 
   const shared = totals(rows.filter(r => r.sharedKey));
   return {
     month: range.month,
     pricesSet: p.input !== null && p.output !== null,
+    planQuotas: plans,
     sharedKeyConfigured: !!process.env.GEMINI_API_KEY,
     totals: { ...totals(rows), shared: { ...shared, estimatedCostUsd: costOf(p, shared.inputTokens, shared.outputTokens) } },
     tenants: list

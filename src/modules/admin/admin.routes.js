@@ -69,6 +69,39 @@ router.get('/tenants/:id/impersonations', adminAuth, async (req, res, next) => {
     next(error);
   }
 });
+// Coupons for subscription invoices, and referrals
+const sendErr = (res, next) => (err) => (err.status ? res.status(err.status).json({ success: false, message: err.message }) : next(err));
+router.get('/coupons', adminAuth, (req, res, next) => require('../billing/coupon.service').listCoupons().then(data => res.json({ success: true, data })).catch(sendErr(res, next)));
+router.post('/coupons', adminAuth, (req, res, next) => require('../billing/coupon.service').createCoupon(req.body || {}).then(data => res.json({ success: true, data })).catch(sendErr(res, next)));
+router.patch('/coupons/:id', adminAuth, (req, res, next) => require('../billing/coupon.service').setActive(req.params.id, req.body?.isActive).then(data => res.json({ success: true, data })).catch(sendErr(res, next)));
+router.get('/referrals', adminAuth, (req, res, next) => require('../billing/referral.service').listAll().then(data => res.json({ success: true, data })).catch(sendErr(res, next)));
+router.put('/referral-settings', adminAuth, async (req, res, next) => {
+  try {
+    const raw = req.body?.rewardAmount;
+    const amount = raw === '' || raw === null || raw === undefined ? null : Number(raw);
+    if (amount !== null && !(amount >= 0)) return res.status(400).json({ success: false, message: 'The reward must be 0 or more' });
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    const settings = await prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } });
+    const data = { ...(settings?.data || {}), referralRewardAmount: amount };
+    await prisma.systemSetting.upsert({ where: { id: 'GLOBAL' }, update: { data }, create: { id: 'GLOBAL', data } });
+    res.json({ success: true, data: { rewardAmount: amount } });
+  } catch (error) { next(error); }
+});
+
+// Add-ons of one account (extra team members / numbers) and cancelling one
+router.get('/tenants/:id/addons', adminAuth, (req, res, next) => Promise.all([require('../billing/addon.service').limits(req.params.id), require('../billing/addon.service').list(req.params.id)])
+  .then(([limits, purchases]) => res.json({ success: true, data: { limits, purchases } })).catch(sendErr(res, next)));
+router.post('/addons/:id/cancel', adminAuth, (req, res, next) => require('../billing/addon.service').cancel(req.params.id).then(data => res.json({ success: true, data })).catch(sendErr(res, next)));
+
+// Monthly AI quota per plan on the shared key, in tokens ({ FREE: 50000, PRO: null = no limit, … })
+router.put('/ai-quotas', adminAuth, async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await require('../ai/ai.quota').savePlanQuotas(req.body || {}) });
+  } catch (error) {
+    next(error);
+  }
+});
 router.get('/tenants', adminAuth, adminController.getTenants.bind(adminController));
 router.get('/tenants/:id', adminAuth, adminController.getTenantById.bind(adminController));
 router.put('/tenants/:id/plan', adminAuth, adminController.updatePlan.bind(adminController));

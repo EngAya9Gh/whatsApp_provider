@@ -79,6 +79,52 @@
       </div>
     </div>
 
+    <!-- Plan limits and add-ons (shown when the plan has a limit or an add-on is for sale) -->
+    <div v-if="addonCards.length" class="plan-card">
+      <h3>{{ isAr ? 'الموظفون والأرقام' : 'Team members & numbers' }}</h3>
+      <div class="addon-grid">
+        <div v-for="c in addonCards" :key="c.kind" class="addon-box">
+          <div class="addon-name">{{ c.name }}</div>
+          <div class="addon-used"><b>{{ c.used }}</b> / {{ c.limit === null ? (isAr ? 'بلا حد' : 'no limit') : c.limit }}</div>
+          <div class="addon-sub">{{ isAr ? 'من الباقة' : 'In the plan' }}: {{ c.included === null ? '∞' : c.included }}<template v-if="c.extra"> · {{ isAr ? 'إضافات' : 'add-ons' }}: {{ c.extra }}</template></div>
+          <template v-if="c.price !== null && isOwner">
+            <div class="addon-buy">
+              <input v-model.number="addonQty[c.kind]" type="number" min="1" max="20" />
+              <button type="button" :disabled="buying" @click="quoteAddon(c.kind)">{{ isAr ? 'شراء' : 'Buy' }}</button>
+            </div>
+            <div class="addon-sub">{{ money(c.price) }} {{ isAr ? 'ريال شهرياً + الضريبة' : 'SAR / month + VAT' }}</div>
+          </template>
+        </div>
+      </div>
+      <div v-if="addonQuote" class="addon-quote">
+        <p>{{ isAr
+          ? `${addonQuote.quantity} × ${addonQuote.kind === 'USERS' ? 'موظف إضافي' : 'رقم إضافي'} لبقية هذا الشهر (${addonQuote.firstPeriod.daysLeft} من ${addonQuote.firstPeriod.daysInMonth} يوم): ${money(addonQuote.subtotal)} + ضريبة ${money(addonQuote.tax)} = ${money(addonQuote.total)} ريال. تصلك فاتورة، وتتفعّل الإضافة بعد الدفع. بعدها تُضاف لفاتورتك الشهرية.`
+          : `${addonQuote.quantity} × extra ${addonQuote.kind === 'USERS' ? 'team member' : 'number'} for the rest of this month (${addonQuote.firstPeriod.daysLeft}/${addonQuote.firstPeriod.daysInMonth} days): ${money(addonQuote.subtotal)} + VAT ${money(addonQuote.tax)} = ${money(addonQuote.total)} SAR. You get an invoice; the add-on turns on once it is paid, then joins your monthly invoice.` }}</p>
+        <div class="addon-actions">
+          <button type="button" class="ghost" @click="addonQuote = null">{{ isAr ? 'إلغاء' : 'Cancel' }}</button>
+          <button type="button" :disabled="buying" @click="buyAddon">{{ buying ? '…' : (isAr ? 'أنشئ الفاتورة' : 'Create the invoice') }}</button>
+        </div>
+      </div>
+      <p v-if="addonMsg" class="addon-msg">{{ addonMsg }}</p>
+    </div>
+
+    <!-- Invite a friend (shown when the admin set a referral reward) -->
+    <div v-if="referral?.enabled" class="plan-card invite-card">
+      <h3>{{ isAr ? 'ادعُ صديقاً واكسب' : 'Invite a friend and earn' }} <span dir="ltr">{{ money(referral.rewardAmount) }}</span> {{ isAr ? 'ريال' : 'SAR' }}</h3>
+      <p class="invite-sub">{{ isAr
+        ? 'شارك رابطك. لما يسجّل صديقك منه ويدفع أول فاتورة له، يُضاف المبلغ لمحفظتك تلقائياً.'
+        : 'Share your link. When a friend signs up with it and pays their first invoice, the amount is added to your wallet.' }}</p>
+      <div class="invite-row">
+        <input :value="referral.link" readonly dir="ltr" class="invite-link" @focus="$event.target.select()" />
+        <button type="button" class="invite-copy" @click="copyInvite">{{ copied ? (isAr ? 'تم النسخ ✓' : 'Copied ✓') : (isAr ? 'نسخ الرابط' : 'Copy link') }}</button>
+      </div>
+      <div class="invite-stats">
+        <span>{{ isAr ? 'سجّلوا من رابطك:' : 'Signed up:' }} <b>{{ referral.invited }}</b></span>
+        <span>{{ isAr ? 'دفعوا:' : 'Paid:' }} <b>{{ referral.rewarded }}</b></span>
+        <span>{{ isAr ? 'ربحت:' : 'Earned:' }} <b dir="ltr">{{ money(referral.earned) }}</b> {{ isAr ? 'ريال' : 'SAR' }}</span>
+      </div>
+    </div>
+
     <div class="plan-card" style="margin-top: 2rem; max-width: 800px;">
       <h3>{{ isAr ? 'فواتيرك' : 'Your Invoices' }}</h3>
       <table class="invoices-table" v-if="invoices.length > 0">
@@ -103,6 +149,16 @@
             </td>
             <td>
               <router-link :to="`/invoice/${inv.id}`" class="view-link" target="_blank">{{ isAr ? 'عرض الإيصال' : 'View Receipt' }}</router-link>
+              <template v-if="canApplyCoupon(inv)">
+                <button v-if="couponFor !== inv.id" type="button" class="coupon-link" @click="openCoupon(inv.id)">{{ isAr ? 'عندك كوبون؟' : 'Have a coupon?' }}</button>
+                <form v-else class="coupon-form" @submit.prevent="applyCoupon(inv)">
+                  <input v-model.trim="couponCode" dir="ltr" maxlength="40" :placeholder="isAr ? 'رمز الكوبون' : 'Coupon code'" required />
+                  <button type="submit" :disabled="applying">{{ applying ? '…' : (isAr ? 'تطبيق' : 'Apply') }}</button>
+                  <button type="button" class="ghost" @click="couponFor = null">✕</button>
+                </form>
+              </template>
+              <span v-else-if="hasCoupon(inv)" class="coupon-done">✓ {{ isAr ? 'تم تطبيق كوبون' : 'Coupon applied' }}</span>
+              <div v-if="couponFor === inv.id && couponError" class="coupon-err">{{ couponError }}</div>
             </td>
           </tr>
         </tbody>
@@ -137,6 +193,7 @@ const typeLabels = computed(() => ({
   TOP_UP: isAr.value ? 'شحن رصيد' : 'Top-up',
   CAMPAIGN_CHARGE: isAr.value ? 'تكلفة حملة' : 'Campaign charge',
   REFUND: isAr.value ? 'استرجاع' : 'Refund',
+  REFERRAL_REWARD: isAr.value ? 'مكافأة دعوة صديق' : 'Referral reward',
   ADMIN_DEDUCTION: isAr.value ? 'خصم من الإدارة' : 'Admin deduction',
   ADMIN_SET: isAr.value ? 'تعديل الرصيد' : 'Balance adjustment'
 }))
@@ -190,7 +247,83 @@ onMounted(async () => {
   } catch (err) {
     console.error('Failed to load invoices')
   }
+
+  try {
+    referral.value = (await axios.get('/api/billing/referral')).data.data
+  } catch { referral.value = null }
+  loadAddons()
 })
+
+// Coupons on unpaid invoices (owner only; employees do not see billing actions)
+const isOwner = (() => { try { return !JSON.parse(localStorage.getItem('tenant') || '{}').isSubUser } catch { return true } })()
+const couponFor = ref(null)
+const couponCode = ref('')
+const couponError = ref('')
+const applying = ref(false)
+const hasCoupon = (inv) => Array.isArray(inv.items) && inv.items.some(i => i.coupon)
+const canApplyCoupon = (inv) => isOwner && ['UNPAID', 'PENDING'].includes(inv.status) && !hasCoupon(inv)
+const openCoupon = (id) => { couponFor.value = id; couponCode.value = ''; couponError.value = '' }
+const applyCoupon = async (inv) => {
+  applying.value = true
+  couponError.value = ''
+  try {
+    const res = await axios.post(`/api/billing/invoices/${inv.id}/coupon`, { code: couponCode.value })
+    invoices.value = invoices.value.map(i => (i.id === inv.id ? res.data.data : i))
+    couponFor.value = null
+  } catch (err) {
+    couponError.value = err.response?.data?.message || (isAr.value ? 'تعذّر تطبيق الكوبون' : 'Could not apply the coupon')
+  } finally {
+    applying.value = false
+  }
+}
+
+// Plan limits and add-ons
+const addonData = ref(null)
+const addonQty = ref({ USERS: 1, NUMBERS: 1 })
+const addonQuote = ref(null)
+const addonMsg = ref('')
+const buying = ref(false)
+const addonCards = computed(() => {
+  const l = addonData.value?.limits
+  if (!l) return []
+  return Object.entries(l)
+    .filter(([, v]) => v.limit !== null || v.price !== null)
+    .map(([kind, v]) => ({ kind, ...v, name: kind === 'USERS' ? (isAr.value ? 'الموظفون' : 'Team members') : (isAr.value ? 'أرقام واتساب الرسمية' : 'Official WhatsApp numbers') }))
+})
+const loadAddons = async () => {
+  try { addonData.value = (await axios.get('/api/billing/addons')).data.data } catch { addonData.value = null }
+}
+const quoteAddon = async (kind) => {
+  addonMsg.value = ''
+  try {
+    addonQuote.value = (await axios.get('/api/billing/addons/quote', { params: { kind, quantity: addonQty.value[kind] || 1 } })).data.data
+  } catch (err) {
+    addonMsg.value = err.response?.data?.message || ''
+  }
+}
+const buyAddon = async () => {
+  buying.value = true
+  try {
+    const res = await axios.post('/api/billing/addons', { kind: addonQuote.value.kind, quantity: addonQuote.value.quantity })
+    invoices.value = [res.data.data.invoice, ...invoices.value]
+    addonQuote.value = null
+    addonMsg.value = isAr.value ? 'تم إنشاء الفاتورة في «فواتيرك». تتفعّل الإضافة بعد الدفع.' : 'The invoice is in "Your invoices". The add-on turns on once it is paid.'
+    loadAddons()
+  } catch (err) {
+    addonMsg.value = err.response?.data?.message || (isAr.value ? 'تعذّر إنشاء الفاتورة' : 'Could not create the invoice')
+  } finally {
+    buying.value = false
+  }
+}
+
+// Invite a friend
+const referral = ref(null)
+const copied = ref(false)
+const copyInvite = async () => {
+  try { await navigator.clipboard.writeText(referral.value.link) } catch { /* the field is selectable */ }
+  copied.value = true
+  setTimeout(() => { copied.value = false }, 2000)
+}
 
 const progressPercentage = computed(() => {
   if (!usage.value) return 0
@@ -223,6 +356,34 @@ h3 span { color: #3b82f6; }
 .status-badge.paid { background: #d1fae5; color: #059669; }
 .view-link { color: #3b82f6; text-decoration: none; font-weight: 600; font-size: 0.875rem; }
 .view-link:hover { text-decoration: underline; }
+.coupon-link { display: block; margin-top: 4px; background: none; border: none; padding: 0; color: #ea580c; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
+.coupon-form { display: flex; gap: 4px; margin-top: 6px; }
+.coupon-form input { width: 120px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.8rem; text-transform: uppercase; }
+.coupon-form button { border: none; background: #ea580c; color: #fff; border-radius: 6px; padding: 4px 10px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.coupon-form button.ghost { background: #f1f5f9; color: #64748b; }
+.coupon-done { display: block; margin-top: 4px; color: #059669; font-size: 0.8rem; font-weight: 600; }
+.coupon-err { color: #dc2626; font-size: 0.75rem; margin-top: 4px; max-width: 220px; }
+.addon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 0.75rem; }
+.addon-box { border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.9rem; background: #f8fafc; }
+.addon-name { font-size: 0.8rem; font-weight: 700; color: #64748b; }
+.addon-used { font-size: 1rem; color: #475569; margin-top: 2px; }
+.addon-used b { font-size: 1.4rem; color: #0f172a; }
+.addon-sub { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+.addon-buy { display: flex; gap: 6px; margin-top: 8px; }
+.addon-buy input { width: 60px; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 6px; }
+.addon-buy button, .addon-actions button { border: none; background: #ea580c; color: #fff; border-radius: 6px; padding: 5px 14px; font-weight: 700; cursor: pointer; }
+.addon-actions button.ghost { background: #f1f5f9; color: #475569; }
+.addon-quote { margin-top: 1rem; border: 1px solid #fed7aa; background: #fff7ed; border-radius: 10px; padding: 0.9rem; font-size: 0.85rem; color: #7c2d12; }
+.addon-quote p { margin: 0 0 0.6rem; line-height: 1.7; }
+.addon-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.addon-msg { font-size: 0.8rem; color: #475569; margin-top: 0.6rem; }
+.invite-card { border: 1px solid #fed7aa; }
+.invite-card h3 { margin: 0 0 0.4rem; }
+.invite-sub { color: #64748b; font-size: 0.85rem; margin: 0 0 0.9rem; }
+.invite-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.invite-link { flex: 1; min-width: 220px; padding: 0.55rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; background: #f8fafc; }
+.invite-copy { border: none; background: #ea580c; color: #fff; font-weight: 700; border-radius: 8px; padding: 0.55rem 1rem; cursor: pointer; }
+.invite-stats { display: flex; gap: 1.25rem; flex-wrap: wrap; margin-top: 0.9rem; font-size: 0.85rem; color: #475569; }
 .empty-state { text-align: center; color: #6b7280; padding: 2rem 0; font-style: italic; }
 
 .wallet-card { max-width: 800px; }

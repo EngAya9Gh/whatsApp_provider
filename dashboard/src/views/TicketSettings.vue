@@ -54,9 +54,36 @@
         </div>
       </section>
 
-      <!-- 2. Customer writes again after a close -->
+      <!-- 2. Who takes an unassigned ticket -->
       <section class="card">
-        <h2 class="card-title"><span class="num">2</span>{{ isAr ? 'إذا راسلك العميل بعد إغلاق تذكرته' : 'When the customer writes again after a close' }}</h2>
+        <h2 class="card-title"><span class="num">2</span>{{ isAr ? 'متى يستلم الموظف التذكرة بنفسه' : 'When a team member takes a ticket' }}</h2>
+        <p class="text-xs text-slate-500 -mt-2 mb-3 leading-relaxed">{{ isAr
+          ? 'للتذاكر التي لم يوزّعها التوزيع التلقائي على أحد (لا يوجد فريق للرقم، أو التوزيع يدوي، أو لا أحد في الدوام).'
+          : 'For tickets routing did not give to anyone (no team for the number, manual routing, or nobody on shift).' }}</p>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <label class="choice" :class="{ on: form.claimOn === 'OPEN' }">
+            <input type="radio" class="sr-only" value="OPEN" v-model="form.claimOn" />
+            <span class="flex items-center gap-2 font-bold text-sm text-slate-800"><i class="fas fa-door-open text-emerald-600"></i>{{ isAr ? 'أول ما يفتح المحادثة' : 'As soon as they open the chat' }}<span class="badge">{{ isAr ? 'موصى به' : 'Recommended' }}</span></span>
+            <span class="block text-xs text-slate-500 mt-1.5 leading-relaxed">{{ isAr
+              ? 'أول موظف يفتح المحادثة يستلمها، ولو فتحها اثنان بنفس اللحظة تذهب لواحد فقط ويُبلَّغ الآخر. لا تُستلم ما دام السير أو الموظف الذكي يرد، ففتحها للمتابعة لا يأخذها منه.'
+              : 'The first person to open the chat takes it; if two open it at the same moment only one gets it and the other is told. Not while a flow or the AI agent is answering, so opening it to watch does not take it over.' }}</span>
+          </label>
+          <label class="choice" :class="{ on: form.claimOn === 'REPLY' }">
+            <input type="radio" class="sr-only" value="REPLY" v-model="form.claimOn" />
+            <span class="flex items-center gap-2 font-bold text-sm text-slate-800"><i class="fas fa-reply text-[#FF6600]"></i>{{ isAr ? 'عند أول رد يكتبه' : 'With their first reply' }}</span>
+            <span class="block text-xs text-slate-500 mt-1.5 leading-relaxed">{{ isAr
+              ? 'الفتح والقراءة لا يغيّران شيئاً، والتذكرة لمن يرد على العميل أولاً.'
+              : 'Opening and reading change nothing; the ticket goes to whoever replies to the customer first.' }}</span>
+          </label>
+        </div>
+        <p class="note"><i class="fas fa-circle-info"></i>{{ isAr
+          ? 'ينطبق على أعضاء الفريق فقط؛ صاحب الحساب لا تُسند له تذاكر. وتُحسب «مدة الاستلام» في تحليلات التذاكر من لحظة جاهزية التذكرة (أو تحويل السير لها) حتى استلامها.'
+          : 'Applies to team members only; the account owner is not assigned tickets. "Pick-up time" in ticket analytics runs from when the ticket was ready (or the flow handed it over) until it was taken.' }}</p>
+      </section>
+
+      <!-- 3. Customer writes again after a close -->
+      <section class="card">
+        <h2 class="card-title"><span class="num">3</span>{{ isAr ? 'إذا راسلك العميل بعد إغلاق تذكرته' : 'When the customer writes again after a close' }}</h2>
         <div class="grid sm:grid-cols-2 gap-3">
           <label class="choice" :class="{ on: form.reopenHours > 0 }">
             <input type="radio" class="sr-only" :checked="form.reopenHours > 0" @change="form.reopenHours = lastReopenHours || 24" />
@@ -77,9 +104,9 @@
           : 'Once the customer rates the service the problem counts as finished, so their next message opens a new ticket. Agents can always reopen or open a new ticket by hand in Live Chat.' }}</p>
       </section>
 
-      <!-- 3. Auto-close -->
+      <!-- 4. Auto-close -->
       <section class="card">
-        <h2 class="card-title"><span class="num">3</span>{{ isAr ? 'الإغلاق التلقائي' : 'Auto-close' }}</h2>
+        <h2 class="card-title"><span class="num">4</span>{{ isAr ? 'الإغلاق التلقائي' : 'Auto-close' }}</h2>
         <label class="row">
           <span class="flex-1">
             <span class="row-title">{{ isAr ? 'أغلق التذكرة إذا لم يرد العميل' : 'Close the ticket when the customer stops replying' }}</span>
@@ -98,9 +125,9 @@
         </div>
       </section>
 
-      <!-- 4. Rating -->
+      <!-- 5. Rating -->
       <section class="card">
-        <h2 class="card-title"><span class="num">4</span>{{ isAr ? 'تقييم الخدمة' : 'Service rating' }}</h2>
+        <h2 class="card-title"><span class="num">5</span>{{ isAr ? 'تقييم الخدمة' : 'Service rating' }}</h2>
         <label class="row">
           <span class="flex-1">
             <span class="row-title">{{ isAr ? 'اطلب من العميل تقييم الخدمة عند إغلاق التذكرة' : 'Ask the customer to rate the service when a ticket closes' }}</span>
@@ -203,7 +230,9 @@ const lifeSteps = computed(() => {
     : (isAr.value ? 'تُفتح له تذكرة جديدة.' : 'A new ticket opens.')
   return [
     { icon: 'fas fa-comment', color: '#3b82f6', title: isAr.value ? 'العميل يراسلك' : 'The customer writes', text: isAr.value ? 'تُفتح تذكرة برقم مثل \u2066#TK-0012\u2069 وتذهب لفريق الرقم.' : 'A ticket like #TK-0012 opens and goes to the number\'s team.' },
-    { icon: 'fas fa-user-check', color: '#f97316', title: isAr.value ? 'موظف يتولاها' : 'An agent takes it', text: isAr.value ? 'بالتوزيع التلقائي، أو بالإسناد، أو أول من يرد عليها.' : 'By routing, by assignment, or whoever replies first.' },
+    { icon: 'fas fa-user-check', color: '#f97316', title: isAr.value ? 'موظف يتولاها' : 'An agent takes it', text: form.value?.claimOn === 'REPLY'
+      ? (isAr.value ? 'بالتوزيع التلقائي، أو بالإسناد، أو أول من يرد عليها.' : 'By routing, by assignment, or whoever replies first.')
+      : (isAr.value ? 'بالتوزيع التلقائي، أو بالإسناد، أو أول من يفتح المحادثة.' : 'By routing, by assignment, or whoever opens the chat first.') },
     { icon: 'fas fa-circle-check', color: '#10b981', title: isAr.value ? 'تُغلق' : 'It closes', text: isAr.value ? 'يدوياً مع التصنيف والحل، أو تلقائياً، ويُطلب من العميل التقييم.' : 'By hand with a category and resolution, or automatically; the customer is asked to rate.' },
     { icon: 'fas fa-redo', color: '#8b5cf6', title: isAr.value ? 'العميل يرجع' : 'The customer comes back', text: reopen }
   ]
@@ -223,6 +252,7 @@ const toForm = (data) => ({
   ratingEnabled: data.ratingEnabled,
   ratingType: data.ratingType,
   ratingMessageText: data.ratingMessageText,
+  claimOn: data.claimOn || 'OPEN',
   channels: (data.channels || []).map(c => ({ ...c }))
 })
 

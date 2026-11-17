@@ -131,6 +131,11 @@ class FlowEngine {
           await this._sendText(ctx, d.text);
           nodeId = this._next(ctx.graph, node.id, 'out');
           break;
+        case 'link':
+          // Meta does not report a tap on a link button, so the flow goes on right away (like a message)
+          await this._sendLink(ctx, d);
+          nodeId = this._next(ctx.graph, node.id, 'out');
+          break;
         case 'question':
           await this._ask(ctx, node, 0);
           return null; // wait for the customer
@@ -201,6 +206,7 @@ class FlowEngine {
         const busy = ['AI_BUSY', 'AI_TIMEOUT', 'AI_RATE_LIMIT', 'AI_NETWORK'].includes(err.code);
         const reason = busy ? 'خدمة الذكاء الاصطناعي مزدحمة أو متأخرة الآن'
           : err.code === 'AI_KEY_INVALID' ? 'مفتاح Gemini غير صالح، راجعه في الإعدادات'
+          : err.code === 'AI_QUOTA_EXCEEDED' ? 'انتهت حصة الذكاء الاصطناعي لهذا الشهر'
           : 'تعذّر رد الذكاء الاصطناعي';
         result = { reply: '', handoff: true, reason };
       }
@@ -264,6 +270,11 @@ class FlowEngine {
   async _sendText(ctx, text, meta = {}) {
     const chatService = require('../chat/chat.service');
     await chatService.sendMessage(ctx.tenantId, ctx.threadId, { content: text, type: 'text', isAutomated: true, source: meta.ai ? 'FLOW_AI' : 'FLOW' });
+  }
+
+  async _sendLink(ctx, d) {
+    const chatService = require('../chat/chat.service');
+    await chatService.sendLinkButton(ctx.tenantId, ctx.threadId, { body: d.text, buttonText: d.buttonText, url: d.url, source: 'FLOW' });
   }
 
   async _ask(ctx, node, attempts) {
@@ -331,6 +342,8 @@ class FlowEngine {
       ticket = await ticketsService.createTicket(ctx.tenantId, ctx.channelId, ctx.threadId, thread?.crmClientId || null, 'محادثة واتساب', null,
         d.mode === 'AGENT' && d.agentId ? { assignedToId: d.agentId, skipRouting: true } : {});
     }
+    // From now the ticket is the team's (its pick-up time starts here, not while the flow talked)
+    await ticketsService.markReady(ticket.id);
     if (ticket.assignedToId) return;
 
     let assigned = false;

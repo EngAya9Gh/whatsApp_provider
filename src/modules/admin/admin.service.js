@@ -272,7 +272,7 @@ class AdminService {
       };
     }
 
-    return prisma.invoice.create({
+    const invoice = await prisma.invoice.create({
       data: {
         tenantId,
         amount: amount.toString(),
@@ -286,6 +286,11 @@ class AdminService {
         sellerDetails: finalSellerDetails
       }
     });
+    if (invoice.status === 'PAID') {
+      await require('../billing/addon.service').onInvoicePaid(invoice);
+      await require('../billing/referral.service').onInvoicePaid(invoice);
+    }
+    return invoice;
   }
 
   async getAllInvoices() {
@@ -488,10 +493,17 @@ class AdminService {
     const validStatuses = ['PENDING', 'PAID', 'CANCELLED'];
     if (!validStatuses.includes(status)) throw new Error('Invalid status');
 
-    return prisma.invoice.update({
+    const before = await prisma.invoice.findUnique({ where: { id }, select: { status: true } });
+    const invoice = await prisma.invoice.update({
       where: { id },
       data: { status }
     });
+    // An invited account's first paid invoice rewards whoever invited it
+    if (status === 'PAID' && before?.status !== 'PAID') {
+      await require('../billing/addon.service').onInvoicePaid(invoice);
+      await require('../billing/referral.service').onInvoicePaid(invoice);
+    }
+    return invoice;
   }
 
   async resetTenantPassword(id, newPassword) {

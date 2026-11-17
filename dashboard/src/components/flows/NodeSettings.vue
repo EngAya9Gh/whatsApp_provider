@@ -58,6 +58,22 @@
         <div class="counter">{{ (node.data.text || '').length }} / 4096</div>
       </template>
 
+      <!-- Link button -->
+      <template v-else-if="node.type === 'link'">
+        <label class="lbl">{{ isAr ? 'نص الرسالة' : 'Message text' }}</label>
+        <textarea v-model="node.data.text" rows="4" maxlength="1024" class="inp" :placeholder="isAr ? 'مثال: تصفح منتجاتنا واطلب مباشرة من متجرنا 👇' : 'e.g. Browse our products and order from our store 👇'"></textarea>
+        <div class="counter">{{ (node.data.text || '').length }} / 1024</div>
+        <label class="lbl mt-3">{{ isAr ? 'نص الزر' : 'Button text' }}</label>
+        <input v-model="node.data.buttonText" maxlength="20" class="inp" :placeholder="isAr ? 'اضغط هنا' : 'Open the store'" />
+        <div class="counter">{{ (node.data.buttonText || '').length }} / 20</div>
+        <label class="lbl mt-3">{{ isAr ? 'الرابط' : 'Link' }}</label>
+        <input v-model.trim="node.data.url" dir="ltr" class="inp" placeholder="https://example.com" />
+        <p v-if="node.data.url && !linkOk" class="hint text-red-600">{{ isAr ? 'اكتب الرابط كاملاً يبدأ بـ https://' : 'Write the full link, starting with https://' }}</p>
+        <p class="hint">{{ isAr
+          ? 'لماذا ليس زراً داخل «سؤال بخيارات»؟ أزرار الأسئلة في واتساب ترجع اختيار العميل فقط ولا تفتح روابط، وزر الرابط نوع رسالة منفصل بزر واحد. لتجمع بينهما: اجعل أحد خيارات السؤال يوصل لهذه الخطوة.'
+          : 'Why not a button inside a "Question"? WhatsApp question buttons only send back the choice and cannot open links; a link button is a separate message type with one button. To combine them, connect one of the question\'s options to this step.' }}</p>
+      </template>
+
       <!-- Question -->
       <template v-else-if="node.type === 'question'">
         <label class="lbl">{{ isAr ? 'نص السؤال' : 'Question text' }}</label>
@@ -183,10 +199,11 @@
       </template>
 
       <!-- WhatsApp preview -->
-      <div v-if="node.type === 'message' || node.type === 'question'" class="preview">
+      <div v-if="node.type === 'message' || node.type === 'question' || node.type === 'link'" class="preview">
         <div class="preview-label">{{ isAr ? 'معاينة' : 'Preview' }}</div>
         <div class="phone">
           <div class="bubble">{{ node.data.text || '…' }}</div>
+          <div v-if="node.type === 'link'" class="wa-btn"><i class="fas fa-arrow-up-right-from-square"></i> {{ node.data.buttonText || '…' }}</div>
           <template v-if="node.type === 'question'">
             <template v-if="options.length <= 3">
               <div v-for="opt in options" :key="opt.id" class="wa-btn">{{ opt.title || '…' }}</div>
@@ -221,6 +238,12 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'delete', 'option-removed', 'test'])
 const hours = computed(() => Number(props.node.data?.inactivityHours) || 24)
+const linkOk = computed(() => {
+  try {
+    const u = new URL(String(props.node.data?.url || ''))
+    return (u.protocol === 'https:' || u.protocol === 'http:') && !!u.hostname
+  } catch { return false }
+})
 
 const meta = computed(() => FLOW_NODE_TYPES[props.node.type] || FLOW_NODE_TYPES.message)
 const options = computed(() => props.node.data.options || [])

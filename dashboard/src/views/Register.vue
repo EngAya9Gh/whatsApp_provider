@@ -21,6 +21,7 @@
         <h1>{{ $t('register.title') }}</h1>
         <p class="form-subtitle">{{ $t('register.subtitle') }}</p>
 
+        <p v-if="referralCode" class="ref-note">🎁 {{ locale === 'ar' ? 'دعاك صديق للتسجيل في وكيل.' : 'A friend invited you to Wakeel.' }}</p>
         <form @submit.prevent="handleRegister">
           <div class="form-group">
             <label>{{ $t('register.name') }}</label>
@@ -62,7 +63,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
@@ -81,6 +82,8 @@ const success = ref('')
 const loading = ref(false)
 const showPassword = ref(false)
 const router = useRouter()
+// Invite link: /register?ref=CODE (the inviter is rewarded when this account pays its first invoice)
+const referralCode = String(useRoute().query.ref || '').trim().slice(0, 40)
 
 onMounted(async () => {
   try {
@@ -101,7 +104,7 @@ const handleRegister = async () => {
       email: email.value,
       password: password.value,
       companyName: name.value,
-      
+      ...(referralCode && { referralCode })
     })
     success.value = t('register.success')
     setTimeout(() => router.push('/login'), 1800)
@@ -115,6 +118,7 @@ const handleRegister = async () => {
 </script>
 
 <style scoped>
+.ref-note { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; border-radius: 10px; padding: 8px 12px; font-size: 0.85rem; margin: 0 0 12px; text-align: center; }
 .auth-page { display: flex; min-height: 100vh; width: 100%; }
 .brand-panel { flex: 1; background: #0F172A; display: flex; align-items: center; justify-content: center; padding: 3rem; position: relative; overflow: hidden; }
 .brand-content { position: relative; z-index: 2; max-width: 400px; }

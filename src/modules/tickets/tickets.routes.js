@@ -34,6 +34,9 @@ router.patch('/:id', ticketAccess, ticketsController.updateTicket);
 // Create a ticket manually
 router.post('/', liveChat, accessService.bodyThreadGuard(), ticketsController.createTicket);
 
+// A team member opened a conversation in Live Chat: takes its unassigned ticket (ticket setting claimOn)
+router.post('/claim-on-open', liveChat, accessService.bodyThreadGuard(), ticketsController.claimOnOpen);
+
 // Close a ticket
 router.post('/:id/close', ticketAccess, ticketsController.closeTicket);
 

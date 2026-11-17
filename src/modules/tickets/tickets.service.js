@@ -14,6 +14,9 @@ const CUSTOMER_WINDOW_MS = 24 * HOUR_MS;
 const RATING_TEXT = /تقييم|شكراً لتقييمك/;
 
 const RATING_TYPES = ['LIST_5_STARS', 'BUTTONS_3', 'TEXT'];
+const CLAIM_MODES = ['OPEN', 'REPLY'];
+// How a ticket was first taken (tickets.assigned_via)
+const VIA = ['OPEN', 'REPLY', 'ROUTING', 'MANUAL', 'SELF', 'FLOW'];
 const DEFAULT_RATING_TEXT = 'تم إغلاق التذكرة الخاصة بك. نأمل أن نكون قد وفقنا في خدمتك! يرجى تقييم الخدمة من 1 إلى 5 (حيث 5 هو الأفضل).';
 
 /**
@@ -27,6 +30,9 @@ const DEFAULT_RATING_TEXT = 'تم إغلاق التذكرة الخاصة بك. �
  *                     rated, reopens the same ticket (0 = always a new ticket)
  *  autoCloseEnabled / autoCloseHours   close when the customer stays silent after our answer
  *  ratingEnabled / ratingType / ratingMessageText   the rating request sent on close
+ *  claimOn            when a team member takes an unassigned ticket by themselves: 'OPEN' (as soon as they
+ *                     open the conversation) or 'REPLY' (with their first reply). Routing and assigning by
+ *                     hand work either way.
  */
 function ticketSettingsOf(customFeatures) {
   const features = customFeatures && typeof customFeatures === 'object' ? customFeatures : {};
@@ -40,7 +46,8 @@ function ticketSettingsOf(customFeatures) {
     autoCloseHours: Number(s.autoCloseHours) || 24,
     ratingEnabled: s.ratingEnabled !== false,
     ratingType: RATING_TYPES.includes(s.ratingType) ? s.ratingType : 'LIST_5_STARS',
-    ratingMessageText: String(s.ratingMessageText || '').trim() || DEFAULT_RATING_TEXT
+    ratingMessageText: String(s.ratingMessageText || '').trim() || DEFAULT_RATING_TEXT,
+    claimOn: CLAIM_MODES.includes(s.claimOn) ? s.claimOn : 'OPEN'
   };
 }
 
@@ -200,7 +207,10 @@ class TicketsService {
               subject: subject || 'محادثة واتساب',
               crmClientId: crmClientId || null,
               ...(categoryId && { categoryId }),
-              ...(assignedToId && { assignedToId })
+              ...(assignedToId && { assignedToId }),
+              // While a flow talks the ticket is not the team's yet: readyAt is set at the hand-off
+              ...(!skipRouting && { readyAt: new Date() }),
+              ...(assignedToId && { firstAssignedAt: new Date(), assignedVia: manual ? 'MANUAL' : 'FLOW' })
             }
           });
         } catch (err) {
@@ -273,7 +283,7 @@ class TicketsService {
     }
     const updated = await prisma.ticket.update({
       where: { id: ticket.id },
-      data: { status: 'OPEN', resolvedAt: null, assignedToId }
+      data: { status: 'OPEN', resolvedAt: null, assignedToId, ...(!skipRouting && !ticket.readyAt && { readyAt: new Date() }) }
     });
     if (!updated.assignedToId && !skipRouting) {
       const routingService = require('../workforce/routing.service');
@@ -306,8 +316,11 @@ class TicketsService {
 
   // ─── Assigning & editing ────────────────────────────────────────────
 
-  /** Assigns an active ticket to a team member of the tenant (null = nobody) */
-  async assignTicket(tenantId, ticketId, assignedToId, { actor = null } = {}) {
+  /**
+   * Assigns an active ticket to a team member of the tenant (null = nobody).
+   * via: how it was taken, for the reports (default: SELF when they took it, MANUAL otherwise)
+   */
+  async assignTicket(tenantId, ticketId, assignedToId, { actor = null, via = null } = {}) {
     const ticket = await prisma.ticket.findFirst({ where: { id: ticketId, tenantId } });
     if (!ticket) throw fail(404, 'Ticket not found');
     if (!ACTIVE_STATUSES.includes(ticket.status)) throw fail(409, 'Reopen the ticket before assigning it');
@@ -322,6 +335,7 @@ class TicketsService {
     if ((ticket.assignedToId || null) === targetId) return ticket;
 
     const updated = await prisma.ticket.update({ where: { id: ticket.id }, data: { assignedToId: targetId } });
+    if (assignee) await this.stampAssigned(ticket.id, via || (actor?.key === assignee.id ? 'SELF' : actor ? 'MANUAL' : 'FLOW'));
     await this._note(tenantId, updated, assignee
       ? (actor?.key === assignee.id ? `👤 استلم ${assignee.name} التذكرة ${updated.ticketNumber}` : `👤 أسند ${actorName(actor)} التذكرة ${updated.ticketNumber} إلى ${assignee.name}`)
       : `👤 أزال ${actorName(actor)} الإسناد عن التذكرة ${updated.ticketNumber}`);
@@ -341,6 +355,68 @@ class TicketsService {
 
     emit(tenantId, 'ticket_updated', ticketEvent(updated));
     return updated;
+  }
+
+  /**
+   * A team member takes an unassigned active ticket by themselves (opening the conversation or replying).
+   * Atomic: when two people open the same conversation at the same moment, the database gives the ticket
+   * to exactly one of them and the other is told who has it.
+   * Returns { claimed, ticket, assignee: { id, name } | null }
+   */
+  async claimTicket(tenantId, ticketId, subUserId, via = 'OPEN') {
+    const member = await prisma.subUser.findFirst({ where: { id: subUserId, tenantId }, select: { id: true, name: true, isActive: true } });
+    if (!member || !member.isActive) throw fail(400, 'This team member cannot take tickets');
+
+    const won = await prisma.ticket.updateMany({
+      where: { id: ticketId, tenantId, assignedToId: null, status: { in: ACTIVE_STATUSES } },
+      data: { assignedToId: member.id }
+    });
+    const ticket = await prisma.ticket.findFirst({ where: { id: ticketId, tenantId } });
+    if (!ticket) throw fail(404, 'Ticket not found');
+    if (won.count === 0) {
+      const name = ticket.assignedToId ? await this._memberName(tenantId, ticket.assignedToId) : null;
+      return { claimed: false, ticket, assignee: ticket.assignedToId ? { id: ticket.assignedToId, name } : null };
+    }
+
+    await this.stampAssigned(ticket.id, via);
+    await this._note(tenantId, ticket, via === 'REPLY'
+      ? `👤 استلم ${member.name} التذكرة ${ticket.ticketNumber} بأول رد`
+      : `👤 استلم ${member.name} التذكرة ${ticket.ticketNumber} عند فتح المحادثة`);
+    emit(tenantId, 'ticket_updated', ticketEvent(ticket));
+    return { claimed: true, ticket, assignee: { id: member.id, name: member.name } };
+  }
+
+  /** First assignment to a person (pick-up time and how); later reassignments keep the first one */
+  async stampAssigned(ticketId, via) {
+    try {
+      await prisma.ticket.updateMany({ where: { id: ticketId, firstAssignedAt: null }, data: { firstAssignedAt: new Date(), assignedVia: VIA.includes(via) ? via : 'MANUAL' } });
+    } catch (err) {
+      logger.warn(`[TicketsService] Could not record the pick-up time: ${err.message}`);
+    }
+  }
+
+  /** The ticket is the team's from now (no-op when it already was) */
+  async markReady(ticketId, at = new Date()) {
+    try {
+      await prisma.ticket.updateMany({ where: { id: ticketId, readyAt: null }, data: { readyAt: at } });
+    } catch (err) {
+      logger.warn(`[TicketsService] Could not mark the ticket ready: ${err.message}`);
+    }
+  }
+
+  /** First reply a person wrote to the customer on this ticket */
+  async markFirstResponse(ticketId) {
+    try {
+      await prisma.ticket.updateMany({ where: { id: ticketId, firstResponseAt: null }, data: { firstResponseAt: new Date() } });
+    } catch (err) {
+      logger.warn(`[TicketsService] Could not record the first response: ${err.message}`);
+    }
+  }
+
+  /** Settings that decide what opening a conversation does */
+  async claimMode(tenantId) {
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } });
+    return ticketSettingsOf(tenant?.customFeatures).claimOn;
   }
 
   /** Category / priority / subject of a ticket */
@@ -604,6 +680,10 @@ class TicketsService {
     if (body.ratingType !== undefined) {
       if (!RATING_TYPES.includes(body.ratingType)) throw fail(400, 'Unknown rating type');
       next.ratingType = body.ratingType;
+    }
+    if (body.claimOn !== undefined) {
+      if (!CLAIM_MODES.includes(body.claimOn)) throw fail(400, 'Unknown way of taking tickets');
+      next.claimOn = body.claimOn;
     }
     if (body.ratingMessageText !== undefined) {
       const text = String(body.ratingMessageText || '').trim();

@@ -86,6 +86,12 @@ function responseTimes(messagesAsc) {
   return { pairs, waiting };
 }
 
+// Ticket timing (see getTicketAnalytics)
+const VIA_KEYS = ['OPEN', 'REPLY', 'ROUTING', 'MANUAL', 'SELF', 'FLOW'];
+const PEOPLE_PICKUPS = ['OPEN', 'REPLY', 'SELF', 'MANUAL'];
+const pickupMs = (t) => (t.firstAssignedAt && t.readyAt ? Math.max(0, t.firstAssignedAt - t.readyAt) : null);
+const firstReplyMs = (t) => (t.firstResponseAt ? Math.max(0, t.firstResponseAt - (t.readyAt || t.createdAt)) : null);
+
 class AnalyticsService {
   // ═══════════════════════════════════════════════════════════
   // Meta (Cloud API) analytics: conversations, tickets, team, stages
@@ -397,6 +403,135 @@ class AnalyticsService {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // Tickets: how fast they are taken and answered, and by whom
+  // ═══════════════════════════════════════════════════════════
+  /**
+   * pick-up      ready (opened, or handed over by a flow) → first taken by a team member
+   *              (opening the chat, first reply, "take", or assigned by hand; automatic routing is instant
+   *              and is shown in "how tickets were taken" instead)
+   * first reply  ready → the first reply a person wrote to the customer
+   * Times in minutes with two decimals, so the dashboard can show seconds.
+   */
+  async getTicketAnalytics(tenantId, { days, channelId } = {}) {
+    const range = buildRange(days);
+    const { start, end, prevStart } = range;
+    const timezone = await shiftService.getTimezone(tenantId);
+
+    const channels = await prisma.whatsAppChannel.findMany({
+      where: { tenantId, providerType: 'META_CLOUD' },
+      select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true }
+    });
+    const channelIds = channelId ? channels.filter(c => c.id === channelId).map(c => c.id) : channels.map(c => c.id);
+    const scope = { tenantId, channelId: { in: channelIds } };
+    const select = {
+      id: true, status: true, createdAt: true, resolvedAt: true, rating: true, assignedToId: true, categoryId: true,
+      readyAt: true, firstAssignedAt: true, assignedVia: true, firstResponseAt: true
+    };
+
+    const [tickets, active, members, onShift, categories] = await Promise.all([
+      prisma.ticket.findMany({
+        where: { ...scope, OR: [{ createdAt: { gte: prevStart } }, { resolvedAt: { gte: prevStart } }, { firstAssignedAt: { gte: prevStart } }, { firstResponseAt: { gte: prevStart } }] },
+        select,
+        take: MAX_ROWS
+      }),
+      prisma.ticket.findMany({ where: { ...scope, status: { in: ['OPEN', 'PENDING'] } }, select, take: MAX_ROWS }),
+      prisma.subUser.findMany({ where: { tenantId }, select: { id: true, name: true, isActive: true }, orderBy: { name: 'asc' } }),
+      shiftService.getOnShiftUserIds(tenantId),
+      prisma.ticketCategory.findMany({ where: { tenantId }, select: { id: true, name: true } })
+    ]);
+
+    const statsOf = (list, from, to) => {
+      const opened = list.filter(t => between(t.createdAt, from, to));
+      const closed = list.filter(t => between(t.resolvedAt, from, to));
+      const picked = list.filter(t => between(t.firstAssignedAt, from, to) && PEOPLE_PICKUPS.includes(t.assignedVia)).map(pickupMs).filter(ms => ms !== null);
+      const replied = list.filter(t => between(t.firstResponseAt, from, to)).map(firstReplyMs).filter(ms => ms !== null);
+      const rated = closed.filter(t => t.rating);
+      return {
+        opened: opened.length,
+        closed: closed.length,
+        pickedCount: picked.length,
+        avgPickupMinutes: minutes(avg(picked)),
+        medianPickupMinutes: minutes(median(picked)),
+        repliedCount: replied.length,
+        avgFirstReplyMinutes: minutes(avg(replied)),
+        medianFirstReplyMinutes: minutes(median(replied)),
+        avgResolutionHours: hours(avg(closed.map(t => t.resolvedAt - t.createdAt))),
+        avgRating: round(avg(rated.map(t => t.rating))),
+        ratedCount: rated.length
+      };
+    };
+    const cur = statsOf(tickets, start, end);
+    const prev = statsOf(tickets, prevStart, start);
+
+    const now = Date.now();
+    const unassigned = active.filter(t => !t.assignedToId);
+    const longestWaitMs = unassigned.length ? Math.max(...unassigned.map(t => now - (t.readyAt || t.createdAt))) : null;
+
+    // How tickets first got an owner in this period
+    const takenInPeriod = tickets.filter(t => between(t.firstAssignedAt, start, end));
+    const howTaken = VIA_KEYS.map(key => ({ key, count: takenInPeriod.filter(t => t.assignedVia === key).length })).filter(v => v.count > 0);
+
+    const onShiftSet = new Set(onShift);
+    const agents = members.map(member => {
+      const mine = tickets.filter(t => t.assignedToId === member.id);
+      const s = statsOf(mine, start, end);
+      return {
+        id: member.id,
+        name: member.name,
+        isActive: member.isActive,
+        onShiftNow: onShiftSet.has(member.id),
+        openNow: active.filter(t => t.assignedToId === member.id).length,
+        taken: mine.filter(t => between(t.firstAssignedAt, start, end)).length,
+        takenByOpening: mine.filter(t => between(t.firstAssignedAt, start, end) && t.assignedVia === 'OPEN').length,
+        closed: s.closed,
+        avgPickupMinutes: s.avgPickupMinutes,
+        avgFirstReplyMinutes: s.avgFirstReplyMinutes,
+        avgResolutionHours: s.avgResolutionHours,
+        avgRating: s.avgRating
+      };
+    }).sort((a, b) => b.taken - a.taken || b.closed - a.closed);
+
+    const openedNow = tickets.filter(t => between(t.createdAt, start, end));
+    const categoryName = Object.fromEntries(categories.map(c => [c.id, c.name]));
+    const byCategory = Object.entries(openedNow.reduce((acc, t) => {
+      const key = t.categoryId && categoryName[t.categoryId] ? t.categoryId : 'none';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {})).map(([id, count]) => ({ id, name: id === 'none' ? null : categoryName[id], count })).sort((a, b) => b.count - a.count);
+
+    const keys = dateKeys(timezone, start, end);
+    const daily = Object.fromEntries(keys.map(k => [k, { date: k, opened: 0, closed: 0 }]));
+    for (const t of tickets) {
+      if (between(t.createdAt, start, end)) { const k = localClock(timezone, t.createdAt).date; if (daily[k]) daily[k].opened++; }
+      if (between(t.resolvedAt, start, end)) { const k = localClock(timezone, t.resolvedAt).date; if (daily[k]) daily[k].closed++; }
+    }
+
+    return {
+      range: { days: range.days, start, end },
+      channels,
+      summary: {
+        ...cur,
+        openedChange: delta(cur.opened, prev.opened),
+        closedChange: delta(cur.closed, prev.closed),
+        pickupChange: delta(cur.avgPickupMinutes, prev.avgPickupMinutes),
+        firstReplyChange: delta(cur.avgFirstReplyMinutes, prev.avgFirstReplyMinutes),
+        resolutionChange: delta(cur.avgResolutionHours, prev.avgResolutionHours),
+        ratingChange: delta(cur.avgRating, prev.avgRating),
+        openNow: active.length,
+        unassignedNow: unassigned.length,
+        longestUnassignedMinutes: minutes(longestWaitMs)
+      },
+      howTaken,
+      agents,
+      byCategory,
+      daily: Object.values(daily),
+      // Pick-up times exist for tickets handled after this report was added
+      tracked: tickets.some(t => t.firstAssignedAt) || active.some(t => t.firstAssignedAt),
+      truncated: tickets.length >= MAX_ROWS
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // Regular (QR / Baileys) analytics: API sends and campaigns
   // ═══════════════════════════════════════════════════════════
   async getQrAnalytics(tenantId, { days } = {}) {
@@ -500,4 +635,5 @@ class AnalyticsService {
 
 module.exports = new AnalyticsService();
 module.exports.responseTimes = responseTimes;
+module.exports.ticketTiming = { pickupMs, firstReplyMs };
 module.exports.dateKeys = dateKeys;

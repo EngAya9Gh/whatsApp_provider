@@ -20,6 +20,14 @@ export const FLOW_NODE_TYPES = {
     helpEn: 'Sends a text and moves straight to the next step without waiting. Examples: a welcome, a price list, or "connecting you to a person".',
     defaults: () => ({ text: '' })
   },
+  link: {
+    icon: 'fas fa-link', color: '#0891b2',
+    ar: 'زر رابط', en: 'Link button',
+    descAr: 'رسالة بزر يفتح رابطاً', descEn: 'A message with a button that opens a link',
+    helpAr: 'ترسل نصاً مع زر واحد يفتح رابطاً (موقعك، متجرك، نموذج تسجيل…). واتساب يسمح بزر رابط واحد في الرسالة، ولا يخبرنا إن ضغطه العميل، لذلك ينتقل السير فوراً للخطوة التالية بدون انتظار، مثل خطوة الرسالة.',
+    helpEn: 'Sends a text with one button that opens a link (your site, store, a sign-up form…). WhatsApp allows one link button per message and does not tell us when it is tapped, so the flow moves straight to the next step, like a message.',
+    defaults: () => ({ text: '', buttonText: '', url: 'https://' })
+  },
   question: {
     icon: 'fas fa-list-ul', color: '#10b981',
     ar: 'سؤال بخيارات', en: 'Question',

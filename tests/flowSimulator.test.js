@@ -49,7 +49,8 @@ inject('@prisma/client', {
 });
 inject(fromRoot('src/modules/chat/chat.service'), {
   sendMessage: guard('sendMessage'),
-  sendInteractiveMessage: guard('sendInteractiveMessage')
+  sendInteractiveMessage: guard('sendInteractiveMessage'),
+  sendLinkButton: guard('sendLinkButton')
 });
 inject(fromRoot('src/modules/chat/chat.tag.service'), { setThreadTags: guard('setThreadTags') });
 inject(fromRoot('src/modules/chat/chat.stage.service'), { setThreadStage: guard('setThreadStage') });
@@ -59,7 +60,8 @@ inject(fromRoot('src/modules/tickets/tickets.service'), {
     return activeTicket;
   },
   createTicket: guard('createTicket'),
-  assignTicket: guard('assignTicket')
+  assignTicket: guard('assignTicket'),
+  markReady: guard('markReady')
 });
 inject(fromRoot('src/modules/workforce/routing.service'), { autoAssignTicket: guard('autoAssignTicket') });
 inject(fromRoot('src/modules/workforce/hours.service'), { isChannelOpen: async () => false });
@@ -247,6 +249,7 @@ test('real engine: flow messages are marked, and a hand-off leaves one note that
   await engine.handleInbound('T', 'ch', { _id: 'th1', flowState: { flowId: 'F1', version: 3, nodeId: 'ask' } }, { text: '2' });
   assert.deepStrictEqual(notes().map(c => c[3].source), ['FLOW_HANDOFF']);
   assert.strictEqual(notes()[0][3].isAutomated, true);
+  assert.ok(calls.some(c => c[0] === 'markReady' && c[1] === 'tk'), 'the ticket is the team\'s from the hand-off');
 
   // The AI agent hands off (reply limit) → its own note is the marker, the hand-off step adds none
   calls.length = 0;
@@ -268,4 +271,47 @@ test('publishing ignores a half-written step that nothing leads to', async () =>
   assert.deepStrictEqual(await flowService.problemsToFix('T', loose), []);
   const linked = { nodes: loose.nodes, edges: [...MENU.edges.filter(x => x.sourceHandle !== 'opt-h'), e('ask', 'draft', 'opt-h')] };
   assert.deepStrictEqual(await flowService.problemsToFix('T', linked), [{ nodeId: 'draft', message: 'Choose a tag' }]);
+});
+
+// ─── Link button step ───
+const LINK = {
+  nodes: [
+    n('start', 'trigger', { inactivityHours: 24 }),
+    n('shop', 'link', { text: 'تصفح متجرنا 👇', buttonText: 'افتح المتجر', url: 'https://rushd.ai/store' }),
+    n('after', 'message', { text: 'نحن هنا إذا احتجت شيئاً' })
+  ],
+  edges: [e('start', 'shop'), e('shop', 'after')]
+};
+
+test('a link button is sent and the flow goes straight on (Meta does not report the tap)', async () => {
+  const [res] = await chat(LINK, [{ text: 'hi' }]);
+  assert.deepStrictEqual(res.replies.slice(0, 2), [
+    { kind: 'link', text: 'تصفح متجرنا 👇', buttonText: 'افتح المتجر', url: 'https://rushd.ai/store' },
+    { kind: 'text', text: 'نحن هنا إذا احتجت شيئاً', ai: false }
+  ]);
+  assert.deepStrictEqual(res.steps, ['start', 'shop', 'after']);
+
+  allowRealEngine = true;
+  flowDoc = { _id: 'F2', isActive: true, published: { version: 1, nodes: LINK.nodes, edges: LINK.edges } };
+  activeTicket = { id: 'tk', assignedToId: 'A1' };
+  assert.strictEqual(await engine.handleInbound('T', 'ch', { _id: 'th1', flowState: { restart: true } }, { text: 'hi' }), true);
+  const sent = calls.find(c => c[0] === 'sendLinkButton');
+  assert.deepStrictEqual(sent[3], { body: 'تصفح متجرنا 👇', buttonText: 'افتح المتجر', url: 'https://rushd.ai/store', source: 'FLOW' });
+});
+
+test('a link button needs a text, a short button and a real web link', async () => {
+  const bad = (data) => ({ nodes: LINK.nodes.map(x => (x.id === 'shop' ? n('shop', 'link', data) : x)), edges: LINK.edges });
+  const problems = async (data) => (await flowService.problemsToFix('T', bad(data))).map(p => p.message);
+  assert.deepStrictEqual(await problems({ text: '', buttonText: '', url: 'https://' }), ['The message is empty', 'Write the button text', 'Write a full link starting with https://']);
+  assert.deepStrictEqual(await problems({ text: 'x', buttonText: 'زر طويل جداً أكثر من عشرين', url: 'javascript:alert(1)' }), ['The button text must be at most 20 characters', 'Write a full link starting with https://']);
+  assert.deepStrictEqual(await problems({ text: 'x', buttonText: 'افتح', url: 'https://wakeel.cc/x?a=1' }), []);
+});
+
+test('the WhatsApp payload of a link button (interactive cta_url)', () => {
+  const { ctaUrlInteractive } = require(fromRoot('src/modules/meta/meta.service'));
+  assert.deepStrictEqual(ctaUrlInteractive('تصفح', 'افتح المتجر', 'https://rushd.ai'), {
+    type: 'cta_url',
+    body: { text: 'تصفح' },
+    action: { name: 'cta_url', parameters: { display_text: 'افتح المتجر', url: 'https://rushd.ai' } }
+  });
 });

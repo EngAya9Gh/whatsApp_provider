@@ -74,6 +74,7 @@ app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/flows', flowRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/team-chat', teamChatRoutes);
+app.use('/api/v1/tasks', require('./modules/tasks/tasks.routes'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

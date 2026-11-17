@@ -39,6 +39,8 @@ class AuthService {
         monthlyLimit: limit
       }
     });
+    // Signed up through an invite link: the inviter is rewarded when this account's first invoice is paid
+    if (data.referralCode) await require('../billing/referral.service').recordSignup(tenant.id, data.referralCode);
 
     return {
       id: tenant.id,

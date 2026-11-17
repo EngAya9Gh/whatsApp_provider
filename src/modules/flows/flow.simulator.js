@@ -111,6 +111,11 @@ class FlowSimulator extends FlowEngine {
     ctx.sim.history.push({ direction: 'OUTBOUND', content: text });
   }
 
+  async _sendLink(ctx, d) {
+    ctx.sim.out.push({ kind: 'link', text: d.text, buttonText: d.buttonText, url: d.url });
+    ctx.sim.history.push({ direction: 'OUTBOUND', content: `${d.text}\n${d.url}` });
+  }
+
   async _ask(ctx, node, attempts) {
     const d = node.data || {};
     ctx.sim.out.push({

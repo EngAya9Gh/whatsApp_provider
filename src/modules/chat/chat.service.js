@@ -255,13 +255,14 @@ class ChatService {
 
     const ticketsService = require('../tickets/tickets.service');
     
-    // A team member who replies to the customer takes an unassigned ticket (a team note does not)
+    // A team member who replies to the customer takes an unassigned ticket (a team note does not).
+    // Atomic, so two people replying at once cannot both take it.
     if (payload.senderId && !payload.isInternal) {
       try {
         const activeTicket = await ticketsService.getActiveTicket(tenantId, threadId);
         if (activeTicket && !activeTicket.assignedToId) {
-          await ticketsService.assignTicket(tenantId, activeTicket.id, payload.senderId, { actor: { key: payload.senderId } });
-          logger.info(`[ChatService] Ticket ${activeTicket.id} taken by ${payload.senderId} (first reply)`);
+          const { claimed } = await ticketsService.claimTicket(tenantId, activeTicket.id, payload.senderId, 'REPLY');
+          if (claimed) logger.info(`[ChatService] Ticket ${activeTicket.id} taken by ${payload.senderId} (first reply)`);
         }
       } catch (err) {
         logger.error('[ChatService] Error auto-assigning ticket: ' + err.message);
@@ -300,6 +301,13 @@ class ChatService {
         await billingService.incrementUsage(tenantId, 'sent');
       }
       
+      // First reply a person wrote on this ticket (first response time in the ticket reports). Taking over
+      // from a running flow makes the ticket the team's at that moment.
+      if (activeTicket && !payload.isInternal && !payload.isAutomated) {
+        if (thread.flowState) await ticketsService.markReady(activeTicket.id);
+        await ticketsService.markFirstResponse(activeTicket.id);
+      }
+
       const message = await ChatMessage.create({
         threadId: thread._id,
         direction: 'OUTBOUND',
@@ -554,6 +562,47 @@ class ChatService {
       return { flowHandled };
     }
     return { flowHandled: false, duplicate: true };
+  }
+
+  /** A message with one button that opens a link (flow "Link button" step) */
+  async sendLinkButton(tenantId, threadId, { body, buttonText, url, source }) {
+    const thread = await ChatThread.findOne({ _id: threadId, tenantId });
+    if (!thread) throw { status: 404, message: 'Thread not found' };
+    const channel = await prisma.whatsAppChannel.findUnique({ where: { id: thread.channelId } });
+    if (!channel) throw { status: 404, message: 'Channel not found' };
+
+    let metaResponse = null;
+    let status = 'SENT';
+    let failure = null;
+    try {
+      metaResponse = await metaService.sendLinkButton(channel, thread.contactPhone, body, buttonText, url);
+      await billingService.incrementUsage(tenantId, 'sent');
+    } catch (error) {
+      logger.error(`Error sending link button: ${metaErrorText(error)}`);
+      status = 'FAILED';
+      failure = metaErrorInfo(error);
+    }
+
+    const ticketsService = require('../tickets/tickets.service');
+    const activeTicket = await ticketsService.getActiveTicket(tenantId, thread._id.toString());
+    const message = await ChatMessage.create({
+      threadId: thread._id,
+      direction: 'OUTBOUND',
+      type: 'INTERACTIVE',
+      content: `${body}\n🔗 ${buttonText}: ${url}`,
+      status,
+      metaMessageId: metaResponse?.messages?.[0]?.id || null,
+      ticketId: activeTicket ? activeTicket.id : null,
+      isAutomated: true,
+      source: FLOW_SOURCES.includes(source) ? source : null
+    });
+    await ChatThread.updateOne({ _id: thread._id }, { $set: { lastMessageAt: new Date() } });
+
+    const msgData = message.toObject();
+    msgData.id = msgData._id.toString();
+    socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
+    if (status === 'FAILED') throw { status: 400, message: `Meta rejected the link button: ${failure.details || failure.message}`, metaCode: failure.code, metaSubcode: failure.subcode };
+    return msgData;
   }
 
   /**

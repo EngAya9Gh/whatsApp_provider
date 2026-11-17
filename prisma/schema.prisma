@@ -56,6 +56,12 @@ model Tenant {
   walletTransactions WalletTransaction[]
   aiUsage          AiUsage[]
   adminSessions    AdminImpersonation[]
+  couponRedemptions CouponRedemption[]
+  referralCode     ReferralCode?
+  referralsMade    Referral[]        @relation("ReferralReferrer")
+  referredBy       Referral?         @relation("ReferralReferred")
+  tasks            Task[]
+  addons           AddonPurchase[]
 
   @@map("tenants")
 }
@@ -298,6 +304,8 @@ model PlanSetting {
   isPopular    Boolean  @default(false) @map("is_popular")
   buttonTextAr String?  @map("button_text_ar")
   buttonTextEn String?  @map("button_text_en")
+  maxUsers     Int?     @map("max_users") // team members included in the plan; null = no limit
+  maxNumbers   Int?     @map("max_numbers") // official (Meta) numbers included in the plan; null = no limit
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -393,7 +401,13 @@ model Ticket {
   crmClientId     String?  @map("crm_client_id")
   crmContactId    String?  @map("crm_contact_id")
   resolvedAt      DateTime? @map("resolved_at")
-  firstResponseAt DateTime? @map("first_response_at")
+  firstResponseAt DateTime? @map("first_response_at") // first reply a person wrote to the customer
+  // When the ticket was ready for a person: at creation, or when a WhatsApp flow handed the chat over
+  readyAt         DateTime? @map("ready_at")
+  firstAssignedAt DateTime? @map("first_assigned_at") // pick-up time = firstAssignedAt - readyAt
+  // How it was first taken: OPEN (opened the chat), REPLY (first reply), ROUTING (team rules),
+  // MANUAL (someone assigned it), SELF ("take" button), FLOW (a flow's hand-off to one agent)
+  assignedVia     String?   @map("assigned_via") @db.VarChar(10)
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -588,4 +602,119 @@ model AdminImpersonation {
 
   @@index([tenantId, startedAt], map: "admin_impersonations_tenant_id_started_at_idx")
   @@map("admin_impersonations")
+}
+
+// Discount codes for subscription invoices (no payment gateway: the customer applies the code to an unpaid
+// invoice, which gets a discount line and its VAT recalculated). value: percent (1-100) or SAR before VAT.
+model Coupon {
+  id               String    @id @default(uuid())
+  code             String    @unique @db.VarChar(40)
+  type             String    @default("PERCENT") @db.VarChar(10) // PERCENT | FIXED
+  value            Float
+  maxUses          Int?      @map("max_uses") // null = no limit
+  usedCount        Int       @default(0) @map("used_count")
+  expiresAt        DateTime? @map("expires_at")
+  plans            Json? // ["PRO", "STARTER"]; null = every plan
+  firstInvoiceOnly Boolean   @default(false) @map("first_invoice_only")
+  isActive         Boolean   @default(true) @map("is_active")
+  note             String?   @db.VarChar(255)
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  redemptions CouponRedemption[]
+
+  @@map("coupons")
+}
+
+// One use of a coupon: on one invoice, once per account
+model CouponRedemption {
+  id        String   @id @default(uuid())
+  couponId  String   @map("coupon_id")
+  tenantId  String   @map("tenant_id")
+  invoiceId String   @unique @map("invoice_id")
+  discount  Float // before VAT
+  createdAt DateTime @default(now()) @map("created_at")
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, tenantId], map: "coupon_redemptions_coupon_tenant_key")
+  @@index([tenantId], map: "coupon_redemptions_tenant_id_idx")
+  @@map("coupon_redemptions")
+}
+
+// An account's invite code (https://…/register?ref=CODE), created the first time it opens its invite card
+model ReferralCode {
+  tenantId  String   @id @map("tenant_id")
+  code      String   @unique @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("referral_codes")
+}
+
+// Who invited whom. PENDING until the invited account's first invoice is paid, then the inviter's wallet is
+// credited with the reward set by the admin (REWARDED).
+model Referral {
+  id           String    @id @default(uuid())
+  referrerId   String    @map("referrer_id")
+  referredId   String    @unique @map("referred_id")
+  status       String    @default("PENDING") @db.VarChar(12) // PENDING | REWARDED
+  rewardAmount Float?    @map("reward_amount")
+  rewardedAt   DateTime? @map("rewarded_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  referrer Tenant @relation("ReferralReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred Tenant @relation("ReferralReferred", fields: [referredId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId], map: "referrals_referrer_id_idx")
+  @@map("referrals")
+}
+
+// A follow-up for the team ("call back tomorrow", "send the price quote"), with a due time and a person in
+// charge, optionally on a conversation. assigneeId / createdBy: 'owner' or a sub-user id.
+model Task {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  title        String    @db.VarChar(200)
+  notes        String?   @db.Text
+  status       String    @default("OPEN") @db.VarChar(10) // OPEN | DONE
+  dueAt        DateTime? @map("due_at")
+  assigneeId   String?   @map("assignee_id") @db.VarChar(64)
+  createdBy    String    @map("created_by") @db.VarChar(64)
+  threadId     String?   @map("thread_id") @db.VarChar(64) // Live Chat conversation (Mongo id)
+  contactName  String?   @map("contact_name") @db.VarChar(191)
+  contactPhone String?   @map("contact_phone") @db.VarChar(32)
+  completedAt  DateTime? @map("completed_at")
+  completedBy  String?   @map("completed_by") @db.VarChar(64)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, dueAt], map: "tasks_tenant_status_due_idx")
+  @@index([tenantId, assigneeId], map: "tasks_tenant_assignee_idx")
+  @@index([threadId], map: "tasks_thread_id_idx")
+  @@map("tasks")
+}
+
+// Extra team members / numbers on top of the plan. Requested by the customer → an invoice for the rest of the
+// month (+ VAT) → ACTIVE once the invoice is paid. Active add-ons stay until an admin cancels them; the monthly
+// invoice the admin issues should include them.
+model AddonPurchase {
+  id         String    @id @default(uuid())
+  tenantId   String    @map("tenant_id")
+  kind       String    @db.VarChar(10) // USERS | NUMBERS
+  quantity   Int
+  unitPrice  Float     @map("unit_price") // SAR per month before VAT, at the time of the request
+  invoiceId  String?   @unique @map("invoice_id")
+  status     String    @default("PENDING") @db.VarChar(10) // PENDING | ACTIVE | CANCELLED
+  activatedAt DateTime? @map("activated_at")
+  cancelledAt DateTime? @map("cancelled_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status], map: "addon_purchases_tenant_status_idx")
+  @@map("addon_purchases")
 }

@@ -4,7 +4,9 @@ const registerSchema = Joi.object({
   name: Joi.string().required().min(2).max(100),
   email: Joi.string().email().required(),
   password: Joi.string().required().min(6),
-  companyName: Joi.string().allow('').optional()
+  companyName: Joi.string().allow('').optional(),
+  // Invite code from a referral link (register?ref=CODE)
+  referralCode: Joi.string().max(40).allow('').optional()
 });
 
 const loginSchema = Joi.object({

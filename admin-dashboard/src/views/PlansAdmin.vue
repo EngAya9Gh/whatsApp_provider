@@ -39,6 +39,17 @@
 
           <div class="form-row">
             <div class="form-group">
+              <label>Team members included (فارغ = بلا حد)</label>
+              <input type="number" v-model="plan.maxUsers" min="0" placeholder="No limit" />
+            </div>
+            <div class="form-group">
+              <label>WhatsApp numbers included (فارغ = بلا حد)</label>
+              <input type="number" v-model="plan.maxNumbers" min="0" placeholder="No limit" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
               <label>Sort Order</label>
               <input type="number" v-model="plan.sortOrder" required />
             </div>
@@ -140,6 +151,8 @@ const updatePlan = async (plan) => {
       nameEn: plan.nameEn,
       price: plan.price,
       limit: plan.limit,
+      maxUsers: plan.maxUsers === '' || plan.maxUsers === undefined ? null : plan.maxUsers,
+      maxNumbers: plan.maxNumbers === '' || plan.maxNumbers === undefined ? null : plan.maxNumbers,
       features: plan.featuresEnText, // fallback
       featuresAr: plan.featuresArText,
       featuresEn: plan.featuresEnText,

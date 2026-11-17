@@ -36,6 +36,13 @@ class PlanService {
     if (data.buttonTextAr !== undefined) updateData.buttonTextAr = data.buttonTextAr;
     if (data.buttonTextEn !== undefined) updateData.buttonTextEn = data.buttonTextEn;
     if (data.featureFlags !== undefined) updateData.featureFlags = data.featureFlags;
+    // Team members / official numbers included in the plan (empty = no limit); more can be bought as add-ons
+    for (const key of ['maxUsers', 'maxNumbers']) {
+      if (data[key] === undefined) continue;
+      const n = data[key] === '' || data[key] === null ? null : parseInt(data[key], 10);
+      if (n !== null && !(n >= 0)) throw { status: 400, message: `${key} must be 0 or more, or empty for no limit` };
+      updateData[key] = n;
+    }
 
     return prisma.planSetting.update({
       where: { id },

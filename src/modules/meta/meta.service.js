@@ -7,6 +7,15 @@ const FormData = require('form-data'); // ✅ Node.js compatible form-data packa
 const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || 'v21.0';
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
+/** Interactive "cta_url" payload: body (max 1024), button text (max 20), https link */
+function ctaUrlInteractive(bodyText, buttonText, url) {
+  return {
+    type: 'cta_url',
+    body: { text: String(bodyText || ' ').substring(0, 1024) },
+    action: { name: 'cta_url', parameters: { display_text: String(buttonText || '').substring(0, 20), url: String(url) } }
+  };
+}
+
 class MetaService {
   /**
    * Core send method — all message types go through here.
@@ -175,6 +184,17 @@ class MetaService {
     return this.sendMessage(channel, phone, {
       type: 'interactive',
       interactive
+    });
+  }
+
+  /**
+   * One button that opens a web link (interactive "cta_url"). Meta allows exactly one such button per
+   * message, it cannot be mixed with reply buttons, and Meta does not tell the business when it is tapped.
+   */
+  async sendLinkButton(channel, phone, bodyText, buttonText, url) {
+    return this.sendMessage(channel, phone, {
+      type: 'interactive',
+      interactive: ctaUrlInteractive(bodyText, buttonText, url)
     });
   }
 
@@ -381,3 +401,4 @@ class MetaService {
 }
 
 module.exports = new MetaService();
+module.exports.ctaUrlInteractive = ctaUrlInteractive;

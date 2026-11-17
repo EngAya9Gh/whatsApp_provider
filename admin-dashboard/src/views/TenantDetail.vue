@@ -40,6 +40,26 @@
       <!-- Left Column -->
       <div class="lg:col-span-5 flex flex-col gap-6">
         
+        <!-- Plan limits and add-ons -->
+        <div v-if="addons" class="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+          <h3 class="text-lg font-bold text-slate-900 mb-3">Limits &amp; add-ons (الحدود والإضافات)</h3>
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div v-for="(l, kind) in addons.limits" :key="kind" class="bg-slate-50 rounded-lg p-3 border border-slate-200">
+              <div class="text-xs font-semibold text-slate-500">{{ kind === 'USERS' ? 'Team members' : 'WhatsApp numbers' }}</div>
+              <div class="text-xl font-extrabold text-slate-900">{{ l.used }} <span class="text-sm font-semibold text-slate-400">/ {{ l.limit === null ? '∞' : l.limit }}</span></div>
+              <div class="text-[11px] text-slate-500">Plan {{ l.included === null ? 'no limit' : l.included }}{{ l.extra ? ` + ${l.extra} add-on` : '' }}</div>
+            </div>
+          </div>
+          <div v-for="a in addons.purchases" :key="a.id" class="flex items-center justify-between gap-2 border-t border-slate-100 py-2 text-sm">
+            <span>{{ a.kind === 'USERS' ? 'Team member' : 'Number' }} × {{ a.quantity }} · {{ a.unitPrice }} SAR/mo</span>
+            <span class="flex items-center gap-2">
+              <span class="text-xs font-bold" :class="a.status === 'ACTIVE' ? 'text-green-700' : a.status === 'PENDING' ? 'text-amber-600' : 'text-slate-400'">{{ a.status === 'PENDING' ? 'Waiting for payment' : a.status }}</span>
+              <button v-if="a.status !== 'CANCELLED'" class="text-xs text-red-600 bg-transparent border border-red-200 rounded px-2 py-0.5 cursor-pointer" @click="cancelAddon(a)">Cancel</button>
+            </span>
+          </div>
+          <p v-if="!addons.purchases.length" class="text-xs text-slate-400">No add-ons.</p>
+        </div>
+
         <!-- Support sessions ("log in as customer") -->
         <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <h3 class="text-lg font-bold text-slate-900 mb-1">Support sessions (جلسات الدخول كعميل)</h3>
@@ -133,6 +153,12 @@
                 <option value="PLATFORM">We pay Meta — wallet takes base cost + markup</option>
               </select>
               <p class="text-xs text-slate-500 mt-2">Applies to campaigns created from now on. Failed messages are refunded either way.</p>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <label class="block text-sm font-semibold text-slate-700 mb-2">AI quota this account, tokens per month (حصة الذكاء الاصطناعي الخاصة)</label>
+              <input v-model="aiQuotaTokens" type="number" min="0" step="1000" dir="ltr" placeholder="Empty = the plan's quota" class="bg-white border border-slate-300 text-slate-900 text-sm rounded-lg block w-full p-2.5 outline-none" />
+              <p class="text-xs text-slate-500 mt-2">Only on the shared Gemini key. Empty = use the plan's quota (AI usage page). 0 = no shared key for this account.</p>
             </div>
 
             <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
@@ -587,6 +613,18 @@ const metaFeesPaidBy = computed({
   }
 })
 
+// This account's own AI quota (customFeatures.aiQuota.monthlyTokens); empty = the plan's quota
+const aiQuotaTokens = computed({
+  get: () => settingsForm.value.customFeatures?.aiQuota?.monthlyTokens ?? '',
+  set: (value) => {
+    const features = { ...(settingsForm.value.customFeatures || {}) }
+    const n = value === '' || value === null ? null : Math.max(0, Math.floor(Number(value)))
+    if (n === null || Number.isNaN(n)) delete features.aiQuota
+    else features.aiQuota = { monthlyTokens: n }
+    settingsForm.value.customFeatures = features
+  }
+})
+
 // What the tenant really has: the plan's features, then this tenant's overrides (the same rule the API applies).
 const planFeatures = computed(() => {
   const plan = dbPlans.value.find(p => p.planCode === tenant.value?.plan)
@@ -999,7 +1037,22 @@ const impersonate = async () => {
   }
 }
 
-onMounted(() => { fetchTenant(); loadWalletTx(true); loadSessions() })
+// Plan limits and add-ons of this account
+const addons = ref(null)
+const loadAddons = async () => {
+  try {
+    addons.value = (await axios.get(`/api/admin/tenants/${route.params.id}/addons`, { headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` } })).data.data
+  } catch (err) {
+    console.error('Failed to load add-ons:', err)
+  }
+}
+const cancelAddon = async (a) => {
+  if (!confirm('Cancel this add-on? The account loses the extra seats now.')) return
+  await axios.post(`/api/admin/addons/${a.id}/cancel`, {}, { headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` } })
+  loadAddons()
+}
+
+onMounted(() => { fetchTenant(); loadWalletTx(true); loadSessions(); loadAddons() })
 </script>
 
 

@@ -109,6 +109,10 @@
             <button v-if="canManageLabels" type="button" class="ticket-btn delete-thread-btn" @click="deleteThread" :title="isAr ? 'حذف المحادثة' : 'Delete conversation'">
               <i class="fas fa-trash"></i>
             </button>
+            <button type="button" class="ticket-btn share-btn" @click="showTaskModal = true" :title="isAr ? 'مهمة متابعة على هذه المحادثة' : 'Follow-up task on this chat'">
+              <i class="fas fa-list-check"></i>
+              <span class="btn-label">{{ isAr ? 'مهمة' : 'Task' }}</span>
+            </button>
             <button type="button" class="ticket-btn share-btn" @click="showShareModal = true" :title="isAr ? 'مشاركة مع زميل' : 'Share with a colleague'">
               <i class="fas fa-share"></i>
               <span class="btn-label">{{ isAr ? 'مشاركة' : 'Share' }}</span>
@@ -317,6 +321,14 @@
           <div v-if="messages.length === 0 && !loadingMessages" class="no-messages">
             <p>No messages yet. Start the conversation!</p>
           </div>
+        </div>
+
+        <!-- Somebody else on the team has this conversation's ticket -->
+        <div v-if="ownedByColleague" class="owner-banner">
+          <i class="fas fa-user-lock"></i>
+          <span>{{ isAr
+            ? `هذه المحادثة عند ${getAssignedUserName(activeTicket.assignedToId) || 'زميل'}. يمكنك القراءة وكتابة ملاحظة داخلية، وإذا رددت على العميل نطلب تأكيدك أولاً.`
+            : `${getAssignedUserName(activeTicket.assignedToId) || 'A colleague'} has this conversation. You can read and write team notes; replying to the customer asks you first.` }}</span>
         </div>
 
         <!-- Chat Input -->
@@ -547,6 +559,13 @@
         :is-ar="isAr"
         @close="showShareModal = false"
       />
+      <TaskModal
+        v-if="showTaskModal && selectedThread"
+        :thread="selectedThread"
+        :is-ar="isAr"
+        @close="showTaskModal = false"
+        @saved="onTaskSaved"
+      />
 
       <TemplateSendModal
         v-if="showTemplateModal && selectedThread && isMetaThread"
@@ -590,6 +609,7 @@ import { connectSocket } from '../services/realtime'
 import { aiErrorMessage } from '../utils/aiErrors'
 import { useI18n } from 'vue-i18n'
 import FeatureLock from '../components/FeatureLock.vue'
+import TaskModal from '../components/TaskModal.vue'
 import StagePicker from '../components/chat/StagePicker.vue'
 import TagPicker from '../components/chat/TagPicker.vue'
 import TemplateSendModal from '../components/chat/TemplateSendModal.vue'
@@ -640,6 +660,11 @@ const storedTenant = (() => {
   }
 })()
 const canManageLabels = !storedTenant.isSubUser || !!storedTenant.subUser?.permissions?.can_manage_settings
+const mySubUserId = storedTenant.isSubUser ? storedTenant.subUser?.id || null : null
+// The open conversation's ticket belongs to another team member (replying asks for confirmation once)
+const ownedByColleague = computed(() => !!(mySubUserId && activeTicket.value?.assignedToId &&
+  activeTicket.value.assignedToId !== mySubUserId && ['OPEN', 'PENDING'].includes(activeTicket.value.status)))
+let replyConfirmedFor = null
 // Agents limited to their team / assigned conversations (chat_scope)
 const isScopedViewer = !!storedTenant.isSubUser && ['TEAM', 'ASSIGNED'].includes(storedTenant.subUser?.permissions?.chat_scope)
 
@@ -691,6 +716,9 @@ const labelErrorToast = (err) => {
 
 // ─── AI: summary & stage suggestion ───────────────────────────
 const showShareModal = ref(false)
+// Follow-up task on the open conversation (Tasks page lists them all)
+const showTaskModal = ref(false)
+const onTaskSaved = () => window.dispatchEvent(new Event('tasks-updated'))
 const route = useRoute()
 
 // Opening a conversation shared from team chat (/live-chat?thread=<id>)
@@ -1148,10 +1176,34 @@ const selectThread = async (thread) => {
     fetchActiveTicket(thread.id)
   ])
   loadSuggestion(thread)
+  claimOnOpen(thread)
   // Viewing a conversation never opens or reopens a ticket: customer messages do that on the server,
   // and the team uses the buttons in the header
 }
 
+
+/**
+ * A team member opening a conversation takes its unassigned ticket (ticket setting "when they open it").
+ * The server decides atomically, so when two people open it at the same moment only one gets it.
+ */
+const claimOnOpen = async (thread) => {
+  const ticket = activeTicket.value
+  if (!mySubUserId || !ticket || ticket.assignedToId || !['OPEN', 'PENDING'].includes(ticket.status)) return
+  try {
+    const res = await axios.post('/api/v1/tickets/claim-on-open', { threadId: thread.id })
+    const data = res.data.data || {}
+    if (selectedThread.value?.id !== thread.id) return
+    if (data.ticket) activeTicket.value = { ...activeTicket.value, ...data.ticket }
+    const toast = { toast: true, position: 'top-end', showConfirmButton: false, timer: 2600 }
+    if (data.claimed) {
+      Swal.fire({ ...toast, icon: 'success', title: isAr.value ? `استلمت التذكرة ${data.ticket?.ticketNumber || ''}` : `You took ticket ${data.ticket?.ticketNumber || ''}` })
+    } else if (data.reason === 'TAKEN') {
+      Swal.fire({ ...toast, icon: 'info', title: isAr.value ? `استلمها ${data.assignee?.name || 'زميل'} قبلك` : `${data.assignee?.name || 'A colleague'} took it first` })
+    }
+  } catch (err) {
+    console.warn('Could not take the ticket on open', err)
+  }
+}
 
 // Assign icon in the conversation list
 const quickAssign = async (thread) => {
@@ -1388,6 +1440,20 @@ const sendMessage = async () => {
   if (!text && !file) return
 
   const internal = isInternal.value
+  if (!internal && ownedByColleague.value && replyConfirmedFor !== thread.id) {
+    const owner = getAssignedUserName(activeTicket.value.assignedToId) || (isAr.value ? 'زميلك' : 'your colleague')
+    const answer = await Swal.fire({
+      icon: 'question',
+      title: isAr.value ? `المحادثة عند ${owner}` : `${owner} has this conversation`,
+      text: isAr.value ? 'ردّك سيصل للعميل، والتذكرة تبقى عنده. للتنسيق يمكنك كتابة ملاحظة داخلية بدلاً من ذلك.' : 'Your reply reaches the customer and the ticket stays with them. To coordinate, write a team note instead.',
+      showCancelButton: true,
+      confirmButtonColor: '#FF6600',
+      confirmButtonText: isAr.value ? 'أرسل الرد' : 'Send the reply',
+      cancelButtonText: isAr.value ? 'إلغاء' : 'Cancel'
+    })
+    if (!answer.isConfirmed) return
+    replyConfirmedFor = thread.id
+  }
   const mentions = internal ? mentionedKeys(newMessage.value) : []
   let type = 'TEXT'
   if (file) {
@@ -2151,6 +2217,8 @@ onUnmounted(() => {
   margin-bottom: 6px;
 }
 
+.owner-banner { display: flex; align-items: flex-start; gap: 8px; margin: 0 16px 8px; padding: 8px 12px; border-radius: 10px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: 12.5px; line-height: 1.6; }
+.owner-banner i { margin-top: 3px; }
 .source-badge {
   display: inline-flex;
   align-items: center;

@@ -8,7 +8,17 @@ const MAX_NODES = 150;
 const MAX_EDGES = 300;
 const MAX_DATA_BYTES = 8000;
 
-const NODE_TYPES = ['trigger', 'message', 'question', 'condition', 'tag', 'stage', 'ai_agent', 'assign', 'end'];
+const NODE_TYPES = ['trigger', 'message', 'link', 'question', 'condition', 'tag', 'stage', 'ai_agent', 'assign', 'end'];
+
+/** A web link WhatsApp opens from a button: http(s), with a host */
+function isWebLink(value) {
+  try {
+    const u = new URL(String(value || '').trim());
+    return (u.protocol === 'https:' || u.protocol === 'http:') && !!u.hostname && String(value).length <= 2000;
+  } catch {
+    return false;
+  }
+}
 const CONDITIONS = ['ASSIGNED', 'WORKING_HOURS', 'HAS_TAG', 'STAGE_IS', 'TEXT_CONTAINS'];
 
 /** Output handles each node type may connect from */
@@ -123,6 +133,13 @@ async function validate(tenantId, { nodes, edges }) {
       case 'message':
         if (!String(d.text || '').trim()) add(node.id, 'The message is empty');
         else if (d.text.length > 4096) add(node.id, 'The message is longer than 4096 characters');
+        break;
+      case 'link':
+        if (!String(d.text || '').trim()) add(node.id, 'The message is empty');
+        else if (d.text.length > 1024) add(node.id, 'The link message is longer than 1024 characters');
+        if (!String(d.buttonText || '').trim()) add(node.id, 'Write the button text');
+        else if (d.buttonText.length > 20) add(node.id, 'The button text must be at most 20 characters');
+        if (!isWebLink(d.url)) add(node.id, 'Write a full link starting with https://');
         break;
       case 'question': {
         const options = Array.isArray(d.options) ? d.options : [];
@@ -303,6 +320,7 @@ module.exports = new FlowService();
 module.exports.validate = validate;
 module.exports.problemsToFix = problemsToFix;
 module.exports.reachable = reachable;
+module.exports.isWebLink = isWebLink;
 module.exports.sanitize = sanitize;
 module.exports.outputHandles = outputHandles;
 module.exports.defaultDraft = defaultDraft;

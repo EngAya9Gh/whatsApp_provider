@@ -290,6 +290,7 @@ export function outlineOf({ nodes, edges }, isAr, names = {}) {
     switch (n.type) {
       case 'trigger': return isAr ? 'العميل يراسلك' : 'The customer writes'
       case 'message': return first(d.text)
+      case 'link': return `${first(d.text)} 🔗`
       case 'question': return first(d.text)
       case 'condition': return d.check === 'WORKING_HOURS' ? (isAr ? 'هل نحن في الدوام الآن؟' : 'Are we open right now?') : (isAr ? 'شرط' : 'Condition')
       case 'tag': return (isAr ? 'إضافة وسم ' : 'Add tag ') + `«${names[d.tagId] || '—'}»`

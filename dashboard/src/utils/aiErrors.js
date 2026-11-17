@@ -8,6 +8,7 @@ const MESSAGES = {
   AI_KEY_INVALID: ['مفتاح Gemini غير صالح أو لا يملك صلاحية. تحقّق منه في الإعدادات ← الذكاء الاصطناعي.', 'The Gemini key is invalid or not allowed. Check it in Settings → AI.'],
   AI_MODEL_UNAVAILABLE: ['نموذج الذكاء الاصطناعي غير متاح حالياً. حاول مرة أخرى لاحقاً.', 'The AI model is not available right now. Try again later.'],
   AI_EMPTY: ['لم يصل رد من الذكاء الاصطناعي. حاول مرة أخرى.', 'The AI returned no answer. Try again.'],
+  AI_QUOTA_EXCEEDED: ['انتهت حصة الذكاء الاصطناعي لهذا الشهر. أضف مفتاح Gemini خاصاً بك من الإعدادات ← الذكاء الاصطناعي، أو اطلب رفع الحصة.', "This month's AI quota is used up. Add your own Gemini key in Settings → AI, or ask for a higher quota."],
   AI_BAD_JSON: ['وصل رد غير مكتمل من الذكاء الاصطناعي. حاول مرة أخرى.', 'The AI returned an incomplete answer. Try again.']
 }
 

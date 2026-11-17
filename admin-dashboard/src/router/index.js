@@ -8,6 +8,7 @@ import PlansAdmin from '../views/PlansAdmin.vue'
 import Settings from '../views/Settings.vue'
 import SystemHealth from '../views/SystemHealth.vue'
 import AiUsage from '../views/AiUsage.vue'
+import CouponsReferrals from '../views/CouponsReferrals.vue'
 
 const routes = [
   { path: '/login', component: Login, meta: { guest: true } },
@@ -19,6 +20,7 @@ const routes = [
   { path: '/settings', component: Settings, meta: { requiresAuth: true } },
   { path: '/system', component: SystemHealth, meta: { requiresAuth: true } },
   { path: '/ai-usage', component: AiUsage, meta: { requiresAuth: true } },
+  { path: '/coupons', component: CouponsReferrals, meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({

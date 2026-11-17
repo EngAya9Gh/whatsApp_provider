@@ -54,9 +54,11 @@ const routes = [
   { path: '/teams', component: () => import('../views/TeamsShifts.vue'), meta: { requiresAuth: true } },
   { path: '/analytics/meta', component: () => import('../views/AnalyticsMeta.vue'), meta: { requiresAuth: true } },
   { path: '/analytics/qr', component: () => import('../views/AnalyticsQr.vue'), meta: { requiresAuth: true } },
+  { path: '/analytics/tickets', component: () => import('../views/AnalyticsTickets.vue'), meta: { requiresAuth: true } },
   { path: '/flows', component: () => import('../views/Flows.vue'), meta: { requiresAuth: true } },
   { path: '/ai-agent', component: () => import('../views/AiAgent.vue'), meta: { requiresAuth: true } },
   { path: '/team-chat', component: () => import('../views/TeamChat.vue'), meta: { requiresAuth: true } },
+  { path: '/tasks', component: () => import('../views/Tasks.vue'), meta: { requiresAuth: true } },
   { path: '/meta-guide', component: () => import('../views/MetaGuide.vue'), meta: { requiresAuth: true } },
   { path: '/flows/:channelId', component: () => import('../views/FlowEditor.vue'), meta: { requiresAuth: true } },
   { path: '/quick-replies', component: QuickReplies, meta: { requiresAuth: true } },
@@ -132,6 +134,7 @@ router.beforeEach((to, from, next) => {
       '/connect': perms.can_manage_settings,
       '/connect-meta': perms.can_manage_settings,
       '/live-chat': perms.can_view_live_chat,
+      '/tasks': perms.can_view_live_chat,
       '/tickets': perms.can_view_live_chat, // Using live-chat permission for tickets for now, or true
       '/contacts': perms.can_manage_contacts,
       

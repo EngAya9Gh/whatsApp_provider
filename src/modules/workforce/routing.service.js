@@ -71,7 +71,10 @@ class RoutingService {
       if (!chosen) chosen = nextInTurn(team.memberIds, candidates, team.lastAssignedUserId);
       if (!chosen) return null;
 
-      await prisma.ticket.update({ where: { id: ticket.id }, data: { assignedToId: chosen } });
+      // Only while still unassigned: someone who opened the conversation meanwhile keeps it
+      const won = await prisma.ticket.updateMany({ where: { id: ticket.id, assignedToId: null }, data: { assignedToId: chosen } });
+      if (won.count === 0) return null;
+      await require('../tickets/tickets.service').stampAssigned(ticket.id, 'ROUTING');
       await Team.updateOne({ _id: team._id }, { $set: { lastAssignedUserId: chosen } });
       logger.info(`[Routing] Ticket ${ticket.id} → ${chosen} (team ${team.name})`);
       return chosen;

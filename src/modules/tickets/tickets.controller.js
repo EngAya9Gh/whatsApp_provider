@@ -146,6 +146,40 @@ class TicketsController {
     }
   }
 
+  /**
+   * Live Chat calls this when a team member opens a conversation. Takes the active ticket for them when
+   * nobody has it yet, unless the ticket settings say "on the first reply" or a WhatsApp flow / AI agent is
+   * still talking (watching the bot must not take the conversation away from it).
+   * Returns { claimed, reason?, ticket?, assignee? }; reason: OWNER | SETTING | NO_TICKET | FLOW | TAKEN | MINE
+   */
+  async claimOnOpen(req, res, next) {
+    try {
+      const tenantId = req.tenant.id;
+      const threadId = String(req.body?.threadId || '');
+      // The account owner is not a team member: tickets can only be assigned to team members
+      if (!req.isSubUser || !req.subUser) return res.json({ success: true, data: { claimed: false, reason: 'OWNER' } });
+      if (await ticketsService.claimMode(tenantId) !== 'OPEN') return res.json({ success: true, data: { claimed: false, reason: 'SETTING' } });
+
+      const ticket = await ticketsService.getActiveTicket(tenantId, threadId);
+      if (!ticket) return res.json({ success: true, data: { claimed: false, reason: 'NO_TICKET' } });
+      if (ticket.assignedToId) {
+        const mine = ticket.assignedToId === req.subUser.id;
+        const name = mine ? req.subUser.name : (await prisma.subUser.findFirst({ where: { id: ticket.assignedToId, tenantId }, select: { name: true } }))?.name || null;
+        return res.json({ success: true, data: { claimed: false, reason: mine ? 'MINE' : 'TAKEN', ticket, assignee: { id: ticket.assignedToId, name } } });
+      }
+
+      const ChatThread = require('../../models/mongo/ChatThread');
+      const thread = await ChatThread.findOne({ _id: threadId, tenantId }).select('flowState').lean().catch(() => null);
+      if (thread?.flowState?.nodeId) return res.json({ success: true, data: { claimed: false, reason: 'FLOW', ticket } });
+
+      const result = await ticketsService.claimTicket(tenantId, ticket.id, req.subUser.id, 'OPEN');
+      res.json({ success: true, data: { ...result, reason: result.claimed ? undefined : 'TAKEN' } });
+    } catch (error) {
+      if (error && error.status) return res.status(error.status).json({ error: { message: error.message } });
+      next(error);
+    }
+  }
+
   async assignTicket(req, res, next) {
     try {
       const ticket = await ticketsService.assignTicket(req.tenant.id, req.params.id, req.body?.assignedToId || null, { actor: actorOf(req) });

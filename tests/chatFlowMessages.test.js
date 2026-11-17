@@ -23,7 +23,11 @@ inject('@prisma/client', {
   PrismaClient: class { constructor() { this.whatsAppChannel = { findUnique: async () => ({ id: 'ch', tenantId: 'T' }) }; } }
 });
 const wamid = async () => ({ messages: [{ id: 'wamid.1' }] });
-inject(fromRoot('src/modules/meta/meta.service'), { sendButtons: wamid, sendList: wamid, sendText: wamid, sendMedia: wamid });
+const linkCalls = [];
+inject(fromRoot('src/modules/meta/meta.service'), {
+  sendButtons: wamid, sendList: wamid, sendText: wamid, sendMedia: wamid,
+  sendLinkButton: async (...args) => { linkCalls.push(args.slice(1)); return wamid(); }
+});
 inject(fromRoot('src/modules/billing/billing.service'), { checkLimit: async () => true, incrementUsage: async () => {} });
 inject(fromRoot('src/modules/webhook/webhook.service'), { syncCrmContact: async () => null });
 inject(fromRoot('src/modules/tickets/tickets.service'), { getActiveTicket: async () => null, assignTicket: async () => {} });
@@ -59,4 +63,11 @@ test('a person\'s message is never marked as the flow\'s, and it stops the runni
   assert.strictEqual(created[0].source, null);
   assert.strictEqual(created[0].isAutomated, false);
   assert.ok(threadUpdates.some(u => u.$set && u.$set.flowState === null), 'the flow stopped');
+});
+
+test('a flow link button reaches Meta and shows in Live Chat with its link', async () => {
+  await chatService.sendLinkButton('T', 'th1', { body: 'تصفح متجرنا', buttonText: 'افتح المتجر', url: 'https://rushd.ai', source: 'FLOW' });
+  assert.deepStrictEqual(linkCalls.at(-1), ['966500000001', 'تصفح متجرنا', 'افتح المتجر', 'https://rushd.ai']);
+  assert.strictEqual(created[0].source, 'FLOW');
+  assert.strictEqual(created[0].content, 'تصفح متجرنا\n🔗 افتح المتجر: https://rushd.ai');
 });

@@ -30,6 +30,16 @@ const fail = (status, message) => () => { throw httpError(status, message); };
 const timeout = () => () => { throw Object.assign(new Error('timeout of 20000ms exceeded'), { code: 'ECONNABORTED' }); };
 const answer = (text) => () => ({ candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }] });
 
+// Quota check on the shared key: off unless a test turns it on
+let quotaExceeded = false;
+inject(fromRoot('src/modules/ai/ai.quota.js'), {
+  assertWithinQuota: async () => {
+    if (!quotaExceeded) return null;
+    const { AiError } = require(fromRoot('src/modules/ai/ai.client.js'));
+    throw new AiError('AI_QUOTA_EXCEEDED', 'quota used up', { status: 429 });
+  }
+});
+
 for (const key of ['GEMINI_MODEL', 'GEMINI_FALLBACK_MODELS', 'GEMINI_THINKING_LEVEL']) delete process.env[key];
 const client = require(fromRoot('src/modules/ai/ai.client.js'));
 const req = { system: 'sys', contents: [{ role: 'user', text: 'hi' }], maxOutputTokens: 400 };
@@ -108,4 +118,19 @@ test('every Gemini answer records its tokens, the feature, and whether the share
     ['own', 'suggest_reply', false, 300, 12]
   ], 'thinking counts as output; an unusable answer is still billed by Google, so it is recorded');
   assert.strictEqual(usageRows[0].model, 'gemini-3.6-flash');
+});
+
+test('a used-up quota stops shared-key requests before Gemini is called; an own key is never limited', async () => {
+  process.env.GEMINI_API_KEY = 'platform-key';
+  quotaExceeded = true;
+  try {
+    reset([answer('x')]);
+    await assert.rejects(client.generate('shared', req), (e) => e.code === 'AI_QUOTA_EXCEEDED' && e.status === 429);
+    assert.strictEqual(calls.length, 0, 'nothing was sent to Google');
+    reset([answer('own key works')]);
+    assert.strictEqual(await client.generate('own', req), 'own key works');
+  } finally {
+    quotaExceeded = false;
+    delete process.env.GEMINI_API_KEY;
+  }
 });

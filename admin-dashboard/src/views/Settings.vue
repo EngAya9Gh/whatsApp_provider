@@ -200,6 +200,22 @@
             <p class="text-xs text-slate-500 mt-2">If disabled, campaigns will send without checking or deducting from tenant wallets.</p>
           </div>
           
+          <!-- Add-ons on top of the plan limits (Plans page) -->
+          <div class="p-4 border border-slate-100 rounded-lg bg-slate-50/50">
+            <h4 class="font-bold text-slate-800 mb-3 text-sm">Add-ons (الإضافات) — SAR per month, before VAT</h4>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Extra team member</label>
+                <input v-model="form.addonUserPrice" type="number" step="0.01" min="0" placeholder="Not for sale" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Extra WhatsApp number</label>
+                <input v-model="form.addonNumberPrice" type="number" step="0.01" min="0" placeholder="Not for sale" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">Empty = not for sale. The first invoice covers the rest of the month (+ VAT); the add-on turns on when it is marked paid. Include active add-ons in the monthly invoice.</p>
+          </div>
+
           <!-- AI (Gemini) prices, for the AI usage page -->
           <div class="p-4 border border-slate-100 rounded-lg bg-slate-50/50">
             <h4 class="font-bold text-slate-800 mb-3 text-sm">AI (Gemini) prices — shared key</h4>
@@ -285,7 +301,9 @@ const form = ref({
   enableWalletDeduction: true,
   metaFeesPaidBy: 'CUSTOMER',
   aiInputPricePerMillionUsd: '',
-  aiOutputPricePerMillionUsd: ''
+  aiOutputPricePerMillionUsd: '',
+  addonUserPrice: '',
+  addonNumberPrice: ''
 })
 
 const fetchSettings = async () => {
@@ -322,7 +340,7 @@ const saveSettings = async () => {
     dataToSave.serviceBaseCost = parseFloat(dataToSave.serviceBaseCost)
     dataToSave.serviceMarkupPercent = parseFloat(dataToSave.serviceMarkupPercent)
     // Empty AI prices stay empty (the AI usage page then shows no cost)
-    for (const k of ['aiInputPricePerMillionUsd', 'aiOutputPricePerMillionUsd']) {
+    for (const k of ['aiInputPricePerMillionUsd', 'aiOutputPricePerMillionUsd', 'addonUserPrice', 'addonNumberPrice']) {
       dataToSave[k] = dataToSave[k] === '' || dataToSave[k] === null ? null : parseFloat(dataToSave[k])
     }
 
