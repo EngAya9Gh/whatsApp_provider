@@ -58,6 +58,7 @@ const startServer = async () => {
       require('./services/ticketScheduler').start();
       // Campaign completion + refunds of failed messages
       require('./services/campaignBillingScheduler').start();
+      require('./services/channelBillingScheduler').start();
       // Meta campaigns go out in waves per WhatsApp number
       require('./modules/campaign/campaign.dispatcher').start();
     }
@@ -81,6 +82,7 @@ const shutdown = () => {
     const ticketScheduler = require('./services/ticketScheduler');
     ticketScheduler.stop();
     require('./services/campaignBillingScheduler').stop();
+    require('./services/channelBillingScheduler').stop();
     if (runsBackground) require('./modules/campaign/campaign.dispatcher').stop();
   } catch (e) {}
 

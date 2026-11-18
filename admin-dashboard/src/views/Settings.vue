@@ -216,6 +216,26 @@
             <p class="text-xs text-slate-500 mt-2">Empty = not for sale. The first invoice covers the rest of the month (+ VAT); the add-on turns on when it is marked paid. Include active add-ons in the monthly invoice.</p>
           </div>
 
+          <!-- Channels sold per channel: monthly fee from the tenant's one wallet (channels/channel.billing.js) -->
+          <div class="p-4 border border-slate-100 rounded-lg bg-slate-50/50">
+            <h4 class="font-bold text-slate-800 mb-3 text-sm">Channel prices (أسعار القنوات) — SAR per month, from the wallet</h4>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Website widget (ويدجت الموقع), per widget</label>
+                <input v-model="form.channelPriceWebchat" type="number" step="0.01" min="0" placeholder="Free" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Instagram, per account (coming soon)</label>
+                <input v-model="form.channelPriceInstagram" type="number" step="0.01" min="0" placeholder="Free" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Messenger, per page (coming soon)</label>
+                <input v-model="form.channelPriceMessenger" type="number" step="0.01" min="0" placeholder="Free" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">Empty = free. Charged from the tenant's wallet when the channel is created, then every month (hourly check). A channel the wallet cannot pay for stops, and starts again by itself after a top-up. Nothing is charged to accounts with wallet deduction off. Every charge shows its channel in the tenant's wallet history.</p>
+          </div>
+
           <!-- AI (Gemini) prices, for the AI usage page -->
           <div class="p-4 border border-slate-100 rounded-lg bg-slate-50/50">
             <h4 class="font-bold text-slate-800 mb-3 text-sm">AI (Gemini) prices — shared key</h4>
@@ -303,7 +323,10 @@ const form = ref({
   aiInputPricePerMillionUsd: '',
   aiOutputPricePerMillionUsd: '',
   addonUserPrice: '',
-  addonNumberPrice: ''
+  addonNumberPrice: '',
+  channelPriceWebchat: '',
+  channelPriceInstagram: '',
+  channelPriceMessenger: ''
 })
 
 const fetchSettings = async () => {
@@ -340,7 +363,7 @@ const saveSettings = async () => {
     dataToSave.serviceBaseCost = parseFloat(dataToSave.serviceBaseCost)
     dataToSave.serviceMarkupPercent = parseFloat(dataToSave.serviceMarkupPercent)
     // Empty AI prices stay empty (the AI usage page then shows no cost)
-    for (const k of ['aiInputPricePerMillionUsd', 'aiOutputPricePerMillionUsd', 'addonUserPrice', 'addonNumberPrice']) {
+    for (const k of ['aiInputPricePerMillionUsd', 'aiOutputPricePerMillionUsd', 'addonUserPrice', 'addonNumberPrice', 'channelPriceWebchat', 'channelPriceInstagram', 'channelPriceMessenger']) {
       dataToSave[k] = dataToSave[k] === '' || dataToSave[k] === null ? null : parseFloat(dataToSave[k])
     }
 

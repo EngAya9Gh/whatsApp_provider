@@ -18,6 +18,29 @@
         {{ isAr ? 'حملاتك لا تُخصم من المحفظة حالياً.' : 'Your campaigns are not charged to the wallet at the moment.' }}
       </p>
 
+      <!-- One wallet for every channel: what each one cost this month, and the monthly price of paid channels -->
+      <div v-if="wallet.spentByChannel?.length || wallet.paidChannels?.length" class="by-channel">
+        <h4>{{ isAr ? 'من وين انصرف الرصيد هذا الشهر' : 'Where the balance went this month' }}</h4>
+        <div v-for="row in wallet.spentByChannel" :key="row.kind + row.channelId" class="by-channel-row">
+          <span class="kind-chip" :style="{ '--k': kindColor(row.kind) }">{{ kindLabel(row.kind) }}</span>
+          <span class="by-channel-name">{{ row.channelName || (isAr ? 'بدون قناة محددة' : 'No specific channel') }}</span>
+          <b dir="ltr">{{ money(row.spent) }} <small>{{ wallet.currency }}</small></b>
+        </div>
+        <template v-if="wallet.paidChannels?.length">
+          <h5>{{ isAr ? 'اشتراكات القنوات (تُخصم شهرياً من نفس الرصيد)' : 'Channel subscriptions (monthly, from the same balance)' }}</h5>
+          <div v-for="ch in wallet.paidChannels" :key="ch.id" class="by-channel-row">
+            <span class="kind-chip" :style="{ '--k': kindColor(ch.kind) }">{{ kindLabel(ch.kind) }}</span>
+            <span class="by-channel-name">{{ ch.name }}</span>
+            <span class="by-channel-meta">
+              <span dir="ltr">{{ money(ch.price) }} {{ wallet.currency }}</span> / {{ isAr ? 'شهر' : 'month' }} ·
+              <template v-if="ch.state === 'UNPAID'"><span class="stopped">{{ isAr ? 'متوقف: الرصيد لا يكفي' : 'Stopped: balance too low' }}</span></template>
+              <template v-else-if="ch.paidUntil">{{ isAr ? 'مدفوع حتى' : 'Paid until' }} {{ formatDay(ch.paidUntil) }}</template>
+              <template v-else>{{ isAr ? 'يُخصم خلال ساعة' : 'Charged within the hour' }}</template>
+            </span>
+          </div>
+        </template>
+      </div>
+
       <div class="wallet-history-head">
         <h4>{{ isAr ? 'سجل المحفظة' : 'Wallet history' }}</h4>
         <select v-model="txType" @change="loadTransactions(true)" class="wallet-filter">
@@ -38,7 +61,10 @@
         <tbody>
           <tr v-for="tx in transactions" :key="tx.id">
             <td class="nowrap">{{ formatDate(tx.createdAt) }}</td>
-            <td><span class="tx-type" :class="tx.amount >= 0 ? 'in' : 'out'">{{ typeLabels[tx.type] || tx.type }}</span></td>
+            <td>
+              <span class="tx-type" :class="tx.amount >= 0 ? 'in' : 'out'">{{ typeLabels[tx.type] || tx.type }}</span>
+              <span v-if="txKind(tx)" class="kind-chip small" :style="{ '--k': kindColor(txKind(tx)) }">{{ kindLabel(txKind(tx)) }}</span>
+            </td>
             <td>
               <router-link v-if="tx.referenceType === 'CAMPAIGN' && tx.referenceId" :to="`/campaigns/${tx.referenceId}`" class="view-link">{{ tx.description || (isAr ? 'عرض الحملة' : 'View campaign') }}</router-link>
               <span v-else>{{ tx.description || '—' }}</span>
@@ -195,11 +221,26 @@ const loadingMore = ref(false)
 const typeLabels = computed(() => ({
   TOP_UP: isAr.value ? 'شحن رصيد' : 'Top-up',
   CAMPAIGN_CHARGE: isAr.value ? 'تكلفة حملة' : 'Campaign charge',
+  CHANNEL_FEE: isAr.value ? 'اشتراك قناة' : 'Channel fee',
   REFUND: isAr.value ? 'استرجاع' : 'Refund',
   REFERRAL_REWARD: isAr.value ? 'مكافأة دعوة صديق' : 'Referral reward',
   ADMIN_DEDUCTION: isAr.value ? 'خصم من الإدارة' : 'Admin deduction',
   ADMIN_SET: isAr.value ? 'تعديل الرصيد' : 'Balance adjustment'
 }))
+
+// The channel a wallet movement was for (campaign rows from before channels were recorded are WhatsApp)
+const KIND_COLORS = { WHATSAPP: '#16a34a', WHATSAPP_QR: '#0f766e', WEBCHAT: '#0891b2', INSTAGRAM: '#c026d3', MESSENGER: '#2563eb', OTHER: '#64748b' }
+const kindColor = (kind) => KIND_COLORS[kind] || KIND_COLORS.OTHER
+const kindLabel = (kind) => ({
+  WHATSAPP: isAr.value ? 'واتساب' : 'WhatsApp',
+  WHATSAPP_QR: isAr.value ? 'واتساب (باركود)' : 'WhatsApp (QR)',
+  WEBCHAT: isAr.value ? 'ويدجت الموقع' : 'Website widget',
+  INSTAGRAM: isAr.value ? 'انستغرام' : 'Instagram',
+  MESSENGER: isAr.value ? 'ماسنجر' : 'Messenger',
+  OTHER: isAr.value ? 'أخرى' : 'Other'
+})[kind] || kind
+const txKind = (tx) => tx.channelKind || (tx.referenceType === 'CAMPAIGN' || tx.type === 'CAMPAIGN_CHARGE' ? 'WHATSAPP' : null)
+const formatDay = (iso) => new Intl.DateTimeFormat(isAr.value ? 'ar-u-nu-latn-ca-gregory' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso))
 
 const moneyFormat = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 const money = (n) => moneyFormat.format(Number(n) || 0)
@@ -397,6 +438,17 @@ h3 span { color: #3b82f6; }
 .wallet-balance small, .wallet-spent-value small { font-size: 0.9rem; font-weight: 600; color: #6b7280; }
 .wallet-spent-value { font-size: 1.4rem; font-weight: 700; color: #374151; }
 .wallet-note { margin: 1rem 0 0; font-size: 0.85rem; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 0.6rem 0.9rem; }
+.by-channel { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #e5e7eb; }
+.by-channel h4 { margin: 0 0 0.75rem; color: #1E293B; }
+.by-channel h5 { margin: 1rem 0 0.5rem; font-size: 0.85rem; color: #475569; }
+.by-channel-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0; border-bottom: 1px dashed #eef0f3; font-size: 0.9rem; }
+.by-channel-row b { margin-inline-start: auto; white-space: nowrap; color: #111827; }
+.by-channel-row b small { color: #6b7280; font-weight: 600; }
+.by-channel-name { color: #374151; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.by-channel-meta { margin-inline-start: auto; font-size: 0.8rem; color: #64748b; white-space: nowrap; }
+.by-channel-meta .stopped { color: #b91c1c; font-weight: 700; }
+.kind-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 700; color: var(--k); background: color-mix(in srgb, var(--k) 10%, white); border: 1px solid color-mix(in srgb, var(--k) 25%, white); border-radius: 999px; padding: 2px 9px; white-space: nowrap; flex-shrink: 0; }
+.kind-chip.small { font-size: 0.68rem; padding: 1px 7px; margin-inline-start: 6px; }
 .wallet-history-head { display: flex; justify-content: space-between; align-items: center; margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid #e5e7eb; }
 .wallet-history-head h4 { margin: 0; color: #1E293B; }
 .wallet-filter { border: 1px solid #d1d5db; border-radius: 8px; padding: 0.4rem 0.7rem; font-size: 0.85rem; background: white; }

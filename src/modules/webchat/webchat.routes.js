@@ -21,5 +21,6 @@ router.get('/widgets', requireAnyPermission('can_manage_settings', 'can_view_liv
 router.post('/widgets', requirePermission('can_manage_settings'), handle(req => webchatService.createWidget(req.tenant.id, req.body || {}), 201));
 router.put('/widgets/:id', requirePermission('can_manage_settings'), handle(req => webchatService.updateWidget(req.tenant.id, req.params.id, req.body || {})));
 router.delete('/widgets/:id', requirePermission('can_manage_settings'), handle(req => webchatService.deleteWidget(req.tenant.id, req.params.id)));
+router.post('/widgets/:id/renew', requirePermission('can_manage_settings'), handle(req => webchatService.renewWidget(req.tenant.id, req.params.id)));
 
 module.exports = router;

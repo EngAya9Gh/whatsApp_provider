@@ -6,6 +6,7 @@ const TYPES = {
   ADMIN_DEDUCTION: 'ADMIN_DEDUCTION',   // money removed by an admin
   ADMIN_SET: 'ADMIN_SET',               // balance set to a value by an admin
   CAMPAIGN_CHARGE: 'CAMPAIGN_CHARGE',   // campaign cost, charged when the campaign is created
+  CHANNEL_FEE: 'CHANNEL_FEE',           // monthly fee of a channel sold per channel (channels/channel.billing.js)
   REFUND: 'REFUND',                     // a charge handed back
   REFERRAL_REWARD: 'REFERRAL_REWARD'    // an invited account paid its first invoice (referral.service.js)
 };
@@ -23,6 +24,8 @@ const formatTransaction = (t) => ({
   description: t.description,
   referenceType: t.referenceType,
   referenceId: t.referenceId,
+  channelKind: t.channelKind || null,
+  channelId: t.channelId || null,
   createdAt: t.createdAt
 });
 
@@ -32,7 +35,7 @@ const notFound = () => ({ status: 404, message: 'Tenant not found' });
  * Moves the balance by `delta` and writes the ledger row, inside the caller's transaction.
  * A debit only succeeds while the balance covers it, so concurrent charges can never overdraw.
  */
-async function apply(db, tenantId, delta, { type, description = null, referenceType = null, referenceId = null, createdBy = null }) {
+async function apply(db, tenantId, delta, { type, description = null, referenceType = null, referenceId = null, createdBy = null, channelKind = null, channelId = null }) {
   const amount = round(delta);
   if (amount < 0) {
     const debited = await db.tenant.updateMany({
@@ -66,7 +69,9 @@ async function apply(db, tenantId, delta, { type, description = null, referenceT
       description,
       referenceType,
       referenceId,
-      createdBy
+      createdBy,
+      channelKind,
+      channelId
     }
   });
 }
@@ -154,14 +159,14 @@ class WalletService {
     return { transactions: rows.map(formatTransaction), pagination: { total, page: current, pages: Math.ceil(total / take) } };
   }
 
-  /** Balance, and what was spent on campaigns so far this month (refunds taken off) */
+  /** Balance, what was spent so far this month (refunds taken off), and that spend per channel */
   async getSummary(tenantId, now = new Date()) {
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { walletBalance: true, currency: true, deductBalance: true } });
     if (!tenant) throw notFound();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const settings = await prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } });
     const spent = await prisma.walletTransaction.aggregate({
-      where: { tenantId, type: { in: [TYPES.CAMPAIGN_CHARGE, TYPES.REFUND] }, createdAt: { gte: monthStart } },
+      where: { tenantId, type: { in: [TYPES.CAMPAIGN_CHARGE, TYPES.CHANNEL_FEE, TYPES.REFUND] }, createdAt: { gte: monthStart } },
       _sum: { amount: true }
     });
     return {
@@ -170,7 +175,9 @@ class WalletService {
       // Campaigns are only charged to the wallet when both the platform and this account have it on
       chargesEnabled: settings?.data?.enableWalletDeduction !== false && tenant.deductBalance !== false,
       // `|| 0` turns a negative zero into a plain zero
-      spentThisMonth: round(-(spent._sum.amount || 0)) || 0
+      spentThisMonth: round(-(spent._sum.amount || 0)) || 0,
+      // One wallet: what each channel cost this month, and the monthly price of each paid channel
+      ...(await require('../channels/channel.billing').spendByChannel(tenantId, monthStart))
     };
   }
 }

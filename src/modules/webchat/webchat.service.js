@@ -13,7 +13,8 @@ const { DEFAULTS, normalizeSettings, originAllowed, normalizePhone, hostOf } = r
 const PROVIDER = 'WEBCHAT';
 const MAX_TEXT = 2000;
 const CONFIG_CACHE_MS = 30 * 1000;
-const WIDGET_FIELDS = { id: true, name: true, status: true, settings: true, createdAt: true };
+const WIDGET_FIELDS = { id: true, tenantId: true, providerType: true, name: true, status: true, settings: true, createdAt: true, paidUntil: true, billingState: true };
+const channelBilling = require('../channels/channel.billing');
 
 const httpError = (status, message, code) => Object.assign(new Error(message), { status, code });
 const addressOf = (visitorId) => `web:${visitorId}`;
@@ -25,11 +26,13 @@ const sign = (channelId, visitorId) => crypto.createHmac('sha256', secret()).upd
 /** Our own dashboard may always show the widget (preview page), whatever the allowed websites are */
 const ownHosts = () => [process.env.APP_URL, process.env.FRONTEND_URL].map(hostOf).filter(Boolean);
 
-const widgetView = (channel) => ({
+/** price: monthly fee from the wallet (null = free); state: ACTIVE | UNPAID (stopped) | null */
+const widgetView = (channel, price = null) => ({
   id: channel.id,
   name: channel.name || '',
   createdAt: channel.createdAt,
-  settings: normalizeSettings({}, channel.settings || {}).settings
+  settings: normalizeSettings({}, channel.settings || {}).settings,
+  billing: { price, paidUntil: price ? channel.paidUntil || null : null, state: price ? channel.billingState || null : null }
 });
 
 class WebchatService {
@@ -45,7 +48,8 @@ class WebchatService {
       select: WIDGET_FIELDS,
       orderBy: { createdAt: 'asc' }
     });
-    return channels.map(widgetView);
+    const price = await channelBilling.priceNow(PROVIDER);
+    return channels.map(c => widgetView(c, price));
   }
 
   async createWidget(tenantId, { name, settings } = {}) {
@@ -61,7 +65,24 @@ class WebchatService {
       },
       select: WIDGET_FIELDS
     });
-    return widgetView(channel);
+    // A paid widget starts with its first month, from the wallet
+    const billing = await channelBilling.chargeChannel(channel);
+    if (billing.insufficient) {
+      await prisma.whatsAppChannel.delete({ where: { id: channel.id } }).catch(() => {});
+      throw httpError(402, `The website widget costs ${billing.price} per month from your wallet, and the balance does not cover it. Top up the wallet first.`, 'INSUFFICIENT_BALANCE');
+    }
+    return widgetView({ ...channel, paidUntil: billing.paidUntil, billingState: billing.state }, billing.price);
+  }
+
+  /** Pays the next month now (a widget stopped for the balance starts again at once) */
+  async renewWidget(tenantId, id) {
+    const channel = await prisma.whatsAppChannel.findFirst({ where: { id, tenantId, providerType: PROVIDER }, select: WIDGET_FIELDS });
+    if (!channel) throw httpError(404, 'Widget not found');
+    if (channel.billingState !== 'UNPAID') return widgetView(channel, await channelBilling.priceNow(PROVIDER));
+    const billing = await channelBilling.chargeChannel(channel);
+    if (billing.insufficient) throw httpError(402, 'The wallet balance does not cover this month yet. Top up the wallet first.', 'INSUFFICIENT_BALANCE');
+    this.cache.delete(id);
+    return widgetView({ ...channel, paidUntil: billing.paidUntil, billingState: billing.state }, billing.price);
   }
 
   async updateWidget(tenantId, id, { name, settings } = {}) {
@@ -78,7 +99,7 @@ class WebchatService {
       select: WIDGET_FIELDS
     });
     this.cache.delete(id);
-    return widgetView(updated);
+    return widgetView(updated, await channelBilling.priceNow(PROVIDER));
   }
 
   /** Only a widget without tickets can be deleted (the reports keep them); otherwise switch it off */
@@ -101,7 +122,7 @@ class WebchatService {
     const channel = /^[0-9a-f-]{36}$/i.test(String(channelId))
       ? await prisma.whatsAppChannel.findFirst({
         where: { id: channelId, providerType: PROVIDER },
-        select: { id: true, tenantId: true, name: true, settings: true }
+        select: { id: true, tenantId: true, name: true, settings: true, billingState: true }
       })
       : null;
     if (channel) channel.settings = normalizeSettings({}, channel.settings || {}).settings;
@@ -113,7 +134,8 @@ class WebchatService {
   /** The channel, if this page may use it */
   async _usable(channelId, origin) {
     const channel = await this._channel(channelId);
-    if (!channel || !channel.settings.enabled) throw httpError(404, 'This chat is not available');
+    // Switched off, or stopped because the wallet did not cover its monthly fee
+    if (!channel || !channel.settings.enabled || channelBilling.isStopped(channel)) throw httpError(404, 'This chat is not available');
     if (!originAllowed(channel.settings, origin, ownHosts())) throw httpError(403, 'This chat is not enabled on this website');
     return channel;
   }

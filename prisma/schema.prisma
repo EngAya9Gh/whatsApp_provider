@@ -92,6 +92,10 @@ model WhatsAppChannel {
   // Channel-kind settings. Website widget (providerType WEBCHAT): { enabled, title, welcome, color, position,
   // language, askName, askPhone, whatsappNumber, allowedDomains } — see webchat/webchat.settings.js
   settings Json? @map("settings")
+  // Monthly fee of channels sold per channel (website widget, Instagram, Messenger), paid from the wallet
+  // (channels/channel.billing.js): null state = free, ACTIVE = paid until paidUntil, UNPAID = stopped
+  paidUntil    DateTime? @map("paid_until")
+  billingState String?   @map("billing_state") @db.VarChar(12)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -559,7 +563,7 @@ model Contact {
 model WalletTransaction {
   id            String   @id @default(uuid())
   tenantId      String   @map("tenant_id")
-  // TOP_UP | ADMIN_DEDUCTION | ADMIN_SET | CAMPAIGN_CHARGE | REFUND
+  // TOP_UP | ADMIN_DEDUCTION | ADMIN_SET | CAMPAIGN_CHARGE | CHANNEL_FEE | REFUND | REFERRAL_REWARD
   type          String
   // Signed: positive adds money to the wallet, negative spends it
   amount        Float
@@ -569,6 +573,9 @@ model WalletTransaction {
   // What the movement belongs to, e.g. CAMPAIGN + the campaign id
   referenceType String?  @map("reference_type")
   referenceId   String?  @map("reference_id")
+  // The channel it was for (one wallet, spend shown per channel): WHATSAPP | WHATSAPP_QR | WEBCHAT | …
+  channelKind   String?  @map("channel_kind") @db.VarChar(20)
+  channelId     String?  @map("channel_id")
   // Admin id, or "SYSTEM"
   createdBy     String?  @map("created_by")
   createdAt     DateTime @default(now()) @map("created_at")

@@ -29,8 +29,23 @@
       <!-- Several widgets: one per website -->
       <div v-if="widgets.length > 1" class="flex flex-wrap gap-2 mb-4">
         <button v-for="w in widgets" :key="w.id" type="button" class="pill" :class="{ on: w.id === currentId }" @click="select(w.id)">
-          <span class="dot" :class="w.settings.enabled ? 'bg-emerald-500' : 'bg-slate-300'"></span>{{ w.name || w.settings.title }}
+          <span class="dot" :class="w.billing?.state === 'UNPAID' ? 'bg-red-500' : w.settings.enabled ? 'bg-emerald-500' : 'bg-slate-300'"></span>{{ w.name || w.settings.title }}
         </button>
+      </div>
+
+      <!-- Monthly fee from the wallet (set by the platform; none = free) -->
+      <div v-if="current?.billing?.price" class="fee" :class="{ stopped: current.billing.state === 'UNPAID' }">
+        <i class="fas" :class="current.billing.state === 'UNPAID' ? 'fa-circle-pause' : 'fa-wallet'"></i>
+        <span v-if="current.billing.state === 'UNPAID'">{{ isAr
+          ? `الويدجت متوقف ومختفٍ من موقعك لأن رصيد المحفظة لا يغطي اشتراكه (${current.billing.price} ر.س شهرياً). اشحن الرصيد ويعود خلال ساعة، أو جدّده الآن.`
+          : `The widget is stopped and hidden from your site: the wallet does not cover its fee (${current.billing.price} SAR a month). Top up and it returns within the hour, or renew now.` }}</span>
+        <span v-else>{{ isAr
+          ? `الاشتراك ${current.billing.price} ر.س شهرياً من رصيد المحفظة نفسه${current.billing.paidUntil ? ` · مدفوع حتى ${formatDay(current.billing.paidUntil)}` : ''}. يظهر في «الاستهلاك والفواتير» باسم «ويدجت الموقع».`
+          : `${current.billing.price} SAR a month from your wallet${current.billing.paidUntil ? ` · paid until ${formatDay(current.billing.paidUntil)}` : ''}. Shown under "Website widget" in Usage & Billing.` }}</span>
+        <span v-if="current.billing.state === 'UNPAID'" class="fee-actions">
+          <router-link to="/billing" class="ghost">{{ isAr ? 'المحفظة' : 'Wallet' }}</router-link>
+          <button type="button" class="save" :disabled="saving" @click="renew">{{ isAr ? 'جدّد الآن' : 'Renew now' }}</button>
+        </span>
       </div>
 
       <div class="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
@@ -39,12 +54,19 @@
           <section class="card">
             <h2 class="card-title"><span class="num">1</span>{{ isAr ? 'ضعه على موقعك' : 'Put it on your website' }}</h2>
             <p class="text-xs text-slate-500 -mt-2 mb-3 leading-relaxed">{{ isAr
-              ? 'انسخ هذا السطر والصقه قبل </body> في كل صفحات موقعك (أو في خانة «أكواد إضافية» في سلة وزد وووردبريس).'
-              : 'Copy this line and paste it before </body> on every page of your site (or in the "custom code" box of your store platform).' }}</p>
-            <div class="code" dir="ltr">
-              <code>{{ snippet }}</code>
-              <button type="button" class="copy" @click="copy(snippet)"><i class="far fa-copy"></i>{{ isAr ? 'نسخ' : 'Copy' }}</button>
+              ? 'سطر واحد يُلصق في موقعك مرة واحدة، وبعدها يظهر الزر في كل الصفحات. اختر منصة موقعك:'
+              : 'One line, pasted once, and the button shows on every page. Pick your website platform:' }}</p>
+            <div class="tabs" role="tablist">
+              <button v-for="p in platforms" :key="p.key" type="button" role="tab" :aria-selected="platform === p.key" :class="{ on: platform === p.key }" @click="platform = p.key">{{ p.label }}</button>
             </div>
+            <ol class="how">
+              <li v-for="(step, i) in currentPlatform.steps" :key="i">{{ step }}</li>
+            </ol>
+            <div class="code" dir="ltr">
+              <code>{{ currentPlatform.jsOnly ? jsSnippet : snippet }}</code>
+              <button type="button" class="copy" @click="copy(currentPlatform.jsOnly ? jsSnippet : snippet)"><i class="far fa-copy"></i>{{ isAr ? 'نسخ' : 'Copy' }}</button>
+            </div>
+            <p v-if="currentPlatform.note" class="note warn"><i class="fas fa-triangle-exclamation"></i>{{ currentPlatform.note }}</p>
             <div class="flex flex-wrap gap-2 mt-3">
               <a :href="tryUrl" target="_blank" rel="noopener" class="ghost"><i class="fas fa-up-right-from-square"></i>{{ isAr ? 'جرّبه الآن في صفحة تجربة' : 'Try it on a test page' }}</a>
             </div>
@@ -229,6 +251,27 @@ const dirty = computed(() => !!form.value && JSON.stringify(payload()) !== saved
 const origin = window.location.origin
 const snippet = computed(() => `<script src="${origin}/api/v1/webchat/widget.js" data-id="${currentId.value}" async><\/script>`)
 const tryUrl = computed(() => `${origin}/api/v1/webchat/try/${currentId.value}`)
+// For boxes that take JavaScript only (no HTML tags): the same widget, added by a few lines of JS
+const jsSnippet = computed(() => `(function(){var s=document.createElement('script');s.src='${origin}/api/v1/webchat/widget.js';s.async=true;s.setAttribute('data-id','${currentId.value}');document.body.appendChild(s);})();`)
+const current = computed(() => widgets.value.find(w => w.id === currentId.value) || null)
+const formatDay = (iso) => new Intl.DateTimeFormat(isAr.value ? 'ar-u-nu-latn-ca-gregory' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso))
+
+// Where the line goes on each website platform
+const platform = ref('html')
+const platforms = computed(() => isAr.value ? [
+  { key: 'html', label: 'موقع عادي', steps: ['افتح ملف القالب المشترك لكل الصفحات (عادةً footer أو layout).', 'الصق السطر قبل </body> مباشرة واحفظ.', 'افتح موقعك: يظهر الزر في الزاوية.'] },
+  { key: 'wordpress', label: 'ووردبريس', steps: ['من «الإضافات» ثبّت إضافة WPCode (Insert Headers and Footers) وفعّلها.', 'افتح Code Snippets ← Header & Footer.', 'الصق السطر في خانة Footer واحفظ.'] },
+  { key: 'shopify', label: 'شوبيفاي', steps: ['Online Store ← Themes ← زر (…) بجانب القالب ← Edit code.', 'افتح الملف layout/theme.liquid.', 'الصق السطر قبل </body> مباشرة واحفظ.'] },
+  { key: 'salla', label: 'سلة', jsOnly: true, steps: ['من لوحة سلة: «تصميم المتجر» ثم تخصيص الثيم بالأكواد.', 'في خانة JavaScript الصق الكود أدناه (نسخة JavaScript بدون وسوم) واحفظ.'], note: 'تشترط سلة أن يكون للمتجر دومين خاص، وأن تكون لديك صلاحية تصميم المتجر.' },
+  { key: 'zid', label: 'زد', steps: ['زد لا يوفّر لكل الباقات خانة لإضافة كود يدوياً؛ تُضاف السكربتات عندهم عادةً عبر تطبيقات متجر زد.', 'إذا وجدت في لوحة متجرك خانة للأكواد المخصصة، الصق السطر فيها. وإلا اسأل دعم زد عن إضافة سكربت خارجي لمتجرك.'] }
+] : [
+  { key: 'html', label: 'Any website', steps: ['Open the template shared by all pages (usually the footer or layout).', 'Paste the line right before </body> and save.', 'Open your site: the button is in the corner.'] },
+  { key: 'wordpress', label: 'WordPress', steps: ['Plugins → install and activate WPCode (Insert Headers and Footers).', 'Open Code Snippets → Header & Footer.', 'Paste the line in the Footer box and save.'] },
+  { key: 'shopify', label: 'Shopify', steps: ['Online Store → Themes → (…) next to the theme → Edit code.', 'Open layout/theme.liquid.', 'Paste the line right before </body> and save.'] },
+  { key: 'salla', label: 'Salla', jsOnly: true, steps: ['In Salla: Store design, then customise the theme with code.', 'Paste the code below (JavaScript version, no tags) in the JavaScript box and save.'], note: 'Salla requires your own store domain and the store-design permission.' },
+  { key: 'zid', label: 'Zid', steps: ['Zid does not give every plan a box for manual code; scripts are usually added through Zid apps.', 'If your store has a custom code box, paste the line there. Otherwise ask Zid support about adding an external script.'] }
+])
+const currentPlatform = computed(() => platforms.value.find(p => p.key === platform.value) || platforms.value[0])
 
 // The tenant's WhatsApp numbers, to fill the "Continue on WhatsApp" number in one click
 const whatsappNumbers = computed(() => metaChannels.value
@@ -274,7 +317,11 @@ async function createWidget() {
     select(res.data.data.id)
     toast('success', isAr.value ? 'تم إنشاء الويدجت، انسخ الكود إلى موقعك' : 'Widget created, copy the code to your site')
   } catch (err) {
-    toast('error', errorText(err))
+    if (err?.response?.data?.error?.code === 'INSUFFICIENT_BALANCE') {
+      Swal.fire({ icon: 'info', title: isAr.value ? 'الرصيد لا يكفي' : 'Balance too low', text: isAr.value ? 'ويدجت الموقع اشتراك شهري يُخصم من رصيد المحفظة. اشحن الرصيد من «الاستهلاك والفواتير» ثم أنشئه.' : errorText(err) })
+    } else {
+      toast('error', errorText(err))
+    }
   } finally {
     saving.value = false
   }
@@ -290,6 +337,20 @@ async function save() {
     toast('success', isAr.value ? 'تم الحفظ' : 'Saved')
   } catch (err) {
     Swal.fire({ icon: 'error', title: isAr.value ? 'لم يُحفظ' : 'Not saved', text: errorText(err) })
+  } finally {
+    saving.value = false
+  }
+}
+
+async function renew() {
+  saving.value = true
+  try {
+    const res = await axios.post(`/api/v1/webchat/widgets/${currentId.value}/renew`)
+    const i = widgets.value.findIndex(w => w.id === currentId.value)
+    widgets.value[i] = res.data.data
+    toast('success', isAr.value ? 'تم التجديد، الويدجت يعمل الآن' : 'Renewed, the widget is on')
+  } catch (err) {
+    Swal.fire({ icon: 'info', title: isAr.value ? 'لم يتجدد' : 'Not renewed', text: err?.response?.data?.error?.code === 'INSUFFICIENT_BALANCE' ? (isAr.value ? 'الرصيد لا يكفي بعد. اشحن المحفظة أولاً.' : errorText(err)) : errorText(err) })
   } finally {
     saving.value = false
   }
@@ -350,6 +411,15 @@ onMounted(load)
 .row-desc { display: block; font-size: 12.5px; color: #64748b; margin-top: 3px; line-height: 1.65; }
 .note { display: flex; gap: 8px; margin-top: 12px; font-size: 12px; color: #475569; background: #f8fafc; border-radius: 10px; padding: 10px 12px; line-height: 1.65; }
 .note i { color: #3b82f6; margin-top: 3px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.tabs button { padding: 6px 12px; border-radius: 999px; border: 1px solid #e2e8f0; background: white; color: #475569; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.tabs button.on { border-color: #FF6600; background: #fff7ed; color: #c2410c; }
+.how { margin: 0 0 10px; padding-inline-start: 20px; font-size: 13px; color: #334155; line-height: 1.9; }
+.note.warn i { color: #d97706; }
+.fee { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: #f0f9ff; border: 1px solid #bae6fd; color: #075985; border-radius: 14px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; line-height: 1.7; }
+.fee.stopped { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.fee > span:first-of-type { flex: 1; min-width: 220px; }
+.fee-actions { display: flex; gap: 8px; }
 .code { display: flex; align-items: center; gap: 10px; background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 12px 14px; }
 .code code { flex: 1; min-width: 0; font-size: 12px; overflow-x: auto; white-space: nowrap; }
 .copy { display: inline-flex; align-items: center; gap: 6px; background: #1e293b; color: white; border: 1px solid #334155; border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; flex-shrink: 0; }

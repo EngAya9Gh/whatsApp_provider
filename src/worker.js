@@ -23,6 +23,7 @@ const start = async () => {
     ].filter(Boolean);
     require('./services/ticketScheduler').start();
     require('./services/campaignBillingScheduler').start();
+    require('./services/channelBillingScheduler').start();
     require('./modules/campaign/campaign.dispatcher').start();
     logger.info('[Worker] Running: Meta webhooks, Meta campaigns (in waves), ticket auto-close, campaign refunds');
   } catch (error) {
@@ -36,6 +37,7 @@ const shutdown = async () => {
   try {
     require('./services/ticketScheduler').stop();
     require('./services/campaignBillingScheduler').stop();
+    require('./services/channelBillingScheduler').stop();
     await require('./modules/campaign/campaign.dispatcher').stop();
     await Promise.all(workers.map(w => w.close()));
     await redisClient.quit();
