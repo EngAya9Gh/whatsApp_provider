@@ -36,6 +36,15 @@ async function processJob(job) {
   const { tenantId, phone, message, templateId, buttons, interactiveType, targetId, channelId, campaignId } = job.data;
   let { mediaPath, mediaMime } = job.data;
   
+  // A stopped campaign (or a recipient already handled) is not sent
+  if (targetId) {
+    const target = await prisma.campaignTarget.findUnique({ where: { id: targetId }, select: { status: true, campaign: { select: { status: true } } } }).catch(() => undefined);
+    if (target === null || (target && (target.status !== 'PENDING' || target.campaign?.status === 'CANCELLED'))) {
+      if (target?.status === 'PENDING') await prisma.campaignTarget.update({ where: { id: targetId }, data: { status: 'CANCELLED' } }).catch(() => {});
+      return { skipped: true };
+    }
+  }
+
   try {
     const CAMPAIGN = await sendOptions(campaignId);
     let finalMessage = message;
@@ -84,7 +93,7 @@ async function processJob(job) {
     // Update target status
     await prisma.campaignTarget.update({
       where: { id: targetId },
-      data: { status: 'SENT' }
+      data: { status: 'SENT', sentAt: new Date() }
     });
 
     logger.info(`[Campaign] Sent message to ${phone}`);

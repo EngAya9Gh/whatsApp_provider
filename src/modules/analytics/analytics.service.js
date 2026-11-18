@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { LIVE_CHAT_PROVIDERS } = require('../channels/channel.kinds');
 const prisma = new PrismaClient();
 const ChatThread = require('../../models/mongo/ChatThread');
 const ChatMessage = require('../../models/mongo/ChatMessage');
@@ -421,7 +422,7 @@ class AnalyticsService {
     const timezone = await shiftService.getTimezone(tenantId);
 
     const channels = await prisma.whatsAppChannel.findMany({
-      where: { tenantId, providerType: 'META_CLOUD' },
+      where: { tenantId, providerType: { in: LIVE_CHAT_PROVIDERS } },
       select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true }
     });
     const channelIds = channelId ? channels.filter(c => c.id === channelId).map(c => c.id) : channels.map(c => c.id);

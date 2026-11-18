@@ -10,11 +10,26 @@ process.env.META_CAMPAIGN_THROTTLE_PAUSE_MS = '1500';
 process.env.PROCESS_ROLE = 'all';
 
 const targets = {};
+const campaignStatus = {}; // targetId → status of its campaign (RUNNING when not set)
 inject('@prisma/client', {
   PrismaClient: class {
     constructor() {
       this.whatsAppChannel = { findUnique: async () => ({ id: 'ch', providerType: 'META_CLOUD', metaAccessToken: 'tok', metaPhoneNumberId: 'pn', metaWabaId: 'w' }) };
-      this.campaignTarget = { update: async ({ where, data }) => { targets[where.id] = { ...(targets[where.id] || {}), ...data }; } };
+      this.campaignTarget = {
+        findUnique: async ({ where }) => ({
+          status: targets[where.id]?.status || 'QUEUED',
+          campaign: { status: campaignStatus[where.id] || 'RUNNING' }
+        }),
+        update: async ({ where, data }) => { targets[where.id] = { ...(targets[where.id] || {}), ...data }; },
+        updateMany: async ({ where, data }) => {
+          const now = targets[where.id]?.status || 'QUEUED';
+          const allowed = typeof where.status === 'string' ? [where.status] : where.status.in;
+          if (!allowed.includes(now)) return { count: 0 };
+          targets[where.id] = { ...(targets[where.id] || {}), ...data };
+          return { count: 1 };
+        }
+      };
+      this.campaign = { findUnique: async () => ({ name: 'Campaign' }) };
     }
   }
 });
@@ -46,9 +61,10 @@ inject('axios', {
 let queue;
 let worker;
 let classifyError;
+let processJob;
 before(async () => {
   if (skip) return;
-  ({ metaCampaignQueue: queue, worker, classifyError } = require(fromRoot('src/workers/meta.campaign.worker')));
+  ({ metaCampaignQueue: queue, worker, classifyError, processJob } = require(fromRoot('src/workers/meta.campaign.worker')));
   await queue.obliterate({ force: true }).catch(() => {});
 });
 after(async () => {
@@ -120,4 +136,27 @@ test('a media-header template campaign sends the same image to every recipient, 
       { type: 'body', parameters: [{ type: 'text', text: 'Sara' }] }
     ]);
   }
+});
+
+test('before sending: a paused campaign puts the recipient back, a stopped one cancels it, a sent one is not sent again', { skip }, async () => {
+  const job = (phone) => ({ data: { campaignId: 'p', targetId: `t${phone}`, tenantId: 'T', channelId: 'ch', phone, variables: [], templateName: 'promo', templateLanguage: 'ar' }, opts: { attempts: 4 }, attemptsMade: 0 });
+  campaignStatus.t701 = 'PAUSED';
+  targets.t701 = { status: 'QUEUED' };
+  assert.deepStrictEqual(await processJob(job('701')), { skipped: 'PAUSED' });
+  assert.strictEqual(targets.t701.status, 'PENDING', 'sent when the campaign is resumed');
+  assert.strictEqual(targets.t701.queuedAt, null);
+
+  campaignStatus.t702 = 'CANCELLED';
+  targets.t702 = { status: 'QUEUED' };
+  assert.deepStrictEqual(await processJob(job('702')), { skipped: 'CANCELLED' });
+  assert.strictEqual(targets.t702.status, 'CANCELLED');
+
+  targets.t703 = { status: 'SENT' };
+  assert.deepStrictEqual(await processJob(job('703')), { skipped: 'SENT' });
+  assert.strictEqual(calls['701'] || calls['702'] || calls['703'], undefined, 'nothing reached Meta');
+
+  const sent = await processJob(job('704'));
+  assert.ok(sent.wamid);
+  assert.strictEqual(targets.t704.status, 'SENT');
+  assert.ok(targets.t704.sentAt instanceof Date);
 });

@@ -948,6 +948,7 @@ onUnmounted(() => { if (pollInterval) clearInterval(pollInterval) })
 .accent-pending { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
 .accent-running { background: linear-gradient(90deg, #3B82F6, #60A5FA); }
 .accent-completed { background: linear-gradient(90deg, #10B981, #34D399); }
+.accent-cancelled { background: linear-gradient(90deg, #64748B, #94A3B8); }
 .accent-failed { background: linear-gradient(90deg, #EF4444, #F87171); }
 .accent-sent { background: linear-gradient(90deg, #10B981, #34D399); }
 
@@ -1009,6 +1010,7 @@ onUnmounted(() => { if (pollInterval) clearInterval(pollInterval) })
 .badge-pending { background: #FEF3C7; color: #B45309; }
 .badge-running { background: #DBEAFE; color: #1D4ED8; }
 .badge-completed { background: #DCFCE7; color: #15803D; }
+.badge-cancelled { background: #F1F5F9; color: #475569; }
 .badge-failed { background: #FEE2E2; color: #B91C1C; }
 .badge-sent { background: #DCFCE7; color: #15803D; }
 .badge-pulse {

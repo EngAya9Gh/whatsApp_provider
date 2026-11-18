@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { LIVE_CHAT_PROVIDERS } = require('../channels/channel.kinds');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
 const webhookService = require('../webhook/webhook.service');
@@ -660,7 +661,7 @@ class TicketsService {
     const [tenant, channels] = await Promise.all([
       prisma.tenant.findUnique({ where: { id: tenantId }, select: { customFeatures: true } }),
       prisma.whatsAppChannel.findMany({
-        where: { tenantId, providerType: 'META_CLOUD' },
+        where: { tenantId, providerType: { in: LIVE_CHAT_PROVIDERS } },
         select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true },
         orderBy: { createdAt: 'asc' }
       })

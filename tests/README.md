@@ -9,7 +9,7 @@ real ones: the tests create and delete data.
 | Variable | Used by | Example |
 |---|---|---|
 | `TEST_MONGO_URL` | tickets | `mongodb://127.0.0.1:27017` (each test file uses its own `wakeel_test_*` database) |
-| `TEST_MYSQL_URL` | migrations | `mysql://root@127.0.0.1:3306` (needs CREATE DATABASE; creates and drops `wakeel_test_*`) |
+| `TEST_MYSQL_URL` | migrations, campaigns (billing, waves, HTTP) | `mysql://root@127.0.0.1:3306` (needs CREATE DATABASE; creates and drops `wakeel_test_*`) |
 | `TEST_REDIS_HOST`, `TEST_REDIS_PORT` | campaigns, live events, locks | `127.0.0.1`, `6379` (Redis database 15, or `TEST_REDIS_DB`) |
 
 With Docker:

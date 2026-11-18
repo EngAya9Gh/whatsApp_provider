@@ -16,7 +16,10 @@ inject('@prisma/client', {
   PrismaClient: class {
     constructor() {
       this.walletTransaction = { findFirst: async ({ where }) => (where.referenceId === 'paid' ? { id: 'w1' } : null) };
-      this.campaignTarget = { update: async ({ where, data }) => { targets[where.id] = data; } };
+      this.campaignTarget = {
+        findUnique: async ({ where }) => ({ status: targets[where.id]?.status || 'PENDING', campaign: { status: 'RUNNING' } }),
+        update: async ({ where, data }) => { targets[where.id] = data; }
+      };
       this.whatsAppChannel = { findUnique: async () => null };
       this.messageLog = { create: async () => ({}) };
       this.messageTemplate = { findUnique: async () => null };

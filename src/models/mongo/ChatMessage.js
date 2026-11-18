@@ -24,6 +24,9 @@ const ChatMessageSchema = new mongoose.Schema({
   // conversation when the customer replied (campaignName says which campaign)
   source: { type: String, default: null },
   campaignName: { type: String, default: null },
+  // Buttons of a message the customer can tap, for channels that draw them (the website widget):
+  // { body, options: [{ id, title }] } for a question, { body, link: { text, url } } for a link button
+  interactive: { type: mongoose.Schema.Types.Mixed, default: undefined },
   // Internal notes: team members mentioned with @ (member keys: 'owner' or sub-user id)
   mentions: { type: [String], default: [] }
 }, {

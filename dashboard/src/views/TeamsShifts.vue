@@ -333,7 +333,7 @@
                 :title="channelOwner(ch.id) ? (isAr ? `يتبع فريق ${channelOwner(ch.id).name}` : `Belongs to ${channelOwner(ch.id).name}`) : ''"
               >
                 <input type="checkbox" :value="ch.id" v-model="teamForm.channelIds" :disabled="!!channelOwner(ch.id)" class="accent-[#FF6600]" />
-                <span class="flex-1 truncate" dir="ltr">{{ ch.displayPhoneNumber || ch.phoneNumber }}</span>
+                <span class="flex-1 truncate" :dir="ch.displayPhoneNumber || ch.phoneNumber ? 'ltr' : null">{{ ch.displayPhoneNumber || ch.phoneNumber || `🌐 ${ch.name || (isAr ? 'ويدجت الموقع' : 'Website widget')}` }}</span>
                 <span v-if="channelOwner(ch.id)" class="text-[10px] text-slate-400">{{ channelOwner(ch.id).name }}</span>
               </label>
             </div>
@@ -574,7 +574,7 @@ const fetchAll = async () => {
 
 const fetchChannels = async () => {
   try {
-    const res = await axios.get('/api/v1/meta/channels')
+    const res = await axios.get('/api/v1/channels')
     channels.value = res.data.data || []
   } catch (err) {
     console.error('Error fetching channels:', err)

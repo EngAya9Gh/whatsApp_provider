@@ -18,7 +18,7 @@
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <div class="font-bold text-slate-800 truncate">{{ f.channel.name || (isAr ? 'رقم واتساب' : 'WhatsApp number') }}</div>
-            <div class="text-sm text-slate-500" dir="ltr">{{ f.channel.displayPhoneNumber || f.channel.phoneNumber }}</div>
+            <div class="text-sm text-slate-500" dir="ltr">{{ f.channel.displayPhoneNumber || f.channel.phoneNumber || (isAr ? 'ويدجت الموقع' : 'Website widget') }}</div>
           </div>
           <span class="status" :class="statusOf(f).tone">
             <i :class="statusOf(f).icon"></i>{{ statusOf(f).label }}

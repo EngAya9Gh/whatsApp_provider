@@ -1,6 +1,8 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const metaService = require('../meta/meta.service');
+const channelSender = require('../channels/channel.sender');
+const { capabilitiesOf, isWebchat } = require('../channels/channel.kinds');
 const { metaErrorInfo, metaErrorText } = require('../meta/meta.errors');
 const socketService = require('../../services/socket.service');
 const billingService = require('../billing/billing.service');
@@ -16,6 +18,40 @@ const FLOW_SOURCES = ['FLOW', 'FLOW_AI', 'FLOW_HANDOFF'];
 // Campaign messages added to a conversation when the customer replies: at most this many, this recent
 const CAMPAIGN_CHAT_DAYS = 30;
 const CAMPAIGN_CHAT_MAX = 10;
+
+/**
+ * A WhatsApp message (Meta webhook) in the shape every channel hands to receiveMessage():
+ * { id, type, content, hasMedia, mediaUrl, mediaMime, interactiveId }
+ */
+function normalizeWhatsAppMessage(msg, channelId) {
+  const out = { id: msg.id, type: 'TEXT', content: '', hasMedia: false, mediaUrl: null, mediaMime: null, interactiveId: null };
+  if (msg.type === 'text') {
+    out.content = msg.text.body;
+  } else if (msg.type === 'image' || msg.type === 'document' || msg.type === 'video' || msg.type === 'audio') {
+    out.type = msg.type.toUpperCase();
+    out.hasMedia = true;
+    out.content = msg[msg.type]?.caption || '';
+    out.mediaMime = msg[msg.type]?.mime_type || null;
+    const rawMediaId = msg[msg.type]?.id;
+    if (rawMediaId) out.mediaUrl = `/api/v1/chat/media/${rawMediaId}?channelId=${channelId}`;
+  } else if (msg.type === 'interactive') {
+    out.type = 'INTERACTIVE';
+    if (msg.interactive.type === 'button_reply') {
+      out.content = msg.interactive.button_reply.title;
+      out.interactiveId = msg.interactive.button_reply.id;
+    } else if (msg.interactive.type === 'list_reply') {
+      out.content = msg.interactive.list_reply.title;
+      out.interactiveId = msg.interactive.list_reply.id;
+    }
+  } else if (msg.type === 'button') {
+    // A quick-reply button of a template (a campaign's buttons) was tapped
+    out.type = 'INTERACTIVE';
+    out.content = msg.button?.text || msg.button?.payload || '';
+  } else {
+    out.content = `[Unsupported message type: ${msg.type}]`;
+  }
+  return out;
+}
 
 /** Name of a conversation after a customer message: the team's own name wins over the WhatsApp profile name */
 function inboundName(thread, profileName) {
@@ -274,7 +310,8 @@ class ChatService {
     if (!channel) throw new Error('Channel not found');
     
     // Check billing
-    const canSend = await billingService.checkLimit(tenantId);
+    // Website widget messages are free: no WhatsApp message quota
+    const canSend = isWebchat(channel) || await billingService.checkLimit(tenantId);
     if (!canSend) {
       throw new Error('Monthly message limit reached.');
     }
@@ -286,9 +323,11 @@ class ChatService {
     // Sync Contact with CRM if not yet synced
     const webhookService = require('../webhook/webhook.service');
     let crmClientId = thread.crmClientId;
-    if (!crmClientId && !thread.crmSyncedAt) {
+    // The CRM knows customers by phone: only channels where the number is the customer's identity
+    const customerPhone = capabilitiesOf(channel).hasPhone ? thread.contactPhone : null;
+    if (!crmClientId && !thread.crmSyncedAt && customerPhone) {
       try {
-        const crmData = await webhookService.syncCrmContact(tenantId, thread.contactPhone, thread.contactName || thread.contactPhone);
+        const crmData = await webhookService.syncCrmContact(tenantId, customerPhone, thread.contactName || customerPhone);
         if (crmData) {
           const update = { crmSyncedAt: new Date() };
           if (crmData.client_id) {
@@ -333,7 +372,7 @@ class ChatService {
         metaResponse = null;
       } else {
         if (payload.hasMedia && payload.mediaUrl) {
-          metaResponse = await metaService.sendMedia(
+          metaResponse = await channelSender.sendMedia(
             channel,
             thread.contactPhone,
             msgType,
@@ -341,13 +380,13 @@ class ChatService {
             payload.content
           );
         } else {
-          metaResponse = await metaService.sendText(
+          metaResponse = await channelSender.sendText(
             channel,
             thread.contactPhone,
             payload.content
           );
         }
-        await billingService.incrementUsage(tenantId, 'sent');
+        if (!isWebchat(channel)) await billingService.incrementUsage(tenantId, 'sent');
       }
       
       // First reply a person wrote on this ticket (first response time in the ticket reports). Taking over
@@ -423,49 +462,36 @@ class ChatService {
    * (the webhook queue runs several jobs at once), and a message Meta delivers twice is handled once.
    */
   async handleIncomingMessage(tenantId, channelId, contactPhone, contactName, msg) {
-    return withLock(`inbound:${channelId}:${contactPhone}`, async () => {
-      if (msg?.id && await ChatMessage.exists({ metaMessageId: msg.id })) {
-        logger.info(`[ChatService] Message ${msg.id} was already handled, skipping the duplicate`);
+    return this.receiveMessage(tenantId, channelId, { address: contactPhone, name: contactName, phone: contactPhone }, normalizeWhatsAppMessage(msg, channelId));
+  }
+
+  /**
+   * One customer message from any channel (WhatsApp, the website widget…), in the common shape of
+   * normalizeWhatsAppMessage(). contact: { address (ChatThread.contactPhone), name, phone (null when the
+   * channel has none), info (extra details kept on the conversation: phone, email, page…) }.
+   * Messages of the same customer are handled one at a time and in order, and a message delivered twice
+   * is handled once.
+   */
+  async receiveMessage(tenantId, channelId, contact, message) {
+    return withLock(`inbound:${channelId}:${contact.address}`, async () => {
+      if (message?.id && await ChatMessage.exists({ metaMessageId: message.id })) {
+        logger.info(`[ChatService] Message ${message.id} was already handled, skipping the duplicate`);
         return { flowHandled: false, duplicate: true };
       }
-      return this._handleIncomingMessage(tenantId, channelId, contactPhone, contactName, msg);
+      return this._receive(tenantId, channelId, contact, message);
     }, { ttlMs: 90000, waitMs: 60000 });
   }
 
-  async _handleIncomingMessage(tenantId, channelId, contactPhone, contactName, msg) {
-    let type = 'TEXT';
-    let content = '';
-    let hasMedia = false;
-    let mediaUrl = null;
-    let mediaMime = null;
-    let metaMessageId = msg.id;
-
-    if (msg.type === 'text') {
-      content = msg.text.body;
-    } else if (msg.type === 'image' || msg.type === 'document' || msg.type === 'video' || msg.type === 'audio') {
-      type = msg.type.toUpperCase();
-      hasMedia = true;
-      content = msg[msg.type]?.caption || '';
-      const rawMediaId = msg[msg.type]?.id;
-      mediaMime = msg[msg.type]?.mime_type;
-      
-      if (rawMediaId) {
-        mediaUrl = `/api/v1/chat/media/${rawMediaId}?channelId=${channelId}`;
-      }
-    } else if (msg.type === 'interactive') {
-      type = 'INTERACTIVE';
-      if (msg.interactive.type === 'button_reply') {
-        content = msg.interactive.button_reply.title;
-      } else if (msg.interactive.type === 'list_reply') {
-        content = msg.interactive.list_reply.title;
-      }
-    } else if (msg.type === 'button') {
-      // A quick-reply button of a template (a campaign's buttons) was tapped
-      type = 'INTERACTIVE';
-      content = msg.button?.text || msg.button?.payload || '';
-    } else {
-      content = `[Unsupported message type: ${msg.type}]`;
-    }
+  async _receive(tenantId, channelId, contact, message) {
+    const contactPhone = contact.address;
+    const contactName = contact.name || null;
+    const customerPhone = contact.phone || null;
+    let { type = 'TEXT', content = '', hasMedia = false, mediaUrl = null, mediaMime = null } = message;
+    const metaMessageId = message.id;
+    // Details the channel gives about the customer (website widget: phone, email, page)
+    const infoSet = Object.fromEntries(Object.entries(contact.info || {})
+      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => [`contactInfo.${k}`, v]));
 
     // Upsert Thread in MongoDB
     let thread = await ChatThread.findOne({ tenantId, channelId, contactPhone });
@@ -477,7 +503,7 @@ class ChatService {
       thread = await ChatThread.findOneAndUpdate(
         { _id: thread._id },
         {
-          $set: { lastMessageAt: new Date(), lastInboundAt: new Date(), contactName: inboundName(thread, contactName) },
+          $set: { lastMessageAt: new Date(), lastInboundAt: new Date(), contactName: inboundName(thread, contactName), ...infoSet },
           $inc: { unreadCount: 1 }
         },
         { returnDocument: 'after' }
@@ -485,16 +511,19 @@ class ChatService {
     } else {
       // A customer the business already saved in its contacts keeps that name, not their WhatsApp profile name
       let saved = null;
-      try {
-        saved = await prisma.contact.findFirst({ where: { tenantId, phone: contactPhone }, select: { name: true } });
-      } catch (e) { /* the WhatsApp profile name is fine then */ }
-      const savedName = saved?.name && saved.name !== contactPhone ? saved.name : null;
+      if (customerPhone) {
+        try {
+          saved = await prisma.contact.findFirst({ where: { tenantId, phone: customerPhone }, select: { name: true } });
+        } catch (e) { /* the WhatsApp profile name is fine then */ }
+      }
+      const savedName = saved?.name && saved.name !== customerPhone ? saved.name : null;
       thread = await ChatThread.create({
         tenantId,
         channelId,
         contactPhone,
-        contactName: savedName || contactName || contactPhone,
+        contactName: savedName || contactName || customerPhone || contactPhone,
         nameEditedAt: savedName ? new Date() : null,
+        ...(Object.keys(infoSet).length && { contactInfo: contact.info }),
         lastMessageAt: new Date(),
         lastInboundAt: new Date(),
         unreadCount: 1
@@ -513,8 +542,8 @@ class ChatService {
     let crmClientId = thread.crmClientId;
     
     // We only need to sync if we haven't synced this contact yet (e.g. first message ever)
-    if (!crmClientId && !thread.crmSyncedAt) {
-      const crmData = await webhookService.syncCrmContact(tenantId, contactPhone, contactName || contactPhone);
+    if (!crmClientId && !thread.crmSyncedAt && customerPhone) {
+      const crmData = await webhookService.syncCrmContact(tenantId, customerPhone, contactName || customerPhone);
       if (crmData) {
         const update = { crmSyncedAt: new Date() };
         if (crmData.client_id) {
@@ -535,12 +564,7 @@ class ChatService {
     
     let ratingValue = null;
     let targetTicketId = null;
-    // msg.interactive check needs to look at the raw payload since content might be just the text
-    let interactiveId = null;
-    if (msg.type === 'interactive') {
-       if (msg.interactive.type === 'button_reply') interactiveId = msg.interactive.button_reply.id;
-       else if (msg.interactive.type === 'list_reply') interactiveId = msg.interactive.list_reply.id;
-    }
+    const interactiveId = message.interactiveId || null;
 
     if (interactiveId && interactiveId.startsWith('RATE_')) {
       const parts = interactiveId.split('_');
@@ -608,6 +632,12 @@ class ChatService {
       socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
       socketService.emitToTenant(tenantId, 'thread_updated', threadData);
 
+      // A WhatsApp message quoting a website chat code (W-XXXXXX) links the two conversations
+      if (customerPhone && /\bW-[0-9A-F]{6}\b/i.test(content)) {
+        require('../webchat/webchat.service').linkFromWhatsApp(tenantId, content, { threadId: thread._id, phone: customerPhone })
+          .catch(e => logger.warn('[ChatService] Could not link the website chat: ' + e.message));
+      }
+
       // WhatsApp flow of this channel
       const flowHandled = flowWillHandle ? await flowEngine.handleInbound(tenantId, channelId, thread, flowInput) : false;
 
@@ -633,8 +663,8 @@ class ChatService {
     let status = 'SENT';
     let failure = null;
     try {
-      metaResponse = await metaService.sendLinkButton(channel, thread.contactPhone, body, buttonText, url);
-      await billingService.incrementUsage(tenantId, 'sent');
+      metaResponse = await channelSender.sendLinkButton(channel, thread.contactPhone, body, buttonText, url);
+      if (!isWebchat(channel)) await billingService.incrementUsage(tenantId, 'sent');
     } catch (error) {
       logger.error(`Error sending link button: ${metaErrorText(error)}`);
       status = 'FAILED';
@@ -648,6 +678,7 @@ class ChatService {
       direction: 'OUTBOUND',
       type: 'INTERACTIVE',
       content: `${body}\n🔗 ${buttonText}: ${url}`,
+      interactive: { body, link: { text: buttonText, url } },
       status,
       metaMessageId: metaResponse?.messages?.[0]?.id || null,
       ticketId: activeTicket ? activeTicket.id : null,
@@ -678,13 +709,13 @@ class ChatService {
     let failure = null;
     try {
       if (options.length <= 3) {
-        metaResponse = await metaService.sendButtons(channel, thread.contactPhone, body, options.map(o => ({ id: o.id, text: o.title })));
+        metaResponse = await channelSender.sendButtons(channel, thread.contactPhone, body, options.map(o => ({ id: o.id, text: o.title })));
       } else {
-        metaResponse = await metaService.sendList(channel, thread.contactPhone, null, body, buttonLabel, [
+        metaResponse = await channelSender.sendList(channel, thread.contactPhone, null, body, buttonLabel, [
           { title: (buttonLabel || 'Options').substring(0, 24), rows: options.map(o => ({ id: o.id, title: o.title })) }
         ]);
       }
-      await billingService.incrementUsage(tenantId, 'sent');
+      if (!isWebchat(channel)) await billingService.incrementUsage(tenantId, 'sent');
     } catch (error) {
       logger.error(`Error sending interactive message: ${metaErrorText(error)}`);
       status = 'FAILED';
@@ -698,6 +729,7 @@ class ChatService {
       direction: 'OUTBOUND',
       type: 'INTERACTIVE',
       content: [body, ...options.map(o => `• ${o.title}`)].join('\n'),
+      interactive: { body, options: options.map(o => ({ id: o.id, title: o.title })) },
       status,
       metaMessageId: metaResponse?.messages?.[0]?.id || null,
       ticketId: activeTicket ? activeTicket.id : null,
@@ -737,6 +769,7 @@ class ChatService {
 
     const channel = await prisma.whatsAppChannel.findUnique({ where: { id: thread.channelId } });
     if (!channel) throw { status: 404, message: 'Channel not found' };
+    if (!capabilitiesOf(channel).templates) throw { status: 400, message: 'Templates are a WhatsApp feature; this conversation is on another channel' };
 
     const canSend = await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };

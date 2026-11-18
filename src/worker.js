@@ -23,7 +23,8 @@ const start = async () => {
     ].filter(Boolean);
     require('./services/ticketScheduler').start();
     require('./services/campaignBillingScheduler').start();
-    logger.info('[Worker] Running: Meta webhooks, Meta campaigns, ticket auto-close, campaign refunds');
+    require('./modules/campaign/campaign.dispatcher').start();
+    logger.info('[Worker] Running: Meta webhooks, Meta campaigns (in waves), ticket auto-close, campaign refunds');
   } catch (error) {
     console.error('WORKER CRASH:', error);
     process.exit(1);
@@ -35,6 +36,7 @@ const shutdown = async () => {
   try {
     require('./services/ticketScheduler').stop();
     require('./services/campaignBillingScheduler').stop();
+    await require('./modules/campaign/campaign.dispatcher').stop();
     await Promise.all(workers.map(w => w.close()));
     await redisClient.quit();
     await require('mongoose').disconnect();

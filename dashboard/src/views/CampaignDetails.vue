@@ -20,7 +20,7 @@
         </button>
         <span :class="['status-badge-top', `sbt-${campaign.status.toLowerCase()}`]">
           <span class="sbt-dot" :class="campaign.status === 'RUNNING' ? 'pulsing' : ''"></span>
-          {{ campaign.status }}
+          {{ statusText(campaign.status) }}
         </span>
       </div>
     </div>
@@ -123,13 +123,35 @@
         </div>
 
         <!-- ★ ETA Card (running only) -->
-        <div class="sidebar-card eta-card" v-if="campaign && campaign.status === 'RUNNING' && campaignStats && campaignStats.pending > 0">
+        <div class="sidebar-card eta-card" v-if="campaign && ['RUNNING', 'PAUSED'].includes(campaign.status) && campaignStats && campaignStats.pending > 0">
           <div class="eta-title">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            Estimated Completion
+            {{ isAr ? 'الوقت المتبقي' : 'Estimated Completion' }}
           </div>
-          <div class="eta-value">{{ estimatedTime }}</div>
-          <div class="eta-sub">{{ campaignStats.pending }} messages remaining<br>at ~1 msg / 5 sec</div>
+          <div class="eta-value">{{ campaign.status === 'PAUSED' ? (isAr ? 'متوقفة مؤقتاً' : 'Paused') : estimatedTime }}</div>
+          <div class="eta-sub">
+            {{ isAr ? `${campaignStats.pending} رسالة متبقية` : `${campaignStats.pending} messages remaining` }}<br>
+            {{ etaInfo ? (isAr ? `على دفعات: ~${etaInfo.perSecond} رسالة/ثانية` : `in waves: ~${etaInfo.perSecond} msg / sec`) : (isAr ? 'رسالة كل 5–15 ثانية تقريباً' : 'at ~1 msg / 5–15 sec') }}
+          </div>
+        </div>
+
+        <!-- ★ Sending controls: pause / resume / stop -->
+        <div class="sidebar-card actions-card" v-if="campaign && (canPauseNow || campaign.status === 'PAUSED' || canStopNow)">
+          <div class="actions-title">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            {{ isAr ? 'التحكم بالإرسال' : 'Sending' }}
+          </div>
+          <div class="actions-list">
+            <button v-if="canPauseNow" @click="control('pause')" :disabled="!!controlling" class="qa-btn qa-pause">
+              <i class="fas fa-pause"></i> {{ controlling === 'pause' ? '…' : (isAr ? 'إيقاف مؤقت' : 'Pause') }}
+            </button>
+            <button v-if="campaign.status === 'PAUSED'" @click="control('resume')" :disabled="!!controlling" class="qa-btn qa-resume">
+              <i class="fas fa-play"></i> {{ controlling === 'resume' ? '…' : (isAr ? 'استئناف الإرسال' : 'Resume') }}
+            </button>
+            <button v-if="canStopNow" @click="control('stop')" :disabled="!!controlling" class="qa-btn qa-stop">
+              <i class="fas fa-stop"></i> {{ controlling === 'stop' ? '…' : (isAr ? 'إيقاف نهائي واسترجاع المتبقي' : 'Stop and refund the rest') }}
+            </button>
+          </div>
         </div>
 
         <!-- ★ Quick Actions -->
@@ -211,10 +233,10 @@
           <!-- Toolbar -->
           <div class="tbl-toolbar">
             <div class="tbl-filters-row">
-              <button v-for="s in ['ALL','PENDING','SENT','FAILED']" :key="s"
+              <button v-for="s in targetFilters" :key="s"
                 :class="['fchip', s.toLowerCase(), targetStatus === s ? 'active' : '']"
                 @click="targetStatus = s; targetPage = 1; fetchTargets()">
-                {{ s === 'ALL' ? 'All' : s }}
+                {{ targetFilterText(s) }}
               </button>
             </div>
             <div class="tbl-actions-row">
@@ -251,7 +273,7 @@
                   <td class="td-num">{{ (targetPage - 1) * 20 + idx + 1 }}</td>
                   <td class="td-phone">{{ target.phone }}</td>
                   <td>
-                    <span :class="['chip', target.status.toLowerCase()]">{{ target.status }}</span>
+                    <span :class="['chip', target.status.toLowerCase()]">{{ targetStatusText(target.status) }}</span>
                   </td>
                   <td class="td-err">{{ target.error || '—' }}</td>
                 </tr>
@@ -361,7 +383,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
+import Swal from 'sweetalert2'
+import { formatDuration } from '../utils/campaignAudience'
 
 const route = useRoute()
 const router = useRouter()
@@ -394,13 +419,62 @@ const successRate = computed(() => {
   return Math.round((campaignStats.value.sent / campaignStats.value.total) * 100)
 })
 
+const { locale } = useI18n()
+const isAr = computed(() => locale.value === 'ar')
+const etaInfo = ref(null) // Meta campaigns: { perSecond, seconds } from the server
+const controlling = ref('')
+
 const estimatedTime = computed(() => {
   if (!campaignStats.value || !campaignStats.value.pending) return '—'
-  const seconds = campaignStats.value.pending * 5
-  if (seconds < 60) return `~${seconds}s`
-  if (seconds < 3600) return `~${Math.ceil(seconds / 60)} min`
-  return `~${(seconds / 3600).toFixed(1)} hr`
+  // Meta campaigns go out in waves at the number's pace; QR ones one message every 5–15 s
+  const seconds = etaInfo.value ? etaInfo.value.seconds : campaignStats.value.pending * 10
+  return `~${formatDuration(seconds, isAr.value)}`
 })
+
+const STATUS_TEXT = {
+  PENDING: ['مسودة', 'Draft'], RUNNING: ['جارية', 'Running'], SCHEDULED: ['مجدولة', 'Scheduled'], PAUSED: ['متوقفة مؤقتاً', 'Paused'],
+  COMPLETED: ['مكتملة', 'Completed'], CANCELLED: ['أُوقفت', 'Stopped'], FAILED: ['فشلت', 'Failed']
+}
+const statusText = (status) => (STATUS_TEXT[status] ? STATUS_TEXT[status][isAr.value ? 0 : 1] : status)
+const targetFilters = computed(() => ['ALL', 'PENDING', 'SENT', 'FAILED', ...(campaignStats.value?.cancelled ? ['CANCELLED'] : [])])
+const FILTER_TEXT = { ALL: ['الكل', 'All'], PENDING: ['بانتظار الإرسال', 'Waiting'], SENT: ['أُرسل', 'Sent'], FAILED: ['فشل', 'Failed'], CANCELLED: ['أُلغي', 'Cancelled'] }
+const targetFilterText = (s) => FILTER_TEXT[s][isAr.value ? 0 : 1]
+const TARGET_TEXT = { PENDING: ['بالانتظار', 'Waiting'], QUEUED: ['في الطابور', 'Queued'], SENT: ['أُرسل', 'Sent'], FAILED: ['فشل', 'Failed'], CANCELLED: ['أُلغي', 'Cancelled'] }
+const targetStatusText = (s) => (TARGET_TEXT[s] ? TARGET_TEXT[s][isAr.value ? 0 : 1] : s)
+
+const canPauseNow = computed(() => !!campaign.value?.canPause && ['RUNNING', 'SCHEDULED'].includes(campaign.value.status))
+const canStopNow = computed(() => ['PENDING', 'RUNNING', 'SCHEDULED', 'PAUSED'].includes(campaign.value?.status))
+
+const control = async (action) => {
+  if (action === 'stop') {
+    const ok = await Swal.fire({
+      icon: 'warning',
+      title: isAr.value ? 'إيقاف الحملة نهائياً؟' : 'Stop the campaign for good?',
+      text: isAr.value ? 'الرسائل التي لم تُرسل بعد تُلغى ويرجع ثمنها إلى المحفظة. لا يمكن التراجع.' : 'Messages not sent yet are cancelled and refunded to the wallet. This cannot be undone.',
+      showCancelButton: true,
+      confirmButtonText: isAr.value ? 'إيقاف نهائي' : 'Stop',
+      cancelButtonText: isAr.value ? 'تراجع' : 'Cancel',
+      confirmButtonColor: '#dc2626'
+    })
+    if (!ok.isConfirmed) return
+  }
+  controlling.value = action
+  try {
+    const res = await axios.post(`/api/v1/campaigns/${campaignId}/${action}`)
+    if (action === 'stop') {
+      Swal.fire({
+        icon: 'success',
+        text: isAr.value ? `أُوقفت الحملة: أُلغيت ${res.data.cancelled} رسالة${res.data.refunded ? ` ورجع ${res.data.refunded} للمحفظة` : ''}.` : `Stopped: ${res.data.cancelled} messages cancelled${res.data.refunded ? `, ${res.data.refunded} refunded` : ''}.`,
+        confirmButtonColor: '#FF6600'
+      })
+    }
+    await refreshAll()
+  } catch (err) {
+    Swal.fire({ icon: 'error', text: err.response?.data?.error?.message || err.response?.data?.message || '', confirmButtonColor: '#FF6600' })
+  } finally {
+    controlling.value = ''
+  }
+}
 
 const hasFailedTargets = computed(() => {
   return targets.value.some(t => t.status === 'FAILED')
@@ -448,19 +522,24 @@ onMounted(async () => {
   await fetchCampaignDetails()
   await fetchTargets()
   fetchCampaignStats()
+  // A campaign that is sending right now: follow it live
+  if (campaign.value?.status === 'RUNNING' && !autoRefresh.value) toggleAutoRefresh()
 })
 
 const fetchCampaignStats = async () => {
   try {
     const res = await axios.get(`/api/v1/campaigns/${campaignId}/stats`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
     campaignStats.value = res.data.data.stats
+    etaInfo.value = res.data.data.eta || null
+    // The status moves on while the page is open (completed, paused…)
+    if (campaign.value && res.data.data.status && campaign.value.status !== res.data.data.status) campaign.value.status = res.data.data.status
   } catch (err) {}
 }
 
 const fetchCampaignDetails = async () => {
   try {
-    const res = await axios.get('/api/v1/campaigns', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
-    campaign.value = res.data.data.find(c => c.id === campaignId)
+    const res = await axios.get(`/api/v1/campaigns/${campaignId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+    campaign.value = res.data.data
   } catch (err) {} finally { loading.value = false }
 }
 
@@ -621,6 +700,15 @@ onUnmounted(() => {
 .qa-btn.qa-refresh { border-color: #BFDBFE; color: #2563EB; }
 .qa-btn.qa-refresh:hover { background: #EFF6FF; }
 .qa-btn:disabled, .qa-btn.disabled { opacity: 0.5; cursor: not-allowed; }
+.qa-btn.qa-pause { border-color: #FDE68A; color: #B45309; }
+.qa-btn.qa-pause:hover:not(:disabled) { background: #FFFBEB; }
+.qa-btn.qa-resume { border-color: #BBF7D0; color: #15803D; }
+.qa-btn.qa-resume:hover:not(:disabled) { background: #F0FDF4; }
+.qa-btn.qa-stop { border-color: #FECACA; color: #B91C1C; }
+.qa-btn.qa-stop:hover:not(:disabled) { background: #FEF2F2; }
+.sbt-paused { background: #FEF3C7; color: #B45309; }
+.sbt-scheduled { background: #EDE9FE; color: #7C3AED; }
+.sbt-cancelled { background: #F1F5F9; color: #475569; }
 
 * { box-sizing: border-box; }
 
@@ -988,6 +1076,8 @@ onUnmounted(() => {
 .chip.pending   { background: #FEF3C7; color: #B45309; }
 .chip.sent, .chip.completed { background: #DCFCE7; color: #15803D; }
 .chip.failed    { background: #FEE2E2; color: #B91C1C; }
+.chip.queued    { background: #DBEAFE; color: #1D4ED8; }
+.chip.cancelled { background: #F1F5F9; color: #64748B; }
 
 .td-empty { text-align: center; padding: 3.5rem !important; }
 .td-empty { display: table-cell; }

@@ -3,7 +3,7 @@ const campaignService = require('./campaign.service');
 exports.createCampaign = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
-    const { name, message, templateId, templateName, templateLanguage, interactiveType, startDate, endDate, campaignType, channelId, metaCategory, contactGroupId } = req.body;
+    const { name, message, templateId, templateName, templateLanguage, interactiveType, startDate, endDate, campaignType, channelId, metaCategory, contactGroupId, countryCode, variableMap, fallbacks } = req.body;
     const file = req.files?.file?.[0];
     const image = req.files?.image?.[0];
 
@@ -29,33 +29,19 @@ exports.createCampaign = async (req, res, next) => {
         return res.status(400).json({ error: 'Campaign name and Meta template name are required for Meta campaigns' });
       }
       
-      // Default to first Meta Channel if not provided
-      if (!req.body.channelId) {
-        const { PrismaClient } = require('@prisma/client');
-        const prisma = new PrismaClient();
-        const firstMetaChannel = await prisma.whatsAppChannel.findFirst({
-          where: { tenantId, providerType: 'META_CLOUD' }
-        });
-        if (!firstMetaChannel) {
-          return res.status(400).json({ error: 'No Meta Cloud channel found for this tenant. Please set up Meta configuration first.' });
-        }
-        req.body.channelId = firstMetaChannel.id;
-      }
+      // The account's Meta number (the given one, or its first) is checked by the service
     } else {
       if (!name || (!message && !templateId)) {
         return res.status(400).json({ error: 'Campaign name and either message or template are required' });
       }
     }
 
-    // Pass the resolved channelId
-    const resolvedChannelId = campaignType === 'META' ? req.body.channelId : channelId;
-
     const result = await campaignService.createCampaign({
       tenantId,
       name,
       message: campaignType === 'META' ? templateName : message,
       templateId,
-      templateLanguage: templateLanguage || 'ar',
+      templateLanguage: campaignType === 'META' ? (templateLanguage || null) : (templateLanguage || 'ar'),
       file,
       image,
       buttons,
@@ -63,10 +49,13 @@ exports.createCampaign = async (req, res, next) => {
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,
       campaignType: campaignType || 'BAILEYS',
-      channelId: resolvedChannelId,
+      channelId,
       metaCategory,
       contactGroupId,
-      headerMedia: campaignType === 'META' ? req.body.headerMedia : undefined
+      headerMedia: campaignType === 'META' ? req.body.headerMedia : undefined,
+      countryCode,
+      mapping: variableMap,
+      fallbacks
     });
 
     res.status(201).json(result);
@@ -189,12 +178,13 @@ exports.getInteractions = async (req, res, next) => {
   try {
     const tenantId = req.tenant.id;
     const { id } = req.params;
-    const { page, limit, search } = req.query;
+    const { page, limit, search, status } = req.query;
     
     const result = await campaignService.getInteractions(tenantId, id, {
       page: parseInt(page) || 1,
       limit: parseInt(limit) || 50,
-      search
+      search,
+      status
     });
     res.status(200).json({ success: true, data: result });
   } catch (error) {
@@ -211,10 +201,64 @@ exports.exportCampaignData = async (req, res, next) => {
     const csvData = await campaignService.exportCampaignData(tenantId, id, type, status);
     
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=campaign_\${id}_\${type}.csv`);
-    res.status(200).send(csvData);
+    res.setHeader('Content-Disposition', `attachment; filename=campaign_${String(id).slice(0, 8)}_${type === 'interactions' ? 'interactions' : 'targets'}.csv`);
+    res.status(200).send('\ufeff' + csvData); // BOM: Excel shows Arabic text correctly
   } catch (error) {
     next(error);
   }
 };
 
+
+// Meta campaigns: the uploaded file / group checked against the template, before anything is charged
+exports.previewAudience = async (req, res, next) => {
+  try {
+    const result = await campaignService.previewAudience(req.tenant.id, {
+      channelId: req.body.channelId,
+      templateName: req.body.templateName,
+      templateLanguage: req.body.templateLanguage,
+      metaCategory: req.body.metaCategory,
+      contactGroupId: req.body.contactGroupId,
+      countryCode: req.body.countryCode,
+      mapping: req.body.variableMap,
+      fallbacks: req.body.fallbacks
+    }, req.file);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// The Excel file a template's campaign needs (columns + an example row)
+exports.sampleFile = async (req, res, next) => {
+  try {
+    const { buffer, filename } = await campaignService.sampleFile(req.tenant.id, {
+      channelId: req.query.channelId,
+      templateName: req.query.templateName,
+      templateLanguage: req.query.templateLanguage
+    });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getCampaign = async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await campaignService.getCampaign(req.tenant.id, req.params.id) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const action = (method) => async (req, res, next) => {
+  try {
+    res.json(await campaignService[method](req.tenant.id, req.params.id));
+  } catch (error) {
+    next(error);
+  }
+};
+exports.pauseCampaign = action('pauseCampaign');
+exports.resumeCampaign = action('resumeCampaign');
+exports.stopCampaign = action('stopCampaign');

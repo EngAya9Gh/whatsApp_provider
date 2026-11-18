@@ -289,7 +289,7 @@
               >
                 <input type="checkbox" :value="ch.id" v-model="stageForm.channelIds" class="accent-[#FF6600]" />
                 <span class="text-sm font-medium text-slate-700">{{ ch.name || ch.phoneNumber }}</span>
-                <span class="text-xs text-slate-400 ms-auto" dir="ltr">{{ ch.displayPhoneNumber || ch.phoneNumber }}</span>
+                <span class="text-xs text-slate-400 ms-auto" dir="ltr">{{ ch.displayPhoneNumber || ch.phoneNumber || (isAr ? 'ويدجت الموقع' : 'Website widget') }}</span>
               </label>
             </div>
           </div>
@@ -689,7 +689,7 @@ const saveStages = async () => {
 
 const fetchChannels = async () => {
   try {
-    const res = await axios.get('/api/v1/meta/channels')
+    const res = await axios.get('/api/v1/channels')
     channels.value = res.data.data || []
   } catch (err) {
     console.error('Error fetching channels:', err)

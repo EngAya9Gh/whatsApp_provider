@@ -86,32 +86,35 @@ class DashboardController {
         }
       }
 
-      // Merge CampaignTargets
-      const campaignTargets = await prisma.campaignTarget.findMany({
-        where: {
-          campaign: { tenantId, createdAt: { gte: queryStart, lte: queryEnd } }
-        },
-        select: {
-          status: true,
-          campaign: { select: { campaignType: true, metaCategory: true } }
-        }
+      // Merge CampaignTargets: counted per campaign and status in the database (not one row per recipient);
+      // cancelled recipients (a stopped campaign) were never sent
+      const targetGroups = await prisma.campaignTarget.groupBy({
+        by: ['campaignId', 'status'],
+        where: { status: { not: 'CANCELLED' }, campaign: { tenantId, createdAt: { gte: queryStart, lte: queryEnd } } },
+        _count: { _all: true }
       });
+      const campaignInfo = targetGroups.length
+        ? Object.fromEntries((await prisma.campaign.findMany({
+          where: { id: { in: [...new Set(targetGroups.map(g => g.campaignId))] } },
+          select: { id: true, campaignType: true, metaCategory: true }
+        })).map(c => [c.id, c]))
+        : {};
 
-      totalSent += campaignTargets.length;
-      for (const target of campaignTargets) {
-        if (['DELIVERED', 'READ', 'SENT'].includes(target.status)) {
-          totalDeliveredOrRead++;
-        }
-        
-        const isMeta = target.campaign?.campaignType === 'META' || target.campaign?.campaignType === 'META_CLOUD';
+      for (const group of targetGroups) {
+        const count = group._count._all;
+        const campaign = campaignInfo[group.campaignId];
+        totalSent += count;
+        if (['DELIVERED', 'READ', 'SENT'].includes(group.status)) totalDeliveredOrRead += count;
+
+        const isMeta = campaign?.campaignType === 'META' || campaign?.campaignType === 'META_CLOUD';
         const providerObj = isMeta ? categories.META : categories.QR;
-        
-        if (target.campaign?.metaCategory) {
-          const cat = target.campaign.metaCategory.toUpperCase();
-          if (providerObj[cat] !== undefined) providerObj[cat]++;
-          else providerObj.UNCATEGORIZED++;
+
+        if (campaign?.metaCategory) {
+          const cat = campaign.metaCategory.toUpperCase();
+          if (providerObj[cat] !== undefined) providerObj[cat] += count;
+          else providerObj.UNCATEGORIZED += count;
         } else {
-          providerObj.MARKETING++; // Default for campaigns is usually Marketing
+          providerObj.MARKETING += count; // Default for campaigns is usually Marketing
         }
       }
 

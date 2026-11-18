@@ -7,7 +7,8 @@
 // Meta rates in the admin settings are in USD; the QR message price is in SAR.
 //
 // A campaign is charged up front for every recipient. settle() then makes the money match the
-// recipients that did not fail: failed messages are refunded, and retrying them charges again.
+// recipients that were not failed or cancelled (a stopped campaign): those are refunded, and retrying
+// failed ones charges again.
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const walletService = require('../wallet/wallet.service');
@@ -55,7 +56,7 @@ function unitPrice({ isMeta, category, settings = {}, tenant = {} }) {
 }
 
 /**
- * Makes the campaign's wallet total equal its price × the recipients that did not fail.
+ * Makes the campaign's wallet total equal its price × the recipients that were not failed or cancelled.
  * includeFailed: count the failed ones too (used before retrying them, so the retry is paid first).
  * Returns null for a campaign that was never charged.
  */
@@ -68,15 +69,16 @@ async function settle(campaignId, { includeFailed = false } = {}) {
     const first = rows.find(r => r.type === TYPES.CAMPAIGN_CHARGE);
     if (!first) return null;
 
-    const [total, failed] = await Promise.all([
+    const [total, failed, cancelled] = await Promise.all([
       prisma.campaignTarget.count({ where: { campaignId } }),
-      prisma.campaignTarget.count({ where: { campaignId, status: 'FAILED' } })
+      prisma.campaignTarget.count({ where: { campaignId, status: 'FAILED' } }),
+      prisma.campaignTarget.count({ where: { campaignId, status: 'CANCELLED' } })
     ]);
     if (total === 0) return null;
 
     // The first charge paid for every recipient at the price of the day
     const unit = Math.abs(first.amount) / total;
-    const billable = includeFailed ? total : total - failed;
+    const billable = total - cancelled - (includeFailed ? 0 : failed);
     const due = round(unit * billable);
     const paid = round(-rows.reduce((sum, r) => sum + r.amount, 0));
     const diff = round(paid - due);
@@ -87,7 +89,9 @@ async function settle(campaignId, { includeFailed = false } = {}) {
       await walletService.credit(first.tenantId, {
         amount: diff,
         type: TYPES.REFUND,
-        description: `Refund: ${failed} failed campaign message${failed === 1 ? '' : 's'}`,
+        description: cancelled
+          ? `Refund: ${failed} failed and ${cancelled} cancelled campaign messages`
+          : `Refund: ${failed} failed campaign message${failed === 1 ? '' : 's'}`,
         referenceType: 'CAMPAIGN',
         referenceId: campaignId,
         createdBy: 'SYSTEM'
@@ -109,7 +113,7 @@ async function settle(campaignId, { includeFailed = false } = {}) {
     await prisma.campaign.updateMany({ where: { id: campaignId, NOT: { totalCost: due } }, data: { totalCost: due } })
       .catch(err => logger.warn(`[CampaignBilling] Could not store the cost of campaign ${campaignId}: ${err.message}`));
     if (refunded) logger.info(`[CampaignBilling] Campaign ${campaignId}: refunded ${refunded} for ${failed} failed messages`);
-    return { due, paid: round(paid - refunded + charged), refunded, charged, failed, total };
+    return { due, paid: round(paid - refunded + charged), refunded, charged, failed, cancelled, total };
   });
 }
 
@@ -117,11 +121,11 @@ async function settle(campaignId, { includeFailed = false } = {}) {
 async function sweep({ days = 14 } = {}) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  // Scheduled campaigns stay SCHEDULED while their messages go out
+  // Older scheduled campaigns stay SCHEDULED while their messages go out (newer ones turn RUNNING)
   const running = await prisma.campaign.findMany({ where: { status: { in: ['RUNNING', 'SCHEDULED'] } }, select: { id: true, status: true } });
   for (const c of running) {
-    const pending = await prisma.campaignTarget.count({ where: { campaignId: c.id, status: 'PENDING' } });
-    if (pending === 0) await prisma.campaign.updateMany({ where: { id: c.id, status: c.status }, data: { status: 'COMPLETED' } });
+    const open = await prisma.campaignTarget.count({ where: { campaignId: c.id, status: { in: ['PENDING', 'QUEUED'] } } });
+    if (open === 0) await prisma.campaign.updateMany({ where: { id: c.id, status: c.status }, data: { status: 'COMPLETED', completedAt: new Date() } });
   }
 
   const charged = await prisma.walletTransaction.findMany({

@@ -69,7 +69,7 @@ model Tenant {
 model WhatsAppChannel {
   id           String  @id @default(uuid())
   tenantId     String  @map("tenant_id")
-  providerType String  @default("BAILEYS") @map("provider_type") // BAILEYS or META_CLOUD
+  providerType String  @default("BAILEYS") @map("provider_type") // BAILEYS, META_CLOUD or WEBCHAT (channels/channel.kinds.js)
   phoneNumber  String? @map("phone_number")
   status       String  @default("DISCONNECTED")
 
@@ -88,6 +88,10 @@ model WhatsAppChannel {
   coexOnboardedAt   DateTime? @map("coex_onboarded_at") // start of Meta's 24h window for the one-time syncs
   coexHistoryMonths Int?      @map("coex_history_months") // old chats to keep: 0 (none), 1, 3 or 6 months
   coexSync          Json?     @map("coex_sync") // { state, stateReason, contacts: {...}, history: {...} }
+
+  // Channel-kind settings. Website widget (providerType WEBCHAT): { enabled, title, welcome, color, position,
+  // language, askName, askPhone, whatsappNumber, allowedDomains } — see webchat/webchat.settings.js
+  settings Json? @map("settings")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -187,6 +191,8 @@ model Campaign {
   endDate         DateTime?           @map("end_date")
   totalCost       Float               @default(0) @map("total_cost")
   totalMessages   Int                 @default(0) @map("total_messages")
+  launchedAt      DateTime?           @map("launched_at") // META: launched (sent in waves by campaign.dispatcher.js)
+  completedAt     DateTime?           @map("completed_at")
   interactions    ButtonInteraction[]
   targets         CampaignTarget[]
   autoResponders  AutoResponder[]
@@ -195,6 +201,7 @@ model Campaign {
 
   @@index([tenantId], map: "campaigns_tenant_id_fkey")
   @@index([channelId], map: "campaigns_channel_id_fkey")
+  @@index([status], map: "campaigns_status_idx")
   @@map("campaigns")
 }
 
@@ -202,13 +209,16 @@ model CampaignTarget {
   id           String              @id @default(uuid())
   campaignId   String              @map("campaign_id")
   phone        String
-  status       String              @default("PENDING")
+  status       String              @default("PENDING") // PENDING → QUEUED (META, in the send queue) → SENT / FAILED; CANCELLED
   error        String?             @db.Text
   variables    String?             @db.Text // Store JSON array of variables
+  queuedAt     DateTime?           @map("queued_at")
+  sentAt       DateTime?           @map("sent_at")
   interactions ButtonInteraction[]
   campaign     Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([campaignId], map: "campaign_targets_campaign_id_fkey")
+  @@index([campaignId, status], map: "campaign_targets_campaign_status_idx")
   @@map("campaign_targets")
 }
 

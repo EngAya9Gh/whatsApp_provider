@@ -59,11 +59,11 @@
             </div>
             <div class="thread-info">
               <div class="thread-top">
-                <span class="thread-name">{{ thread.contactName || thread.contactPhone }}</span>
+                <span class="thread-name"><i v-if="isWebThread(thread)" class="fas fa-globe web-icon" :title="isAr ? 'من ويدجت الموقع' : 'From the website widget'"></i>{{ thread.contactName || contactSub(thread) }}</span>
                 <span class="thread-time">{{ formatTime(thread.lastMessageAt) }}</span>
               </div>
               <div class="thread-bottom">
-                <span class="thread-phone">{{ thread.contactPhone }}</span>
+                <span class="thread-phone">{{ contactSub(thread) }}</span>
                 <button @click.stop="quickAssign(thread)" class="btn-icon small text-slate-400 hover:text-[#FF6600]" title="إسناد المحادثة" style="background:transparent; border:none; padding:2px;">
                   <i class="fas fa-user-plus"></i>
                 </button>
@@ -97,12 +97,15 @@
             </div>
             <div>
               <h3>
-                {{ selectedThread.contactName || selectedThread.contactPhone }}
+                <i v-if="isWebThread(selectedThread)" class="fas fa-globe web-icon" :title="isAr ? 'من ويدجت الموقع' : 'From the website widget'"></i>{{ selectedThread.contactName || contactSub(selectedThread) }}
                 <button @click="openRenameModal" class="btn-icon small rename-btn ml-2" title="تعديل الاسم">
                   <i class="fas fa-pen"></i>
                 </button>
               </h3>
-              <span class="contact-phone">{{ selectedThread.contactPhone }}</span>
+              <span class="contact-phone">{{ contactSub(selectedThread) }}</span>
+              <a v-if="isWebThread(selectedThread) && selectedThread.contactInfo?.pageUrl" :href="selectedThread.contactInfo.pageUrl" target="_blank" rel="noopener noreferrer" class="web-page" :title="selectedThread.contactInfo.pageUrl">
+                <i class="fas fa-link"></i> {{ selectedThread.contactInfo.pageTitle || (isAr ? 'الصفحة التي كتب منها' : 'Page they wrote from') }}
+              </a>
             </div>
           </div>
           <div class="chat-header-actions">
@@ -637,6 +640,15 @@ const channelTag = (thread) => {
   if (channels.value.length < 2 || selectedChannel.value || !thread.channel) return ''
   return thread.channel.name || thread.channel.displayPhoneNumber || thread.channel.phoneNumber || ''
 }
+// Website widget conversations: the customer's address is an internal visitor id, so show what they told us
+const isWebThread = (thread) => thread?.channel?.providerType === 'WEBCHAT' || String(thread?.contactPhone || '').startsWith('web:')
+const contactSub = (thread) => {
+  if (!thread) return ''
+  if (!isWebThread(thread)) return thread.contactPhone || ''
+  const info = thread.contactInfo || {}
+  const parts = [info.phone ? `+${info.phone}` : '', info.email || ''].filter(Boolean)
+  return parts.length ? parts.join(' · ') : `${isAr.value ? 'زائر الموقع' : 'Website visitor'}${info.ref ? ` · ${info.ref}` : ''}`
+}
 const selectedChannel = ref('')
 const newMessage = ref('')
 const quickReplies = ref([])
@@ -1014,7 +1026,11 @@ const assignModalSubtitle = ref('')
 const showCloseModal = ref(false)
 const showCategoryModal = ref(false)
 const activeCategory = computed(() => (activeTicket.value?.categoryId ? ticketCategories.value.find(c => c.id === activeTicket.value.categoryId) || null : null))
-const threadLabel = (thread) => (thread ? (thread.contactName && thread.contactName !== thread.contactPhone ? `${thread.contactName} · ${thread.contactPhone}` : thread.contactPhone || '') : '')
+const threadLabel = (thread) => {
+  if (!thread) return ''
+  const sub = contactSub(thread)
+  return thread.contactName && thread.contactName !== sub ? `${thread.contactName} · ${sub}` : sub
+}
 
 // A modal changed the ticket: show it at once (the socket event also refreshes other screens)
 const onTicketChanged = (ticket) => {
@@ -1050,7 +1066,8 @@ let audioChunks = []
 
 const fetchChannels = async () => {
   try {
-    const res = await axios.get('/api/v1/meta/channels')
+    // Every Live Chat channel: WhatsApp numbers and website widgets
+    const res = await axios.get('/api/v1/channels')
     channels.value = res.data.data || []
   } catch (e) {
     console.error('Error fetching channels:', e)
@@ -2066,6 +2083,26 @@ onUnmounted(() => {
   background: white;
   color: #334155;
   outline: none;
+}
+
+.web-icon {
+  color: #0891b2;
+  font-size: 0.8em;
+  margin-inline-end: 6px;
+}
+
+.web-page {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: 8px;
+  font-size: 0.78rem;
+  color: #0891b2;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .channel-tag {

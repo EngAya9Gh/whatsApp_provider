@@ -15,6 +15,11 @@ const queued = [];
 const fakeQueue = { addBulk: async (jobs) => { queued.push(...jobs); } };
 inject(fromRoot('src/workers/campaign.worker.js'), { campaignQueue: fakeQueue, campaignWorker: null });
 inject(fromRoot('src/workers/meta.campaign.worker.js'), { metaCampaignQueue: fakeQueue, worker: null });
+// The approved template on Meta (no variables: the file / group only needs phone numbers)
+inject(fromRoot('src/modules/meta/meta.templateLookup.js'), {
+  lookup: async () => ({ reachable: true, template: { name: 'offer_template', language: 'ar', category: 'MARKETING', status: 'APPROVED', components: [{ type: 'BODY', text: 'Our offer is here' }] } }),
+  approvedVersions: async () => []
+});
 
 let admin;
 let prisma;
@@ -54,6 +59,9 @@ async function tenantWith({ balance = 10, contacts = 4, currency = 'SAR', custom
   const id = `T${++n}`;
   await prisma.tenant.create({
     data: { id, name: id, email: `${id}@test`, passwordHash: 'x', walletBalance: balance, currency, ...(customFeatures && { customFeatures }) }
+  });
+  await prisma.whatsAppChannel.create({
+    data: { tenantId: id, providerType: 'META_CLOUD', status: 'CONNECTED', metaPhoneNumberId: `pn${id}`, metaWabaId: 'w', metaAccessToken: 't', displayPhoneNumber: '966500000000' }
   });
   await prisma.contact.createMany({
     data: Array.from({ length: contacts }, (_, i) => ({ tenantId: id, name: 'Unknown', phone: `96650000${n}${i}` }))
@@ -103,8 +111,10 @@ test('failed messages are refunded once; a retry is paid first; late failures ar
   queued.length = 0;
   await campaigns.retryFailed(tenantId, campaignId);
   assert.strictEqual(await balanceOf(tenantId), 9.85, 'the two retried messages are paid again');
-  assert.strictEqual(queued.length, 2);
   assert.deepStrictEqual((await targetsOf(campaignId)).map(t => t.status), ['PENDING', 'PENDING', 'SENT', 'SENT']);
+  const retried = await prisma.campaign.findUnique({ where: { id: campaignId } });
+  assert.strictEqual(retried.status, 'RUNNING', 'the dispatcher sends them in its next waves');
+  assert.ok(retried.launchedAt);
 
   await setStatus([a.id], 'SENT');
   await setStatus([b.id], 'FAILED');
@@ -157,4 +167,26 @@ test('the sweep completes finished campaigns and refunds their failures; uncharg
   assert.strictEqual((await prisma.campaign.findUnique({ where: { id: campaignId } })).status, 'COMPLETED');
   assert.strictEqual(await balanceOf(tenantId), 4.925, '5 − 3 × 0.0375 + 1 failed × 0.0375');
   assert.strictEqual(await billing.settle(freeCampaign.campaignId), null, 'never charged, never refunded');
+});
+
+test('stopping a campaign cancels what was not sent and refunds it; a draft can be stopped too', { skip, timeout: 60000 }, async () => {
+  const tenantId = await tenantWith({ balance: 10, contacts: 4 });
+  const { campaignId } = await createMeta(tenantId);
+  assert.strictEqual(await balanceOf(tenantId), 9.85);
+  await campaigns.startCampaign(tenantId, campaignId);
+  const [a, b] = await targetsOf(campaignId);
+  await setStatus([a.id], 'SENT');
+  await setStatus([b.id], 'FAILED');
+
+  const r = await campaigns.stopCampaign(tenantId, campaignId);
+  assert.strictEqual(r.cancelled, 2);
+  assert.strictEqual(r.refunded, 0.1125, '1 failed + 2 cancelled');
+  assert.strictEqual(await balanceOf(tenantId), 9.9625, 'only the sent message is paid');
+  assert.deepStrictEqual((await targetsOf(campaignId)).map(t => t.status).sort(), ['CANCELLED', 'CANCELLED', 'FAILED', 'SENT']);
+  await assert.rejects(campaigns.retryFailed(tenantId, campaignId), (e) => /stopped/.test(e.message));
+  await assert.rejects(campaigns.stopCampaign(tenantId, campaignId), (e) => /cannot be stopped/.test(e.message));
+
+  const draft = await createMeta(tenantId);
+  await campaigns.stopCampaign(tenantId, draft.campaignId);
+  assert.strictEqual(await balanceOf(tenantId), 9.9625, 'the draft is refunded in full');
 });

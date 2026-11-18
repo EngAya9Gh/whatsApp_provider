@@ -87,7 +87,7 @@
               <td>
                 <div v-if="user.channel" class="channel-cell">
                   <span class="channel-tag" :class="'provider-' + user.channel.providerType.toLowerCase()">
-                    {{ user.channel.providerType === 'META_CLOUD' ? '☁️' : '📱' }}
+                    {{ user.channel.providerType === 'WEBCHAT' ? '🌐' : user.channel.providerType === 'META_CLOUD' ? '☁️' : '📱' }}
                     {{ user.channel.displayPhoneNumber || user.channel.phoneNumber || user.channel.name || '-' }}
                   </span>
                 </div>
@@ -171,7 +171,7 @@
                 <select v-model="form.channelId" class="input-std">
                   <option value="">{{ isAr ? 'بدون تخصيص' : 'No assignment' }}</option>
                   <option v-for="ch in channels" :key="ch.id" :value="ch.id">
-                    {{ ch.providerType === 'META_CLOUD' ? '☁️' : '📱' }}
+                    {{ ch.providerType === 'WEBCHAT' ? '🌐' : ch.providerType === 'META_CLOUD' ? '☁️' : '📱' }}
                     {{ ch.displayPhoneNumber || ch.phoneNumber || ch.name || ch.id.slice(0,8) }}
                     — {{ ch.status }}
                   </option>
@@ -378,7 +378,7 @@ async function fetchUsers() {
 
 async function fetchChannels() {
   try {
-    const res = await axios.get('/api/v1/meta/channels', { headers: authHeader() })
+    const res = await axios.get('/api/v1/channels', { headers: authHeader() })
     channels.value = res.data.channels || res.data.data || res.data || []
   } catch { channels.value = [] }
 }

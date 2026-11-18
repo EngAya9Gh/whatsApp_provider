@@ -4,6 +4,9 @@ const logger = require('./utils/logger');
 
 const app = express();
 
+// Website chat widget: its public API is called from any website, so it has its own CORS and body limit
+app.use('/api/v1/webchat', require('./modules/webchat/webchat.public.routes'));
+
 // Middleware
 app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:5174'], credentials: true }));
 // Keep the exact bytes of Meta webhooks: their HMAC signature is computed over the raw body
@@ -75,6 +78,8 @@ app.use('/api/v1/flows', flowRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/team-chat', teamChatRoutes);
 app.use('/api/v1/tasks', require('./modules/tasks/tasks.routes'));
+app.use('/api/v1/channels', require('./modules/channels/channels.routes'));
+app.use('/api/v1/webchat', require('./modules/webchat/webchat.routes'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -131,7 +136,13 @@ app.use((err, req, res, next) => {
     const metaSubcode = err.metaSubcode ?? (typeof err.error?.error_subcode === 'number' ? err.error.error_subcode : undefined);
     logger.error(err, '[API Error]');
     return res.status(typeof status === 'number' ? status : 400).json({
-      error: { message, ...(metaCode !== undefined && { metaCode }), ...(metaSubcode !== undefined && { metaSubcode }) }
+      error: {
+        message,
+        // e.g. COLUMNS_MISSING, INSUFFICIENT_BALANCE: lets the dashboard explain the problem in plain words
+        ...(typeof err.code === 'string' && /^[A-Z0-9_]{3,40}$/.test(err.code) && { code: err.code }),
+        ...(metaCode !== undefined && { metaCode }),
+        ...(metaSubcode !== undefined && { metaSubcode })
+      }
     });
   }
   logger.error(err, 'Unhandled Error');

@@ -26,10 +26,14 @@ const MEDIA_HEADERS = { IMAGE: 'image', VIDEO: 'video', DOCUMENT: 'document' }
  */
 export function normalizeTemplate(tpl) {
   const components = tpl.components || []
-  const body = components.find(c => c.type === 'BODY')?.text || ''
+  const bodyComponent = components.find(c => c.type === 'BODY')
+  const body = bodyComponent?.text || ''
   const header = components.find(c => c.type === 'HEADER')
   const buttons = components.find(c => c.type === 'BUTTONS')?.buttons || []
   const variables = [...new Set([...body.matchAll(POSITIONAL)].map(m => Number(m[1])))].sort((a, b) => a - b)
+  // The example values given when the template was submitted to Meta (one per variable, may be empty)
+  const sample = bodyComponent?.example?.body_text?.[0] || []
+  const examples = variables.map((n, i) => String(sample[n - 1] ?? sample[i] ?? ''))
   const bodyHasNamed = ANY_VARIABLE.test(body.replace(POSITIONAL, ''))
   const headerMedia = MEDIA_HEADERS[header?.format] || null
   const headerUnsupported = header && !headerMedia && (header.format !== 'TEXT' || ANY_VARIABLE.test(header.text || ''))
@@ -58,6 +62,7 @@ export function normalizeTemplate(tpl) {
     // 'image' | 'video' | 'document' when the template starts with a media header (the file is given at send time)
     headerMedia,
     variables,
+    examples,
     buttonVars,
     supported: unsupportedKind === null,
     unsupportedKind

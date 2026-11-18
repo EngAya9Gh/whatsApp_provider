@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { LIVE_CHAT_PROVIDERS } = require('../channels/channel.kinds');
 const prisma = new PrismaClient();
 const ChannelHours = require('../../models/mongo/ChannelHours');
 const ChatThread = require('../../models/mongo/ChatThread');
@@ -37,8 +38,8 @@ class HoursService {
   /** Hours of every channel of the tenant (defaults for channels never configured) */
   async listHours(tenantId) {
     const [channels, docs] = await Promise.all([
-      // Live chat (and its away replies) runs on Meta Cloud numbers
-      prisma.whatsAppChannel.findMany({ where: { tenantId, providerType: 'META_CLOUD' }, select: { id: true } }),
+      // Every Live Chat channel (WhatsApp Cloud numbers, website widgets) has hours and an away reply
+      prisma.whatsAppChannel.findMany({ where: { tenantId, providerType: { in: LIVE_CHAT_PROVIDERS } }, select: { id: true } }),
       ChannelHours.find({ tenantId }).lean()
     ]);
     const byChannel = Object.fromEntries(docs.map(d => [d.channelId, d]));

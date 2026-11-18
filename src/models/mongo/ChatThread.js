@@ -3,7 +3,12 @@ const mongoose = require('mongoose');
 const ChatThreadSchema = new mongoose.Schema({
   tenantId: { type: String, required: true, index: true },
   channelId: { type: String, required: true, index: true },
+  // The customer's address on the channel: the phone number on WhatsApp, `web:<visitor id>` on the
+  // website widget (see channels/channel.kinds.js phoneOf for the phone number itself)
   contactPhone: { type: String, required: true },
+  // Details the channel gave about the customer: { phone, email, pageUrl, pageTitle } (website widget).
+  // No default on purpose: updates set its keys with dot paths, which fail on a null value.
+  contactInfo: { type: mongoose.Schema.Types.Mixed },
   contactName: { type: String },
   // Set when someone on the team renamed the customer: their WhatsApp profile name no longer replaces it
   nameEditedAt: { type: Date, default: null },

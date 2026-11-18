@@ -49,13 +49,19 @@ const canList = requireAnyPermission('can_view_campaigns', 'can_view_chatbot');
 const canCreate = requirePermission('can_create_campaigns');
 
 router.post('/', canCreate, upload.fields([{ name: 'file', maxCount: 1 }, { name: 'image', maxCount: 1 }]), campaignController.createCampaign);
+router.post('/audience-preview', canCreate, upload.single('file'), campaignController.previewAudience);
+router.get('/sample-file', canCreate, campaignController.sampleFile);
 router.put('/:id', canCreate, upload.fields([{ name: 'image', maxCount: 1 }]), campaignController.updateCampaign);
 router.post('/:id/start', canCreate, campaignController.startCampaign);
 router.post('/:id/retry', canCreate, campaignController.retryFailed);
+router.post('/:id/pause', canCreate, campaignController.pauseCampaign);
+router.post('/:id/resume', canCreate, campaignController.resumeCampaign);
+router.post('/:id/stop', canCreate, campaignController.stopCampaign);
 router.get('/:id/targets', canView, campaignController.getTargets);
 router.get('/:id/stats', canView, campaignController.getCampaignStats);
 router.get('/:id/interactions', canView, campaignController.getInteractions);
 router.get('/:id/export', canView, campaignController.exportCampaignData);
+router.get('/:id', canView, campaignController.getCampaign);
 router.get('/', canList, campaignController.getCampaigns);
 
 module.exports = router;

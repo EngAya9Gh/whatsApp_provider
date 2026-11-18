@@ -45,7 +45,7 @@
               <i class="fab fa-whatsapp text-emerald-500 text-lg"></i>
               <span class="flex-1 min-w-0">
                 <span class="block text-sm font-semibold text-slate-800 truncate">{{ ch.name || (isAr ? 'رقم واتساب' : 'WhatsApp number') }}</span>
-                <span class="block text-xs text-slate-500" dir="ltr">{{ ch.displayPhoneNumber || ch.phoneNumber }}</span>
+                <span class="block text-xs text-slate-500" dir="ltr">{{ ch.displayPhoneNumber || ch.phoneNumber || (isAr ? 'ويدجت الموقع' : 'Website widget') }}</span>
               </span>
               <span class="text-xs font-semibold" :class="ch.autoCreateTickets ? 'text-emerald-600' : 'text-slate-400'">{{ ch.autoCreateTickets ? (isAr ? 'يفتح تذاكر' : 'Opens tickets') : (isAr ? 'بدون تذاكر' : 'No tickets') }}</span>
               <Switch v-model="ch.autoCreateTickets" />

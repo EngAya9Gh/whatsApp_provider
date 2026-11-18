@@ -140,6 +140,12 @@
             </div>
             <div class="prog-legend"><span class="legend-sent">{{ isAr ? 'أُرسل' : 'Sent' }}</span><span class="legend-read">{{ isAr ? 'قُرئ' : 'Read' }}</span></div>
           </div>
+          <div v-if="activeStats[campaign.id].pending > 0 && ['RUNNING', 'PAUSED'].includes(campaign.status)" :class="['card-eta', campaign.status === 'PAUSED' ? 'paused' : '']">
+            <i class="fas" :class="campaign.status === 'PAUSED' ? 'fa-pause' : 'fa-paper-plane'"></i>
+            {{ isAr ? `متبقي ${activeStats[campaign.id].pending}` : `${activeStats[campaign.id].pending} left` }}
+            <template v-if="campaign.status === 'RUNNING' && activeStats[campaign.id].eta"> · {{ isAr ? 'حوالي' : 'about' }} {{ formatDuration(activeStats[campaign.id].eta.seconds, isAr) }} ({{ activeStats[campaign.id].eta.perSecond }}/{{ isAr ? 'ث' : 's' }})</template>
+            <template v-if="campaign.status === 'PAUSED'"> · {{ isAr ? 'متوقفة مؤقتاً — استأنفها من التفاصيل' : 'paused — resume it from the details' }}</template>
+          </div>
         </div>
 
         <div v-else :class="['card-pending-banner', campaign.status === 'SCHEDULED' ? 'sched-banner' : '']">
@@ -191,26 +197,17 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.999 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.907-1.425A9.962 9.962 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"/></svg>
                 {{ isAr ? 'دليل الحملة' : 'Meta Campaign Guide' }}
               </div>
+              <!-- The message as the first recipient will get it -->
+              <div v-if="selectedTpl" class="wa-preview">
+                <div class="wa-preview-label">{{ previewLabel }}</div>
+                <div class="wa-bubble" dir="auto">{{ previewText }}</div>
+              </div>
               <div class="guide-items">
-                <div class="guide-item"><div class="guide-num">1</div><div><strong>{{ isAr ? 'ملف الأرقام' : 'Phone Numbers File' }}</strong><p>{{ isAr ? 'العمود A: الصيغة الدولية بدون +' : 'Column A: International format (no +)' }}</p></div></div>
-                <div class="guide-item"><div class="guide-num">2</div><div><strong>{{ isAr ? 'المتغيرات' : 'Dynamic Variables' }}</strong><p v-if="isAr"><span v-pre>{{1}}</span> → العمود B، <span v-pre>{{2}}</span> → العمود C</p><p v-else><span v-pre>{{1}}</span> → Column B, <span v-pre>{{2}}</span> → Column C</p></div></div>
-                <div class="guide-item"><div class="guide-num">3</div><div><strong>{{ isAr ? 'القوالب المعتمدة' : 'Approved Templates Only' }}</strong><p>{{ isAr ? 'يُرسل ميتا القوالب المعتمدة فقط' : 'Only APPROVED templates are delivered' }}</p></div></div>
+                <div class="guide-item"><div class="guide-num">1</div><div><strong>{{ isAr ? 'اختر القالب' : 'Pick the template' }}</strong><p>{{ isAr ? 'يظهر لك شكل ملف الإكسل الذي يحتاجه، وزر لتحميله جاهزاً.' : 'You see the Excel layout it needs, with a ready file to download.' }}</p></div></div>
+                <div class="guide-item"><div class="guide-num">2</div><div><strong>{{ isAr ? 'عبّئ الملف وارفعه' : 'Fill the file and upload it' }}</strong><p>{{ isAr ? 'نفحص كل صف قبل الإطلاق: الأرقام، المكرر، والقيم الناقصة. ما لا يُرسل لا يُحسب عليك.' : 'Every row is checked before launch: numbers, repeats and missing values. What is not sent is not charged.' }}</p></div></div>
+                <div class="guide-item"><div class="guide-num">3</div><div><strong>{{ isAr ? 'إرسال على دفعات' : 'Sent in waves' }}</strong><p>{{ isAr ? 'كل ثانية دفعة جديدة حسب سرعة رقمك (حتى 50 رسالة/ثانية)، ويمكنك الإيقاف المؤقت أو الإيقاف في أي وقت.' : 'A new wave every second at your number\'s pace (up to 50 messages/second); pause or stop at any time.' }}</p></div></div>
                 <div class="guide-separator"></div>
-                <div class="guide-launch-info">
-                  <div class="gli-item gli-immediate">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    <div><strong>{{ isAr ? 'إطلاق فوري' : 'Immediate' }}</strong><p>{{ isAr ? 'ترسل الرسائل فوراً' : 'Messages sent right away' }}</p></div>
-                  </div>
-                  <div class="gli-item gli-schedule">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    <div><strong>{{ isAr ? 'جدولة' : 'Schedule' }}</strong><p>{{ isAr ? 'حدد وقتاً مستقبلياً' : 'Pick a future date & time' }}</p></div>
-                  </div>
-                  <div class="gli-item gli-draft">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                    <div><strong>{{ isAr ? 'مسودة' : 'Draft' }}</strong><p>{{ isAr ? 'أطلق يدوياً لاحقاً' : 'Launch manually later' }}</p></div>
-                  </div>
-                </div>
-                <div class="guide-item warn"><div class="guide-num warn">!</div><div><strong>{{ isAr ? 'الحدود اليومية' : 'Daily Limits' }}</strong><p>{{ isAr ? 'احترم حدود ميتا اليومية' : "Respect Meta's daily sending limits" }}</p></div></div>
+                <div class="guide-item warn"><div class="guide-num warn">!</div><div><strong>{{ isAr ? 'حد ميتا اليومي' : "Meta's daily limit" }}</strong><p>{{ isAr ? 'ميتا تحدد عدد العملاء الذين يمكن مراسلتهم بقالب خلال 24 ساعة حسب تصنيف حسابك؛ ما يزيد عنه يفشل ويُسترجع ثمنه.' : 'Meta caps how many customers you can message with templates in 24 hours; messages above it fail and are refunded.' }}</p></div></div>
               </div>
             </div>
 
@@ -258,13 +255,15 @@
                     </button>
                   </div>
 
-                  <div v-if="form.audienceSource === 'file'" class="file-drop" @click="$refs.fileInput.click()" :class="form.file ? 'has-file' : ''">
+                  <TemplateFileGuide v-if="form.audienceSource === 'file' && selectedTpl && !campaignBlocker(selectedTplRaw)" :tpl="selectedTpl" :channel-id="activeMetaChannelId || ''" :is-ar="isAr" style="margin-bottom: 0.75rem;" />
+
+                  <div v-if="form.audienceSource === 'file'" class="file-drop" @click="$refs.fileInput.click()" @dragover.prevent @drop.prevent="handleDrop" :class="form.file ? 'has-file' : ''">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     <span v-if="form.file" class="file-name">{{ form.file.name }}</span>
-                    <span v-else>{{ isAr ? 'اضغط لرفع ملف' : 'Click to upload Excel or CSV' }}</span>
-                    <small>{{ isAr ? 'A = الهاتف، B/C = المتغيرات' : 'Column A = Phone, B/C = Variables' }}</small>
+                    <span v-else>{{ isAr ? 'اضغط أو اسحب الملف هنا' : 'Click or drop the Excel / CSV file here' }}</span>
+                    <small>{{ fileHint }}</small>
                   </div>
-                  <input ref="fileInput" type="file" @change="handleFileUpload" accept=".csv,.xlsx,.xls" style="display:none" />
+                  <input ref="fileInput" type="file" @change="handleFileUpload" accept=".csv,.xlsx,.xls,.txt" style="display:none" />
 
                   <div v-if="form.audienceSource === 'group'">
                     <select v-model="form.contactGroupId" class="form-input">
@@ -275,7 +274,11 @@
                         {{ g.name }} ({{ g._count?.contacts || 0 }})
                       </option>
                     </select>
+                    <GroupVariableMap v-if="form.contactGroupId && selectedTpl?.variables.length && audiencePreview" v-model="form.mapping" :tpl="selectedTpl" :fields="audiencePreview.fields || []" :is-ar="isAr" />
                   </div>
+
+                  <AudienceReport v-if="audienceChosen" :preview="audiencePreview" :loading="previewLoading" :error="previewError" :source="form.audienceSource"
+                    v-model:country-code="form.countryCode" v-model:fallbacks="form.fallbacks" :is-ar="isAr" />
                 </div>
 
                 <!-- ══ LAUNCH MODE ══ -->
@@ -318,7 +321,7 @@
 
               <div class="modal-form-actions">
                 <button @click="closeModal" class="btn-cancel">{{ isAr ? 'إلغاء' : 'Cancel' }}</button>
-                <button @click="createCampaign" :disabled="isSubmitting" :class="['btn-submit', 'btn-' + form.launchMode]">
+                <button @click="createCampaign" :disabled="isSubmitting || !canSubmit" :title="submitBlockedReason" :class="['btn-submit', 'btn-' + form.launchMode]">
                   <svg v-if="isSubmitting" class="spin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
                   <svg v-else-if="form.launchMode === 'immediate'" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                   <svg v-else-if="form.launchMode === 'schedule'" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -339,8 +342,12 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { useMetaChannel } from '../composables/useMetaChannel'
-import { normalizeTemplate } from '../utils/metaTemplate'
+import { normalizeTemplate, buildPreview } from '../utils/metaTemplate'
+import { apiErrorText, formatDuration } from '../utils/campaignAudience'
 import TemplateHeaderMedia from '../components/TemplateHeaderMedia.vue'
+import TemplateFileGuide from '../components/campaigns/TemplateFileGuide.vue'
+import AudienceReport from '../components/campaigns/AudienceReport.vue'
+import GroupVariableMap from '../components/campaigns/GroupVariableMap.vue'
 
 const { activeMetaChannelId } = useMetaChannel()
 const campaigns = ref([])
@@ -366,8 +373,10 @@ const statusFilters = [
   { label: 'All / الكل', value: 'ALL' },
   { label: 'Running / جارية', value: 'RUNNING' },
   { label: 'Scheduled / مجدولة', value: 'SCHEDULED' },
+  { label: 'Paused / متوقفة مؤقتاً', value: 'PAUSED' },
   { label: 'Draft / مسودة', value: 'PENDING' },
   { label: 'Completed / مكتملة', value: 'COMPLETED' },
+  { label: 'Stopped / أُوقفت', value: 'CANCELLED' },
 ]
 
 const launchModes = computed(() => [
@@ -407,13 +416,106 @@ const filteredCampaigns = computed(() => {
   return list
 })
 
-const form = ref({ name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '', headerMedia: null })
+const emptyForm = () => ({ name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '', headerMedia: null, countryCode: '', mapping: null, fallbacks: [] })
+const form = ref(emptyForm())
 // The chosen template as the senders see it (variables, media header); campaigns send body variables + a media header
-const selectedTpl = computed(() => {
-  const raw = metaTemplates.value.find(t => t.name === form.value.templateName)
-  return raw ? normalizeTemplate(raw) : null
+const selectedTplRaw = computed(() => metaTemplates.value.find(t => t.name === form.value.templateName) || null)
+const selectedTpl = computed(() => (selectedTplRaw.value ? normalizeTemplate(selectedTplRaw.value) : null))
+watch(() => form.value.templateName, () => {
+  form.value.headerMedia = null
+  form.value.mapping = null
+  form.value.fallbacks = []
 })
-watch(() => form.value.templateName, () => { form.value.headerMedia = null })
+
+// ── The file / group checked against the template (server: POST /campaigns/audience-preview) ──
+const audiencePreview = ref(null)
+const previewLoading = ref(false)
+const previewError = ref('')
+const audienceChosen = computed(() => !!selectedTpl.value && !campaignBlocker(selectedTplRaw.value) &&
+  (form.value.audienceSource === 'file' ? !!form.value.file : !!form.value.contactGroupId))
+let previewTimer = null
+let previewSeq = 0
+const runPreview = async () => {
+  const seq = ++previewSeq
+  if (!audienceChosen.value || !activeMetaChannelId.value) {
+    audiencePreview.value = null
+    previewError.value = ''
+    previewLoading.value = false
+    return
+  }
+  previewLoading.value = true
+  previewError.value = ''
+  const fd = new FormData()
+  fd.append('channelId', activeMetaChannelId.value)
+  fd.append('templateName', selectedTpl.value.name)
+  fd.append('templateLanguage', selectedTpl.value.language || '')
+  fd.append('metaCategory', selectedTpl.value.category || '')
+  if (form.value.countryCode) fd.append('countryCode', form.value.countryCode)
+  if (form.value.fallbacks.some(Boolean)) fd.append('fallbacks', JSON.stringify(form.value.fallbacks))
+  if (form.value.audienceSource === 'file') fd.append('file', form.value.file)
+  else {
+    fd.append('contactGroupId', form.value.contactGroupId)
+    if (form.value.mapping) fd.append('variableMap', JSON.stringify(form.value.mapping))
+  }
+  try {
+    const res = await axios.post('/api/v1/campaigns/audience-preview', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    if (seq !== previewSeq) return // a newer check is on its way
+    audiencePreview.value = res.data.data
+    // The group's default variable sources, shown so they can be changed
+    if (form.value.audienceSource === 'group' && !form.value.mapping && res.data.data.mapping) form.value.mapping = res.data.data.mapping
+  } catch (err) {
+    if (seq !== previewSeq) return
+    audiencePreview.value = null
+    previewError.value = apiErrorText(err, isAr.value)
+  } finally {
+    if (seq === previewSeq) previewLoading.value = false
+  }
+}
+const previewKey = computed(() => JSON.stringify([
+  form.value.templateName, form.value.audienceSource, form.value.file?.name, form.value.file?.size, form.value.file?.lastModified,
+  form.value.contactGroupId, form.value.countryCode, form.value.fallbacks, form.value.audienceSource === 'group' ? form.value.mapping : null,
+  activeMetaChannelId.value
+]))
+let lastPreviewKey = ''
+watch(previewKey, (key) => {
+  if (key === lastPreviewKey || !showCreateModal.value) return
+  lastPreviewKey = key
+  clearTimeout(previewTimer)
+  if (!audienceChosen.value) { previewSeq++; audiencePreview.value = null; previewError.value = ''; previewLoading.value = false; return }
+  previewLoading.value = true
+  previewTimer = setTimeout(runPreview, 350)
+})
+
+const fileHint = computed(() => {
+  const n = selectedTpl.value?.variables.length || 0
+  if (!selectedTpl.value) return isAr.value ? 'Excel أو CSV — اختر القالب أولاً لترى الأعمدة المطلوبة' : 'Excel or CSV — pick the template first to see the columns it needs'
+  if (!n) return isAr.value ? 'Excel أو CSV — عمود A للأرقام فقط' : 'Excel or CSV — column A with the numbers only'
+  return isAr.value ? `Excel أو CSV — A للرقم ثم ${n} ${n === 1 ? 'عمود' : 'أعمدة'} للمتغيرات` : `Excel or CSV — A for the number, then ${n} variable column${n === 1 ? '' : 's'}`
+})
+
+// What the first recipient reads (values from the checked file, else the template's own examples)
+const firstRecipient = computed(() => audiencePreview.value?.report?.sample?.[0] || null)
+const previewText = computed(() => {
+  if (!selectedTpl.value) return ''
+  const values = firstRecipient.value?.variables || selectedTpl.value.examples
+  return buildPreview(selectedTpl.value, values)
+})
+const previewLabel = computed(() => {
+  if (firstRecipient.value) {
+    return isAr.value ? `كما تصل إلى ${firstRecipient.value.phone} (الصف ${firstRecipient.value.row})` : `As ${firstRecipient.value.phone} gets it (row ${firstRecipient.value.row})`
+  }
+  return isAr.value ? 'معاينة بقيم المثال' : 'Preview with example values'
+})
+
+const submitBlockedReason = computed(() => {
+  const p = audiencePreview.value
+  if (previewLoading.value) return isAr.value ? 'جارٍ فحص الجمهور…' : 'Checking the audience…'
+  if (previewError.value) return previewError.value
+  if (p?.report?.blocking) return isAr.value ? 'صحّح الملف أولاً' : 'Fix the file first'
+  if (p?.cost?.charged && !p.cost.enough) return isAr.value ? 'الرصيد لا يكفي' : 'Not enough balance'
+  return ''
+})
+const canSubmit = computed(() => !submitBlockedReason.value)
 /** Why a template cannot be sent as a campaign (null = it can) */
 const campaignBlocker = (raw) => {
   const tpl = normalizeTemplate(raw)
@@ -423,7 +525,7 @@ const campaignBlocker = (raw) => {
 }
 
 const statusLabel = (status) => {
-  const map = { PENDING: isAr.value ? 'مسودة' : 'Draft', RUNNING: isAr.value ? 'جارية' : 'Running', SCHEDULED: isAr.value ? 'مجدولة' : 'Scheduled', COMPLETED: isAr.value ? 'مكتملة' : 'Completed', FAILED: isAr.value ? 'فشلت' : 'Failed' }
+  const map = { PENDING: isAr.value ? 'مسودة' : 'Draft', RUNNING: isAr.value ? 'جارية' : 'Running', SCHEDULED: isAr.value ? 'مجدولة' : 'Scheduled', PAUSED: isAr.value ? 'متوقفة مؤقتاً' : 'Paused', COMPLETED: isAr.value ? 'مكتملة' : 'Completed', CANCELLED: isAr.value ? 'أُوقفت' : 'Stopped', FAILED: isAr.value ? 'فشلت' : 'Failed' }
   return map[status] || status || 'PENDING'
 }
 
@@ -448,14 +550,14 @@ const fetchCampaigns = async () => {
     const res = await axios.get(url, { headers: { Authorization: 'Bearer ' + token } })
     campaigns.value = res.data.data
     if (res.data.meta) totalPages.value = res.data.meta.totalPages || 1
-    campaigns.value.forEach(c => { if (c.status === 'RUNNING') loadStats(c.id) })
+    campaigns.value.forEach(c => { if (['RUNNING', 'PAUSED', 'COMPLETED', 'CANCELLED'].includes(c.status)) loadStats(c.id) })
   } catch (err) { console.error(err) } finally { loading.value = false }
 }
 
 const loadStats = async (id) => {
   try {
     const res = await axios.get('/api/v1/campaigns/' + id + '/stats', { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } })
-    activeStats.value[id] = res.data.data.stats
+    activeStats.value[id] = { ...res.data.data.stats, eta: res.data.data.eta }
     const campaign = campaigns.value.find(c => c.id === id)
     if (campaign && res.data.data.status) campaign.status = res.data.data.status
   } catch (err) {}
@@ -479,18 +581,36 @@ const fetchGroups = async () => {
   } catch (e) {}
 }
 
-const handleFileUpload = (event) => { form.value.file = event.target.files[0] }
+const handleFileUpload = (event) => {
+  form.value.file = event.target.files[0] || null
+  form.value.fallbacks = []
+  event.target.value = '' // choosing the same file again (after fixing it) is a new check
+}
+const handleDrop = (event) => {
+  const file = event.dataTransfer?.files?.[0]
+  if (file) { form.value.file = file; form.value.fallbacks = [] }
+}
 
+const resetAudience = () => {
+  previewSeq++
+  clearTimeout(previewTimer)
+  audiencePreview.value = null
+  previewError.value = ''
+  previewLoading.value = false
+  lastPreviewKey = ''
+}
 const openModal = () => {
   showCreateModal.value = true
-  form.value = { name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '', headerMedia: null }
+  form.value = emptyForm()
+  resetAudience()
   if (activeMetaChannelId.value) fetchTemplates()
   fetchGroups()
 }
 
 const closeModal = () => {
   showCreateModal.value = false
-  form.value = { name: '', templateName: '', audienceSource: 'file', contactGroupId: '', file: null, launchMode: 'immediate', scheduledAt: '', headerMedia: null }
+  form.value = emptyForm()
+  resetAudience()
 }
 
 const createCampaign = async () => {
@@ -535,6 +655,10 @@ const createCampaign = async () => {
     }
     if (form.value.launchMode === 'schedule') formData.append('startDate', new Date(form.value.scheduledAt).toISOString())
     if (form.value.headerMedia) formData.append('headerMedia', JSON.stringify(form.value.headerMedia))
+    // The same choices the check used: local numbers' country, values for empty cells, the group's variable sources
+    if (form.value.countryCode || audiencePreview.value?.country) formData.append('countryCode', form.value.countryCode || audiencePreview.value.country)
+    if (form.value.fallbacks.some(Boolean)) formData.append('fallbacks', JSON.stringify(form.value.fallbacks))
+    if (form.value.audienceSource === 'group' && form.value.mapping) formData.append('variableMap', JSON.stringify(form.value.mapping))
   }
 
   try {
@@ -542,17 +666,19 @@ const createCampaign = async () => {
     if (form.value.launchMode === 'draft') {
       showAlert(isAr.value ? 'تم حفظ الحملة كمسودة! يمكنك إطلاقها لاحقاً. 📝' : 'Campaign saved as Draft! Launch it manually later. 📝')
     } else {
-      await axios.post('/api/v1/campaigns/' + res.data.campaignId + '/start', {}, { headers: { Authorization: 'Bearer ' + token } })
+      const started = await axios.post('/api/v1/campaigns/' + res.data.campaignId + '/start', {}, { headers: { Authorization: 'Bearer ' + token } })
+      const eta = started.data?.eta
       if (form.value.launchMode === 'schedule') {
         showAlert(isAr.value ? 'تمت الجدولة بنجاح! ⏰ الإرسال في: ' + formatScheduledDate(form.value.scheduledAt) : 'Campaign scheduled! ⏰ Sending at: ' + formatScheduledDate(form.value.scheduledAt))
       } else {
-        showAlert(isAr.value ? 'تم إطلاق الحملة بنجاح! 🚀' : 'Meta Campaign launched successfully! 🚀')
+        showAlert(isAr.value
+          ? `تم إطلاق الحملة 🚀 ${res.data.totalNumbers} رسالة، حوالي ${formatDuration(eta?.seconds, true)}`
+          : `Campaign launched 🚀 ${res.data.totalNumbers} messages, about ${formatDuration(eta?.seconds, false)}`)
       }
     }
     closeModal(); fetchCampaigns()
   } catch (err) {
-    const errorMsg = err.response?.data?.error?.message || err.response?.data?.error || (isAr.value ? 'فشل إنشاء الحملة.' : 'Failed to create campaign.');
-    showAlert(errorMsg, 'error')
+    showAlert(apiErrorText(err, isAr.value), 'error')
   } finally { isSubmitting.value = false }
 }
 
@@ -616,7 +742,7 @@ const fetchWalletCurrency = async () => {
 onMounted(() => {
   fetchCampaigns()
   fetchWalletCurrency()
-  pollInterval = setInterval(() => { campaigns.value.filter(c => c.status === 'RUNNING').forEach(c => loadStats(c.id)) }, 10000)
+  pollInterval = setInterval(() => { campaigns.value.filter(c => c.status === 'RUNNING' || c.status === 'PAUSED').forEach(c => loadStats(c.id)) }, 5000)
 })
 
 onUnmounted(() => { if (pollInterval) clearInterval(pollInterval) })
@@ -681,6 +807,12 @@ onUnmounted(() => { if (pollInterval) clearInterval(pollInterval) })
 /* CARDS */
 .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.5rem; padding: 0 2.5rem 2rem; }
 @media(max-width:640px) { .cards-grid { grid-template-columns: 1fr; padding: 0 1rem 2rem; } }
+@media(max-width:820px) {
+  .modal-box { overflow-y: auto; }
+  .modal-layout { grid-template-columns: 1fr; }
+  .modal-guide { border-radius: 24px 24px 0 0; padding: 1.25rem; }
+  .modal-form-panel { max-height: none; overflow: visible; }
+}
 .camp-card { background: #fff; border-radius: 20px; border: 1px solid #E8EDF5; box-shadow: 0 4px 16px rgba(0,0,0,0.04); display: flex; flex-direction: column; overflow: hidden; transition: all 0.28s cubic-bezier(0.4,0,0.2,1); position: relative; }
 .camp-card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(0,0,0,0.08); border-color: #D1D9E8; }
 .card-accent { height: 4px; width: 100%; }
@@ -689,6 +821,8 @@ onUnmounted(() => { if (pollInterval) clearInterval(pollInterval) })
 .accent-scheduled { background: linear-gradient(90deg, #7C3AED, #A78BFA); }
 .accent-completed { background: linear-gradient(90deg, #10B981, #34D399); }
 .accent-failed    { background: linear-gradient(90deg, #EF4444, #F87171); }
+.accent-paused    { background: linear-gradient(90deg, #F59E0B, #FCD34D); }
+.accent-cancelled { background: linear-gradient(90deg, #64748B, #94A3B8); }
 .card-head { display: flex; align-items: flex-start; gap: 1rem; padding: 1.5rem 1.5rem 0; }
 .card-icon-wrap { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .icon-pending   { background: #F1F5F9; color: #94A3B8; }
@@ -696,6 +830,8 @@ onUnmounted(() => { if (pollInterval) clearInterval(pollInterval) })
 .icon-scheduled { background: #EDE9FE; color: #7C3AED; }
 .icon-completed { background: #DCFCE7; color: #16A34A; }
 .icon-failed    { background: #FEE2E2; color: #DC2626; }
+.icon-paused    { background: #FEF3C7; color: #B45309; }
+.icon-cancelled { background: #F1F5F9; color: #64748B; }
 .card-title-block { flex: 1; min-width: 0; }
 .card-name { font-size: 1.05rem; font-weight: 800; color: #0F172A; margin: 0 0 0.35rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-meta-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -708,6 +844,15 @@ onUnmounted(() => { if (pollInterval) clearInterval(pollInterval) })
 .badge-scheduled { background: #EDE9FE; color: #7C3AED; }
 .badge-completed { background: #DCFCE7; color: #15803D; }
 .badge-failed    { background: #FEE2E2; color: #B91C1C; }
+.badge-paused    { background: #FEF3C7; color: #B45309; }
+.badge-cancelled { background: #F1F5F9; color: #475569; }
+.status-pill.paused.active { background: #B45309; border-color: #B45309; }
+.status-pill.cancelled.active { background: #475569; border-color: #475569; }
+.card-eta { font-size: 0.75rem; font-weight: 600; color: #1D4ED8; background: #EFF6FF; border-radius: 10px; padding: 6px 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.card-eta.paused { color: #B45309; background: #FFFBEB; }
+.wa-preview { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 10px; }
+.wa-preview-label { font-size: 0.68rem; color: #94A3B8; margin-bottom: 6px; font-weight: 600; }
+.wa-bubble { background: #DCF8C6; color: #111B21; border-radius: 10px 10px 10px 2px; padding: 8px 10px; font-size: 0.78rem; line-height: 1.55; white-space: pre-line; word-break: break-word; max-height: 220px; overflow-y: auto; }
 .badge-pulse { width: 7px; height: 7px; border-radius: 50%; background: #25D366; animation: badge-pulse 1.4s infinite; }
 .badge-pulse.sched-pulse { background: #7C3AED; }
 @keyframes badge-pulse { 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(1.6); opacity:0.4; } }
@@ -756,7 +901,7 @@ onUnmounted(() => { if (pollInterval) clearInterval(pollInterval) })
 
 /* MODAL */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.65); backdrop-filter: blur(6px); display: flex; justify-content: center; align-items: center; z-index: 100; padding: 1rem; }
-.modal-box { background: white; border-radius: 24px; width: 100%; max-width: 820px; max-height: 94vh; overflow: hidden; box-shadow: 0 32px 64px rgba(0,0,0,0.2); }
+.modal-box { background: white; border-radius: 24px; width: 100%; max-width: 980px; max-height: 94vh; overflow: hidden; box-shadow: 0 32px 64px rgba(0,0,0,0.2); }
 .modal-fade-enter-active, .modal-fade-leave-active { transition: all 0.25s; }
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; transform: scale(0.95); }
 .modal-layout { display: grid; grid-template-columns: 270px 1fr; height: 100%; }
@@ -830,7 +975,7 @@ onUnmounted(() => { if (pollInterval) clearInterval(pollInterval) })
 .slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: translateY(-10px); max-height: 0; padding: 0; }
 
 /* FORM ACTIONS */
-.modal-form-actions { display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1.25rem 1.75rem; border-top: 1px solid #F1F5F9; background: #FAFBFD; }
+.modal-form-actions { display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1.25rem 1.75rem; border-top: 1px solid #F1F5F9; background: #FAFBFD; position: sticky; bottom: 0; z-index: 1; }
 .btn-cancel { padding: 0.75rem 1.5rem; background: white; color: #64748B; border: 1.5px solid #E2E8F0; border-radius: 12px; font-weight: 700; font-size: 0.875rem; cursor: pointer; transition: all 0.2s; font-family: inherit; }
 .btn-cancel:hover { background: #F8FAFC; border-color: #CBD5E1; }
 .btn-submit { display: inline-flex; align-items: center; gap: 8px; padding: 0.75rem 1.75rem; color: white; border: none; border-radius: 12px; font-weight: 800; font-size: 0.875rem; cursor: pointer; transition: all 0.25s; font-family: inherit; }

@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { LIVE_CHAT_PROVIDERS } = require('../channels/channel.kinds');
 const prisma = new PrismaClient();
 const ChatFlow = require('../../models/mongo/ChatFlow');
 const ChatTag = require('../../models/mongo/ChatTag');
@@ -195,7 +196,7 @@ const formatFlow = (flow, channelId) => ({
 class FlowService {
   async _channel(tenantId, channelId) {
     const channel = await prisma.whatsAppChannel.findFirst({
-      where: { id: channelId, tenantId, providerType: 'META_CLOUD' },
+      where: { id: channelId, tenantId, providerType: { in: LIVE_CHAT_PROVIDERS } },
       select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true }
     });
     if (!channel) throw { status: 404, message: 'Channel not found' };
@@ -205,7 +206,7 @@ class FlowService {
   async listFlows(tenantId) {
     const [channels, flows] = await Promise.all([
       prisma.whatsAppChannel.findMany({
-        where: { tenantId, providerType: 'META_CLOUD' },
+        where: { tenantId, providerType: { in: LIVE_CHAT_PROVIDERS } },
         select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true }
       }),
       ChatFlow.find({ tenantId }).select('channelId isActive published.version published.publishedAt hasDraftChanges draft.nodes').lean()
