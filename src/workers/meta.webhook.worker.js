@@ -34,6 +34,9 @@ async function processJob(job) {
     await require('../modules/meta/meta.coexistence').runSyncJob(channelId);
   } else if (type === 'ACCOUNT_UPDATE') {
     await require('../modules/meta/meta.coexistence').processAccountUpdate(payload);
+  } else if (type === 'SOCIAL_EVENT') {
+    // Instagram and Messenger messages (social/social.inbound.js)
+    await require('../modules/social/social.inbound').processEntry(channelId, payload);
   } else if (type === 'META_AI_EVENT') {
     // Meta Business Agent: read-only copies of the conversations it answers, and its handovers to the team
     await require('../modules/meta/meta.agent.inbox').processAgentEvent(channelId, payload);
@@ -87,54 +90,46 @@ async function processIncomingMessage(channelId, tenantId, payload) {
   if (textForBot && !intake?.flowHandled) {
     const channelRecord = await prisma.whatsAppChannel.findUnique({ where: { id: channelId } }).catch(() => null);
     if (channelRecord) {
-      const rules = await prisma.autoResponder.findMany({ where: { tenantId, isActive: true, OR: [{ channelId }, { channelId: null }] } }).catch(() => []);
+      const rules = await prisma.autoResponder.findMany({ where: { tenantId, isActive: true, OR: [{ channelId }, { channelId: null }, { allChannels: true }] } }).catch(() => []);
       const target = await prisma.campaignTarget.findFirst({ where: { phone: { contains: from }, campaign: { tenantId } }, orderBy: { id: 'desc' } }).catch(() => null);
-      const applicableRules = rules.filter(r => !r.campaignId || (target && target.campaignId === r.campaignId))
-        .sort((a, b) => { if (a.channelId && !b.channelId) return -1; if (!a.channelId && b.channelId) return 1; if (a.campaignId && !b.campaignId) return -1; if (!a.campaignId && b.campaignId) return 1; return 0; });
-      for (const rule of applicableRules) {
-        const now = new Date();
-        if (rule.startDate && now < new Date(rule.startDate)) continue;
-        if (rule.endDate && now > new Date(rule.endDate)) continue;
-        const tL = textForBot.trim().toLowerCase(), kL = rule.keyword.trim().toLowerCase();
-        let isMatch = (rule.matchType === 'EXACT' && tL === kL) || (rule.matchType === 'CONTAINS' && tL.includes(kL)) || (rule.matchType === 'STARTS_WITH' && tL.startsWith(kL));
-        if (isMatch) {
-          try {
-            const rT = rule.responseType;
-            let metaRes = null;
-            if (rT === 'META_TEMPLATE' && rule.metaTemplateName) metaRes = await metaService.sendTemplateViaApi(channelRecord, from, rule.metaTemplateName, rule.metaTemplateLang || 'ar');
-            else if ((rT === 'IMAGE' || rT === 'QR_CODE') && rule.mediaUrl) metaRes = await metaService.sendImageViaApi(channelRecord, from, rule.mediaUrl, rule.message || '');
-            else if (rT === 'VIDEO' && rule.mediaUrl) metaRes = await metaService.sendVideoViaApi(channelRecord, from, rule.mediaUrl, rule.message || '');
-            else if (rT === 'DOCUMENT' && rule.mediaUrl) metaRes = await metaService.sendDocumentViaApi(channelRecord, from, rule.mediaUrl, 'document', rule.message || '');
-            else if (rule.message) metaRes = await metaService.sendTextViaApi(channelRecord, from, rule.message);
+      // Same rule choice as the other channels (chatbot/autoReply.js); WhatsApp can also answer with templates and files
+      const rule = require('../modules/chatbot/autoReply').pickRule(rules, textForBot, { campaignId: target?.campaignId || null });
+      if (rule) {
+        try {
+          const rT = rule.responseType;
+          let metaRes = null;
+          if (rT === 'META_TEMPLATE' && rule.metaTemplateName) metaRes = await metaService.sendTemplateViaApi(channelRecord, from, rule.metaTemplateName, rule.metaTemplateLang || 'ar');
+          else if ((rT === 'IMAGE' || rT === 'QR_CODE') && rule.mediaUrl) metaRes = await metaService.sendImageViaApi(channelRecord, from, rule.mediaUrl, rule.message || '');
+          else if (rT === 'VIDEO' && rule.mediaUrl) metaRes = await metaService.sendVideoViaApi(channelRecord, from, rule.mediaUrl, rule.message || '');
+          else if (rT === 'DOCUMENT' && rule.mediaUrl) metaRes = await metaService.sendDocumentViaApi(channelRecord, from, rule.mediaUrl, 'document', rule.message || '');
+          else if (rule.message) metaRes = await metaService.sendTextViaApi(channelRecord, from, rule.message);
 
-            // Save the auto-reply to Mongoose (Live Chat)
-            if (metaRes && metaRes.messages && metaRes.messages[0]) {
-              const metaMessageId = metaRes.messages[0].id;
-              const ChatThread = require('../models/mongo/ChatThread');
-              const ChatMessage = require('../models/mongo/ChatMessage');
-              const socketService = require('../services/socket.service');
-              
-              const thread = await ChatThread.findOne({ tenantId, channelId, contactPhone: from });
-              if (thread) {
-                const newMsg = await ChatMessage.create({
-                  threadId: thread._id,
-                  direction: 'OUTBOUND',
-                  type: rT === 'META_TEMPLATE' ? 'TEMPLATE' : rT,
-                  content: rule.message || rule.metaTemplateName || '[Auto Reply]',
-                  hasMedia: ['IMAGE', 'VIDEO', 'DOCUMENT', 'QR_CODE'].includes(rT),
-                  mediaUrl: rule.mediaUrl || null,
-                  metaMessageId,
-                  status: 'SENT',
-                  isAutomated: true
-                });
-                const msgData = newMsg.toObject();
-                msgData.id = msgData._id.toString();
-                socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
-              }
+          // Save the auto-reply to Mongoose (Live Chat)
+          if (metaRes && metaRes.messages && metaRes.messages[0]) {
+            const metaMessageId = metaRes.messages[0].id;
+            const ChatThread = require('../models/mongo/ChatThread');
+            const ChatMessage = require('../models/mongo/ChatMessage');
+            const socketService = require('../services/socket.service');
+          
+            const thread = await ChatThread.findOne({ tenantId, channelId, contactPhone: from });
+            if (thread) {
+              const newMsg = await ChatMessage.create({
+                threadId: thread._id,
+                direction: 'OUTBOUND',
+                type: rT === 'META_TEMPLATE' ? 'TEMPLATE' : rT,
+                content: rule.message || rule.metaTemplateName || '[Auto Reply]',
+                hasMedia: ['IMAGE', 'VIDEO', 'DOCUMENT', 'QR_CODE'].includes(rT),
+                mediaUrl: rule.mediaUrl || null,
+                metaMessageId,
+                status: 'SENT',
+                isAutomated: true
+              });
+              const msgData = newMsg.toObject();
+              msgData.id = msgData._id.toString();
+              socketService.emitToTenant(tenantId, 'new_chat_message', msgData);
             }
-          } catch (e) { logger.error(`[MetaAutoResponder] Failed reply to ${from}`, e.message); }
-          break;
-        }
+          }
+        } catch (e) { logger.error(`[MetaAutoResponder] Failed reply to ${from}`, e.message); }
       }
     }
   }

@@ -80,6 +80,7 @@ app.use('/api/v1/team-chat', teamChatRoutes);
 app.use('/api/v1/tasks', require('./modules/tasks/tasks.routes'));
 app.use('/api/v1/channels', require('./modules/channels/channels.routes'));
 app.use('/api/v1/webchat', require('./modules/webchat/webchat.routes'));
+app.use('/api/v1/social', require('./modules/social/social.routes'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

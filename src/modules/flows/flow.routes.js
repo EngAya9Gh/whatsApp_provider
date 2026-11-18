@@ -14,6 +14,7 @@ const bind = (method) => flowController[method].bind(flowController);
 router.get('/', canView, bind('list'));
 router.get('/:channelId', canView, bind('get'));
 router.put('/:channelId/draft', canManage, bind('saveDraft'));
+router.post('/:channelId/copy-from/:sourceChannelId', canManage, bind('copyFrom'));
 router.post('/:channelId/publish', canManage, bind('publish'));
 router.post('/:channelId/discard', canManage, bind('discard'));
 router.put('/:channelId/active', canManage, bind('setActive'));

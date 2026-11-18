@@ -69,7 +69,9 @@ model Tenant {
 model WhatsAppChannel {
   id           String  @id @default(uuid())
   tenantId     String  @map("tenant_id")
-  providerType String  @default("BAILEYS") @map("provider_type") // BAILEYS, META_CLOUD or WEBCHAT (channels/channel.kinds.js)
+  providerType String  @default("BAILEYS") @map("provider_type") // BAILEYS, META_CLOUD, WEBCHAT, MESSENGER, INSTAGRAM (channels/channel.kinds.js)
+  // The channel's own id at its platform: Facebook Page id (MESSENGER), Instagram account id (INSTAGRAM)
+  externalId   String? @map("external_id")
   phoneNumber  String? @map("phone_number")
   status       String  @default("DISCONNECTED")
 
@@ -109,6 +111,7 @@ model WhatsAppChannel {
   subUsers       SubUser[]
 
   @@index([tenantId], map: "whatsapp_channels_tenant_id_fkey")
+  @@index([providerType, externalId], map: "whatsapp_channels_provider_external_idx")
   @@map("whatsapp_channels")
 }
 
@@ -288,6 +291,8 @@ model AutoResponder {
   campaignId       String?          @map("campaign_id")
   // Meta-specific: link rule to a specific Meta channel
   channelId        String?          @map("channel_id")
+  // Also answers on every Live Chat channel: other WhatsApp numbers, website widget, Instagram, Messenger
+  allChannels      Boolean          @default(false) @map("all_channels")
   // For META_TEMPLATE response type
   metaTemplateName String?          @map("meta_template_name")
   metaTemplateLang String?          @default("ar") @map("meta_template_lang")

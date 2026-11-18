@@ -23,13 +23,19 @@
       open: 'افتح المحادثة', close: 'إغلاق', online: 'متصلون الآن', offline: 'خارج الدوام، نرد عليك بأقرب وقت',
       placeholder: 'اكتب رسالتك…', send: 'إرسال', name: 'الاسم', phone: 'رقم الجوال', phoneOptional: 'رقم الجوال (اختياري)',
       start: 'ابدأ المحادثة', whatsapp: 'تابع على واتساب', error: 'تعذّر الإرسال، حاول مرة أخرى',
-      needName: 'اكتب اسمك', needPhone: 'اكتب رقم جوالك مع رمز الدولة', powered: 'مدعوم من وكيل'
+      needName: 'اكتب اسمك', needPhone: 'اكتب رقم جوالك مع رمز الدولة', needText: 'اكتب رسالتك', powered: 'مدعوم من وكيل',
+      intro: 'عرّفنا بنفسك واكتب سؤالك، وسنرد عليك هنا', firstMessage: 'كيف نقدر نساعدك؟',
+      hello: 'أهلاً', sent: '✓ وصلت رسالتك، فريقنا يرد عليك هنا', sentOffline: '✓ وصلت رسالتك. نحن خارج الدوام الآن وسنرد عليك فور عودتنا',
+      newReply: 'رد جديد'
     },
     en: {
       open: 'Open chat', close: 'Close', online: 'We are online', offline: 'We are away, we will reply soon',
       placeholder: 'Write a message…', send: 'Send', name: 'Name', phone: 'Mobile number', phoneOptional: 'Mobile number (optional)',
       start: 'Start chat', whatsapp: 'Continue on WhatsApp', error: 'Could not send, try again',
-      needName: 'Write your name', needPhone: 'Write your number with the country code', powered: 'Powered by Wakeel'
+      needName: 'Write your name', needPhone: 'Write your number with the country code', needText: 'Write your message', powered: 'Powered by Wakeel',
+      intro: 'Tell us who you are and write your question; we reply right here', firstMessage: 'How can we help?',
+      hello: 'Hi', sent: '✓ Message received, our team replies here', sentOffline: '✓ Message received. We are away now and will reply as soon as we are back',
+      newReply: 'New reply'
     }
   };
 
@@ -109,6 +115,7 @@
       '.send:disabled{opacity:.5}.form{padding:16px;display:flex;flex-direction:column;gap:10px;background:#fff;border-top:1px solid #e5e7eb}' +
       '.err{color:#e11d48;font-size:12px;padding:0 12px 8px;background:#fff}.wa{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:#15803d;background:#f0fdf4;border:0;border-top:1px solid #dcfce7;padding:8px;cursor:pointer;width:100%}' +
       '.pw{font-size:10px;color:#9ca3af;text-align:center;padding:4px;background:#fff}' +
+      '.intro{font-size:13px;color:#4b5563;line-height:1.6}.note{align-self:center;font-size:11.5px;color:#6b7280;background:#eef2f7;border-radius:999px;padding:4px 12px;text-align:center;max-width:90%}' +
       '@media (max-width:480px){.panel{width:calc(100vw - 24px);height:calc(100vh - 100px)}.wrap.right{right:12px}.wrap.left{left:12px}}';
   }
 
@@ -155,12 +162,16 @@
     showFormIfNeeded();
   }
 
+  /** Name, number and the first message in one step: "Start chat" sends it, nothing waits for a second step */
   function buildForm(config) {
-    var fields = [];
+    var fields = [el('div', { class: 'intro', text: t.intro })];
     ui.name = config.askName ? el('input', { type: 'text', placeholder: t.name, autocomplete: 'name', maxlength: '80' }) : null;
     ui.phone = config.askPhone !== 'OFF' ? el('input', { type: 'tel', placeholder: config.askPhone === 'REQUIRED' ? t.phone : t.phoneOptional, autocomplete: 'tel', dir: 'ltr', maxlength: '20' }) : null;
+    ui.first = el('textarea', { rows: '2', placeholder: t.firstMessage, 'aria-label': t.firstMessage, maxlength: '2000' });
+    ui.first.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitForm(); } });
     if (ui.name) fields.push(ui.name);
     if (ui.phone) fields.push(ui.phone);
+    fields.push(ui.first);
     fields.push(el('button', { class: 'send', type: 'button', text: t.start, on: { click: submitForm } }));
     return el('div', { class: 'form' }, fields);
   }
@@ -168,7 +179,7 @@
   function needsForm() {
     var c = state.config;
     if (state.me.started || Object.keys(state.messages).length) return false;
-    return !!(c.askName || c.askPhone === 'REQUIRED');
+    return !!(c.askName || c.askPhone !== 'OFF');
   }
   function showFormIfNeeded() {
     var form = needsForm();
@@ -178,21 +189,27 @@
   function submitForm() {
     var name = ui.name ? ui.name.value.trim() : '';
     var phone = ui.phone ? ui.phone.value.trim() : '';
+    var text = ui.first.value.trim();
     if (ui.name && !name) return showError(t.needName);
     if (state.config.askPhone === 'REQUIRED' && phone.replace(/\D/g, '').length < 8) return showError(t.needPhone);
+    if (!text) return showError(t.needText);
     state.me.name = name || undefined;
     state.me.phone = phone || undefined;
     state.me.started = true;
     save();
     showError('');
+    ui.first.value = '';
+    setStatus(state.config.online);
     showFormIfNeeded();
+    send(text, null);
     ui.text.focus();
   }
 
   function setStatus(online) {
     ui.status.textContent = '';
     ui.status.appendChild(el('span', { class: 'dot' + (online ? '' : ' off') }));
-    ui.status.appendChild(document.createTextNode(online ? t.online : t.offline));
+    var first = String(state.me.name || '').split(' ')[0];
+    ui.status.appendChild(document.createTextNode((first ? t.hello + ' ' + first + ' · ' : '') + (online ? t.online : t.offline)));
   }
   function showError(text) {
     ui.err.textContent = text || '';
@@ -224,6 +241,10 @@
       ui.body.appendChild(bubble);
     });
     state.pending.forEach(function (p) { ui.body.appendChild(el('div', { class: 'msg me pending' }, [richText(p.text)])); });
+    var last = list[list.length - 1];
+    if (!state.pending.length && last && last.from === 'visitor') {
+      ui.body.appendChild(el('div', { class: 'note', text: state.config.online ? t.sent : t.sentOffline }));
+    }
     ui.body.scrollTop = ui.body.scrollHeight;
   }
 
@@ -235,7 +256,7 @@
         if (m.from === 'visitor') {
           var i = state.pending.findIndex(function (p) { return p.text === m.text; });
           if (i >= 0) state.pending.splice(i, 1);
-        } else if (!state.open && state.lastAt) {
+        } else if ((!state.open || document.visibilityState === 'hidden') && state.lastAt) {
           state.unread++;
         }
       }
@@ -262,9 +283,17 @@
     if (!state.open && !hasChat) return; // nothing to watch until the visitor writes
     state.timer = setTimeout(poll, state.open ? POLL_OPEN_MS : POLL_CLOSED_MS);
   }
+  var baseTitle = document.title;
   function updateBadge() {
     ui.badge.textContent = String(state.unread);
     ui.badge.style.display = state.unread && !state.open ? 'block' : 'none';
+    var waiting = state.unread && (!state.open || document.visibilityState === 'hidden');
+    if (waiting && document.title.indexOf('(' + state.unread + ')') !== 0) {
+      if (!/^\(\d+\) /.test(document.title)) baseTitle = document.title;
+      document.title = '(' + state.unread + ') ' + t.newReply + ' · ' + baseTitle;
+    } else if (!waiting && /^\(\d+\) /.test(document.title)) {
+      document.title = baseTitle;
+    }
   }
 
   function sendText() {
@@ -314,14 +343,18 @@
       updateBadge();
       render();
       showFormIfNeeded();
-      (needsForm() ? (ui.name || ui.phone) : ui.text).focus();
+      (needsForm() ? (ui.name || ui.phone || ui.first) : ui.text).focus();
       if (state.me.visitorId) poll(); else schedule();
     } else {
       schedule();
     }
   }
 
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') poll(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    if (state.open) { state.unread = 0; updateBadge(); }
+    poll();
+  });
 
   function start() {
     api('GET', '/config').then(function (config) {

@@ -87,7 +87,7 @@
               <td>
                 <div v-if="user.channel" class="channel-cell">
                   <span class="channel-tag" :class="'provider-' + user.channel.providerType.toLowerCase()">
-                    {{ user.channel.providerType === 'WEBCHAT' ? '🌐' : user.channel.providerType === 'META_CLOUD' ? '☁️' : '📱' }}
+                    {{ ({ WEBCHAT: '🌐', INSTAGRAM: '📸', MESSENGER: '💬', META_CLOUD: '☁️' })[user.channel.providerType] || '📱' }}
                     {{ user.channel.displayPhoneNumber || user.channel.phoneNumber || user.channel.name || '-' }}
                   </span>
                 </div>
@@ -171,7 +171,7 @@
                 <select v-model="form.channelId" class="input-std">
                   <option value="">{{ isAr ? 'بدون تخصيص' : 'No assignment' }}</option>
                   <option v-for="ch in channels" :key="ch.id" :value="ch.id">
-                    {{ ch.providerType === 'WEBCHAT' ? '🌐' : ch.providerType === 'META_CLOUD' ? '☁️' : '📱' }}
+                    {{ ({ WEBCHAT: '🌐', INSTAGRAM: '📸', MESSENGER: '💬', META_CLOUD: '☁️' })[ch.providerType] || '📱' }}
                     {{ ch.displayPhoneNumber || ch.phoneNumber || ch.name || ch.id.slice(0,8) }}
                     — {{ ch.status }}
                   </option>

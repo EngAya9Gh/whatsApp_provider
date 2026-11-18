@@ -71,7 +71,7 @@
               <a :href="tryUrl" target="_blank" rel="noopener" class="ghost"><i class="fas fa-up-right-from-square"></i>{{ isAr ? 'جرّبه الآن في صفحة تجربة' : 'Try it on a test page' }}</a>
             </div>
             <p class="note"><i class="fas fa-circle-info"></i>{{ isAr
-              ? 'الويدجت قناة مثل رقم الواتساب: اضبط فريقه وأوقات عمله ورسالة خارج الدوام من صفحة «الفرق والشيفتات»، وسيره والموظف الذكي من «سير الواتساب»، وستجده هناك باسمه.'
+              ? 'الويدجت قناة مثل رقم الواتساب: اضبط فريقه وأوقات عمله ورسالة خارج الدوام من صفحة «الفرق والشيفتات»، وسيره والموظف الذكي من «سير المحادثة» (وتقدر تنسخ سير رقم الواتساب إليه بكبسة)، وستجده هناك باسمه.'
               : 'The widget is a channel like a WhatsApp number: set its team, working hours and away message on Teams & Shifts, and its flow and AI agent on Chat Flows, where it appears under its name.' }}</p>
           </section>
 

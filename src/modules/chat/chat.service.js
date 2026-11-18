@@ -2,7 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const metaService = require('../meta/meta.service');
 const channelSender = require('../channels/channel.sender');
-const { capabilitiesOf, isWebchat } = require('../channels/channel.kinds');
+const { capabilitiesOf } = require('../channels/channel.kinds');
 const { metaErrorInfo, metaErrorText } = require('../meta/meta.errors');
 const socketService = require('../../services/socket.service');
 const billingService = require('../billing/billing.service');
@@ -310,8 +310,8 @@ class ChatService {
     if (!channel) throw new Error('Channel not found');
     
     // Check billing
-    // Website widget messages are free: no WhatsApp message quota
-    const canSend = isWebchat(channel) || await billingService.checkLimit(tenantId);
+    // Website widget, Instagram and Messenger messages are free: no WhatsApp message quota
+    const canSend = !capabilitiesOf(channel).metered || await billingService.checkLimit(tenantId);
     if (!canSend) {
       throw new Error('Monthly message limit reached.');
     }
@@ -386,7 +386,7 @@ class ChatService {
             payload.content
           );
         }
-        if (!isWebchat(channel)) await billingService.incrementUsage(tenantId, 'sent');
+        if (capabilitiesOf(channel).metered) await billingService.incrementUsage(tenantId, 'sent');
       }
       
       // First reply a person wrote on this ticket (first response time in the ticket reports). Taking over
@@ -647,9 +647,9 @@ class ChatService {
         hoursService.sendAwayMessageIfClosed(tenantId, channelId, thread)
           .catch(e => logger.error('[ChatService] Away message failed: ' + e.message));
       }
-      return { flowHandled };
+      return { flowHandled, threadId: threadIdStr };
     }
-    return { flowHandled: false, duplicate: true };
+    return { flowHandled: false, duplicate: true, threadId: threadIdStr };
   }
 
   /** A message with one button that opens a link (flow "Link button" step) */
@@ -664,7 +664,7 @@ class ChatService {
     let failure = null;
     try {
       metaResponse = await channelSender.sendLinkButton(channel, thread.contactPhone, body, buttonText, url);
-      if (!isWebchat(channel)) await billingService.incrementUsage(tenantId, 'sent');
+      if (capabilitiesOf(channel).metered) await billingService.incrementUsage(tenantId, 'sent');
     } catch (error) {
       logger.error(`Error sending link button: ${metaErrorText(error)}`);
       status = 'FAILED';
@@ -715,7 +715,7 @@ class ChatService {
           { title: (buttonLabel || 'Options').substring(0, 24), rows: options.map(o => ({ id: o.id, title: o.title })) }
         ]);
       }
-      if (!isWebchat(channel)) await billingService.incrementUsage(tenantId, 'sent');
+      if (capabilitiesOf(channel).metered) await billingService.incrementUsage(tenantId, 'sent');
     } catch (error) {
       logger.error(`Error sending interactive message: ${metaErrorText(error)}`);
       status = 'FAILED';

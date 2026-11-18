@@ -17,6 +17,15 @@ class FlowController {
     }
   }
 
+  async copyFrom(req, res, next) {
+    try {
+      res.json({ success: true, data: await flowService.copyFrom(req.tenant.id, req.params.channelId, req.params.sourceChannelId) });
+    } catch (error) {
+      if (error && error.status) return res.status(error.status).json({ error: { message: error.message } });
+      next(error);
+    }
+  }
+
   async saveDraft(req, res, next) {
     try {
       res.json({ success: true, data: await flowService.saveDraft(req.tenant.id, req.params.channelId, req.body) });

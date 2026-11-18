@@ -225,11 +225,11 @@
                 <input v-model="form.channelPriceWebchat" type="number" step="0.01" min="0" placeholder="Free" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
               </div>
               <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Instagram, per account (coming soon)</label>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Instagram, per account</label>
                 <input v-model="form.channelPriceInstagram" type="number" step="0.01" min="0" placeholder="Free" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
               </div>
               <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Messenger, per page (coming soon)</label>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Messenger, per page</label>
                 <input v-model="form.channelPriceMessenger" type="number" step="0.01" min="0" placeholder="Free" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
               </div>
             </div>

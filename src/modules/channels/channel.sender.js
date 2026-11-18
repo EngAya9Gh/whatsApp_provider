@@ -5,17 +5,20 @@
 //   WhatsApp Cloud → Meta's API.
 //   Website widget → nothing to send: the widget reads its conversation from Live Chat (the message is
 //                    saved by the caller), so the id is only ours.
+//   Instagram / Messenger → the Messenger Platform Send API.
 const crypto = require('crypto');
 const metaService = require('../meta/meta.service');
-const { isWebchat } = require('./channel.kinds');
+const { isWebchat, isSocial } = require('./channel.kinds');
 
 const kept = () => ({ messages: [{ id: `web.${crypto.randomBytes(8).toString('hex')}` }] });
+// Instagram / Messenger go through the Messenger Platform (social/social.sender.js)
+const social = () => require('../social/social.sender');
 
 module.exports = {
-  sendText: (channel, to, text) => (isWebchat(channel) ? kept() : metaService.sendText(channel, to, text)),
-  sendMedia: (channel, to, type, url, caption) => (isWebchat(channel) ? kept() : metaService.sendMedia(channel, to, type, url, caption)),
+  sendText: (channel, to, text) => (isWebchat(channel) ? kept() : isSocial(channel) ? social().sendText(channel, to, text) : metaService.sendText(channel, to, text)),
+  sendMedia: (channel, to, type, url, caption) => (isWebchat(channel) ? kept() : isSocial(channel) ? social().sendMedia(channel, to, type, url, caption) : metaService.sendMedia(channel, to, type, url, caption)),
   /** buttons: [{ id, text }] */
-  sendButtons: (channel, to, body, buttons) => (isWebchat(channel) ? kept() : metaService.sendButtons(channel, to, body, buttons)),
-  sendList: (channel, to, header, body, buttonLabel, sections) => (isWebchat(channel) ? kept() : metaService.sendList(channel, to, header, body, buttonLabel, sections)),
-  sendLinkButton: (channel, to, body, buttonText, url) => (isWebchat(channel) ? kept() : metaService.sendLinkButton(channel, to, body, buttonText, url))
+  sendButtons: (channel, to, body, buttons) => (isWebchat(channel) ? kept() : isSocial(channel) ? social().sendButtons(channel, to, body, buttons) : metaService.sendButtons(channel, to, body, buttons)),
+  sendList: (channel, to, header, body, buttonLabel, sections) => (isWebchat(channel) ? kept() : isSocial(channel) ? social().sendList(channel, to, header, body, buttonLabel, sections) : metaService.sendList(channel, to, header, body, buttonLabel, sections)),
+  sendLinkButton: (channel, to, body, buttonText, url) => (isWebchat(channel) ? kept() : isSocial(channel) ? social().sendLinkButton(channel, to, body, buttonText, url) : metaService.sendLinkButton(channel, to, body, buttonText, url))
 };

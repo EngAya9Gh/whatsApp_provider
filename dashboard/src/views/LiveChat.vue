@@ -55,11 +55,12 @@
             :class="['thread-item', { active: selectedThread?.id === thread.id }]"
           >
             <div class="thread-avatar">
-              <i class="fas fa-user-circle"></i>
+              <img v-if="thread.contactInfo?.avatarUrl" :src="thread.contactInfo.avatarUrl" class="thread-photo" alt="" referrerpolicy="no-referrer" @error="$event.target.style.display = 'none'" />
+              <i v-else class="fas fa-user-circle"></i>
             </div>
             <div class="thread-info">
               <div class="thread-top">
-                <span class="thread-name"><i v-if="isWebThread(thread)" class="fas fa-globe web-icon" :title="isAr ? 'من ويدجت الموقع' : 'From the website widget'"></i>{{ thread.contactName || contactSub(thread) }}</span>
+                <span class="thread-name"><i v-if="threadKind(thread) !== 'META_CLOUD'" :class="kindInfo(threadKind(thread)).icon" class="web-icon" :style="{ color: kindInfo(threadKind(thread)).color }" :title="kindLabel(threadKind(thread), isAr)"></i>{{ thread.contactName || contactSub(thread) }}</span>
                 <span class="thread-time">{{ formatTime(thread.lastMessageAt) }}</span>
               </div>
               <div class="thread-bottom">
@@ -97,12 +98,15 @@
             </div>
             <div>
               <h3>
-                <i v-if="isWebThread(selectedThread)" class="fas fa-globe web-icon" :title="isAr ? 'من ويدجت الموقع' : 'From the website widget'"></i>{{ selectedThread.contactName || contactSub(selectedThread) }}
+                <i v-if="threadKind(selectedThread) !== 'META_CLOUD'" :class="kindInfo(threadKind(selectedThread)).icon" class="web-icon" :style="{ color: kindInfo(threadKind(selectedThread)).color }" :title="kindLabel(threadKind(selectedThread), isAr)"></i>{{ selectedThread.contactName || contactSub(selectedThread) }}
                 <button @click="openRenameModal" class="btn-icon small rename-btn ml-2" title="تعديل الاسم">
                   <i class="fas fa-pen"></i>
                 </button>
               </h3>
               <span class="contact-phone">{{ contactSub(selectedThread) }}</span>
+              <button v-if="isWebThread(selectedThread) && selectedThread.contactInfo?.whatsappThreadId" type="button" class="wa-jump" @click="openWhatsAppThread(selectedThread.contactInfo.whatsappThreadId)">
+                <i class="fab fa-whatsapp"></i> {{ isAr ? 'محادثته على واتساب' : 'Their WhatsApp chat' }}
+              </button>
               <a v-if="isWebThread(selectedThread) && selectedThread.contactInfo?.pageUrl" :href="selectedThread.contactInfo.pageUrl" target="_blank" rel="noopener noreferrer" class="web-page" :title="selectedThread.contactInfo.pageUrl">
                 <i class="fas fa-link"></i> {{ selectedThread.contactInfo.pageTitle || (isAr ? 'الصفحة التي كتب منها' : 'Page they wrote from') }}
               </a>
@@ -625,7 +629,8 @@ import AssignTicketModal from '../components/tickets/AssignTicketModal.vue'
 import CloseTicketModal from '../components/tickets/CloseTicketModal.vue'
 import TicketCategoryModal from '../components/tickets/TicketCategoryModal.vue'
 import { isActiveStatus, categoryColor, initials, ticketErrorText } from '../utils/tickets'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { threadKind, kindInfo, kindLabel } from '../utils/channelKinds'
 import EmojiPicker from 'vue3-emoji-picker'
 import 'vue3-emoji-picker/css'
 
@@ -641,10 +646,14 @@ const channelTag = (thread) => {
   return thread.channel.name || thread.channel.displayPhoneNumber || thread.channel.phoneNumber || ''
 }
 // Website widget conversations: the customer's address is an internal visitor id, so show what they told us
-const isWebThread = (thread) => thread?.channel?.providerType === 'WEBCHAT' || String(thread?.contactPhone || '').startsWith('web:')
+const isWebThread = (thread) => threadKind(thread) === 'WEBCHAT'
+// Under the name: the phone on WhatsApp, @username on Instagram, the channel on Messenger, what a visitor told us
 const contactSub = (thread) => {
   if (!thread) return ''
-  if (!isWebThread(thread)) return thread.contactPhone || ''
+  const kind = threadKind(thread)
+  if (kind === 'META_CLOUD') return thread.contactPhone || ''
+  if (kind === 'INSTAGRAM') return thread.contactInfo?.username ? `@${thread.contactInfo.username}` : kindLabel(kind, isAr.value)
+  if (kind === 'MESSENGER') return kindLabel(kind, isAr.value)
   const info = thread.contactInfo || {}
   const parts = [info.phone ? `+${info.phone}` : '', info.email || ''].filter(Boolean)
   return parts.length ? parts.join(' · ') : `${isAr.value ? 'زائر الموقع' : 'Website visitor'}${info.ref ? ` · ${info.ref}` : ''}`
@@ -736,6 +745,11 @@ const showShareModal = ref(false)
 const showTaskModal = ref(false)
 const onTaskSaved = () => window.dispatchEvent(new Event('tasks-updated'))
 const route = useRoute()
+const router = useRouter()
+
+// A website visitor who continued on WhatsApp: jump to that conversation
+const openWhatsAppThread = (id) => router.replace({ path: '/live-chat', query: { thread: id } })
+watch(() => route.query.thread, (id, before) => { if (id && id !== before) openThreadFromLink() })
 
 // Opening a conversation shared from team chat (/live-chat?thread=<id>)
 const openThreadFromLink = async () => {
@@ -2085,10 +2099,31 @@ onUnmounted(() => {
   outline: none;
 }
 
+.thread-photo {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .web-icon {
   color: #0891b2;
   font-size: 0.8em;
   margin-inline-end: 6px;
+}
+
+.wa-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: 8px;
+  font-size: 0.78rem;
+  color: #15803d;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  padding: 1px 8px;
+  cursor: pointer;
 }
 
 .web-page {

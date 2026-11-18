@@ -243,6 +243,10 @@ class WebchatService {
       content: text,
       interactiveId
     });
+    // Keyword auto-replies («الرد الآلي») answer when no flow did, as on WhatsApp
+    if (result?.threadId && !result.flowHandled && !result.duplicate) {
+      await require('../chatbot/autoReply').replyIfMatched(channel.tenantId, { id: channel.id, providerType: PROVIDER }, result.threadId, text);
+    }
     return { sent: true, duplicate: !!result?.duplicate };
   }
 

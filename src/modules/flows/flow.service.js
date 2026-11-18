@@ -197,7 +197,7 @@ class FlowService {
   async _channel(tenantId, channelId) {
     const channel = await prisma.whatsAppChannel.findFirst({
       where: { id: channelId, tenantId, providerType: { in: LIVE_CHAT_PROVIDERS } },
-      select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true }
+      select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true, providerType: true }
     });
     if (!channel) throw { status: 404, message: 'Channel not found' };
     return channel;
@@ -207,7 +207,7 @@ class FlowService {
     const [channels, flows] = await Promise.all([
       prisma.whatsAppChannel.findMany({
         where: { tenantId, providerType: { in: LIVE_CHAT_PROVIDERS } },
-        select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true }
+        select: { id: true, name: true, phoneNumber: true, displayPhoneNumber: true, providerType: true }
       }),
       ChatFlow.find({ tenantId }).select('channelId isActive published.version published.publishedAt hasDraftChanges draft.nodes').lean()
     ]);
@@ -239,6 +239,21 @@ class FlowService {
       { upsert: true, returnDocument: 'after' }
     ).lean();
     return formatFlow(flow, channelId);
+  }
+
+  /**
+   * Starts a channel's flow as a copy of another channel's (e.g. the website widget gets the WhatsApp
+   * number's flow with its AI agent step): the source's published version, or its draft if never published,
+   * becomes this channel's draft, to review and publish.
+   */
+  async copyFrom(tenantId, channelId, sourceChannelId) {
+    if (channelId === sourceChannelId) throw { status: 400, message: 'Pick another channel to copy from' };
+    await this._channel(tenantId, channelId);
+    await this._channel(tenantId, sourceChannelId);
+    const source = await ChatFlow.findOne({ tenantId, channelId: sourceChannelId }).lean();
+    const graph = source?.published?.nodes?.length ? source.published : source?.draft;
+    if (!graph?.nodes?.length) throw { status: 404, message: 'That channel has no flow to copy' };
+    return this.saveDraft(tenantId, channelId, { nodes: graph.nodes, edges: graph.edges || [] });
   }
 
   async publish(tenantId, channelId) {

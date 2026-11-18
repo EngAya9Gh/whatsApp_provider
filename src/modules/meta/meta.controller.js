@@ -65,6 +65,29 @@ class MetaController {
   }
 
   /**
+   * Instagram (object "instagram", entry.id = Instagram account) and Messenger (object "page", entry.id =
+   * Facebook Page) messages of connected channels. They are signed with the platform app's secret.
+   */
+  async _handleSocial(req, body) {
+    if (!hasValidSignature(req, { id: `${body.object} webhook` })) return;
+    const providerType = body.object === 'instagram' ? 'INSTAGRAM' : 'MESSENGER';
+    for (const entry of body.entry || []) {
+      if (!entry?.messaging?.length) continue;
+      const channel = await prisma.whatsAppChannel.findFirst({
+        where: { providerType, externalId: String(entry.id), status: 'CONNECTED' },
+        select: { id: true, tenantId: true }
+      }).catch(() => null);
+      if (!channel) {
+        logger.warn(`[MetaWebhook] ⚠️ ${providerType} message for an unknown account ${entry.id}`);
+        continue;
+      }
+      await metaWebhookQueue.add('social-event', {
+        type: 'SOCIAL_EVENT', channelId: channel.id, tenantId: channel.tenantId, payload: { object: body.object, entry }
+      }).catch(e => logger.error(`[MetaWebhook] Failed to queue ${providerType} event: ${e.message}`));
+    }
+  }
+
+  /**
    * Handle all incoming webhook POST events from Meta.
    * 
    * Event types we handle:
@@ -78,6 +101,8 @@ class MetaController {
     res.sendStatus(200);
 
     const body = req.body;
+    // Instagram and Messenger channels (Messenger Platform) come on the same webhook
+    if (body && (body.object === 'page' || body.object === 'instagram')) return this._handleSocial(req, body);
     if (!body || body.object !== 'whatsapp_business_account') return;
 
     for (const entry of body.entry) {

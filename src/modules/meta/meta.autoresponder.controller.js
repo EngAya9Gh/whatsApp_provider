@@ -16,7 +16,8 @@ class MetaAutoResponderController {
       const { channelId } = req.params;
       await this._getChannel(req.tenant.id, channelId);
       const rules = await prisma.autoResponder.findMany({
-        where: { tenantId: req.tenant.id, channelId },
+        // This number's rules, and the rules that answer on every channel
+        where: { tenantId: req.tenant.id, OR: [{ channelId }, { allChannels: true }] },
         orderBy: { createdAt: 'desc' }
       });
       res.json({ success: true, data: rules });
@@ -27,7 +28,7 @@ class MetaAutoResponderController {
     try {
       const { channelId } = req.params;
       await this._getChannel(req.tenant.id, channelId);
-      const { keyword, matchType, responseType, message, mediaUrl, mediaMime, metaTemplateName, metaTemplateLang, startDate, endDate, isActive } = req.body;
+      const { keyword, matchType, responseType, message, mediaUrl, mediaMime, metaTemplateName, metaTemplateLang, startDate, endDate, isActive, allChannels } = req.body;
       if (!keyword) return res.status(400).json({ success: false, message: 'keyword is required' });
       const rule = await prisma.autoResponder.create({
         data: {
@@ -42,7 +43,8 @@ class MetaAutoResponderController {
           metaTemplateLang: metaTemplateLang || 'ar',
           startDate: startDate ? new Date(startDate) : null,
           endDate: endDate ? new Date(endDate) : null,
-          isActive: isActive !== undefined ? isActive : true
+          isActive: isActive !== undefined ? isActive : true,
+          allChannels: !!allChannels
         }
       });
       logger.info(`[MetaAutoResponder] Rule created: "${keyword}" for channel ${channelId}`);
@@ -53,9 +55,9 @@ class MetaAutoResponderController {
   async updateRule(req, res, next) {
     try {
       const { channelId, id } = req.params;
-      const existing = await prisma.autoResponder.findFirst({ where: { id, tenantId: req.tenant.id, channelId } });
+      const existing = await prisma.autoResponder.findFirst({ where: { id, tenantId: req.tenant.id, OR: [{ channelId }, { allChannels: true }] } });
       if (!existing) return res.status(404).json({ success: false, message: 'Rule not found' });
-      const { keyword, matchType, responseType, message, mediaUrl, mediaMime, metaTemplateName, metaTemplateLang, startDate, endDate, isActive } = req.body;
+      const { keyword, matchType, responseType, message, mediaUrl, mediaMime, metaTemplateName, metaTemplateLang, startDate, endDate, isActive, allChannels } = req.body;
       const updated = await prisma.autoResponder.update({
         where: { id },
         data: {
@@ -69,7 +71,8 @@ class MetaAutoResponderController {
           metaTemplateLang: metaTemplateLang || existing.metaTemplateLang,
           startDate: startDate ? new Date(startDate) : existing.startDate,
           endDate: endDate ? new Date(endDate) : existing.endDate,
-          isActive: isActive !== undefined ? isActive : existing.isActive
+          isActive: isActive !== undefined ? isActive : existing.isActive,
+          allChannels: allChannels !== undefined ? !!allChannels : existing.allChannels
         }
       });
       res.json({ success: true, data: updated });
@@ -79,7 +82,7 @@ class MetaAutoResponderController {
   async deleteRule(req, res, next) {
     try {
       const { channelId, id } = req.params;
-      const existing = await prisma.autoResponder.findFirst({ where: { id, tenantId: req.tenant.id, channelId } });
+      const existing = await prisma.autoResponder.findFirst({ where: { id, tenantId: req.tenant.id, OR: [{ channelId }, { allChannels: true }] } });
       if (!existing) return res.status(404).json({ success: false, message: 'Rule not found' });
       await prisma.autoResponder.delete({ where: { id } });
       res.json({ success: true, message: 'Rule deleted' });
@@ -89,7 +92,7 @@ class MetaAutoResponderController {
   async toggleActive(req, res, next) {
     try {
       const { channelId, id } = req.params;
-      const existing = await prisma.autoResponder.findFirst({ where: { id, tenantId: req.tenant.id, channelId } });
+      const existing = await prisma.autoResponder.findFirst({ where: { id, tenantId: req.tenant.id, OR: [{ channelId }, { allChannels: true }] } });
       if (!existing) return res.status(404).json({ success: false, message: 'Rule not found' });
       const updated = await prisma.autoResponder.update({ where: { id }, data: { isActive: req.body.isActive } });
       res.json({ success: true, data: updated });

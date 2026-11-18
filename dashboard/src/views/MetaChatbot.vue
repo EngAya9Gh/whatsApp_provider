@@ -71,7 +71,9 @@
           </thead>
           <tbody>
             <tr v-for="rule in rules" :key="rule.id" class="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-              <td class="px-5 py-4 font-bold text-slate-900">{{ rule.keyword }}</td>
+              <td class="px-5 py-4 font-bold text-slate-900">{{ rule.keyword }}
+                <span v-if="rule.allChannels" class="ms-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">{{ isArUi ? 'كل القنوات' : 'All channels' }}</span>
+              </td>
               <td class="px-5 py-4">
                 <span class="px-2 py-0.5 rounded-full text-xs font-bold border" :class="{
                   'bg-blue-50 text-blue-700 border-blue-200': rule.matchType === 'EXACT',
@@ -223,6 +225,17 @@
             </div>
           </div>
 
+          <!-- Every channel: other WhatsApp numbers, the website widget, Instagram, Messenger -->
+          <div class="flex items-center justify-between bg-slate-50 rounded-xl p-4 border border-slate-200">
+            <div>
+              <p class="text-sm font-bold text-slate-700 m-0">{{ isArUi ? 'على كل القنوات' : 'On every channel' }}</p>
+              <p class="text-xs text-slate-400 m-0">{{ isArUi ? 'ترد القاعدة أيضاً على أرقام الواتساب الأخرى وويدجت الموقع وانستغرام وماسنجر (القوالب لواتساب فقط).' : 'Also answers on other WhatsApp numbers, the website widget, Instagram and Messenger (templates are WhatsApp-only).' }}</p>
+            </div>
+            <button @click="form.allChannels = !form.allChannels" class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors border-none cursor-pointer" :class="form.allChannels ? 'bg-emerald-500' : 'bg-slate-300'">
+              <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform" :class="form.allChannels ? 'translate-x-6' : 'translate-x-1'"></span>
+            </button>
+          </div>
+
           <!-- Active Toggle -->
           <div class="flex items-center justify-between bg-slate-50 rounded-xl p-4 border border-slate-200">
             <div>
@@ -253,11 +266,14 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { useMetaChannel } from '../composables/useMetaChannel'
+import { useI18n } from 'vue-i18n'
 
 const { activeMetaChannelId } = useMetaChannel()
+const { locale: uiLocale } = useI18n()
+const isArUi = computed(() => uiLocale.value === 'ar')
 const rules = ref([])
 const metaTemplates = ref([])
 const loading = ref(false)
@@ -286,11 +302,11 @@ const responseTypes = [
 const form = ref({
   keyword: '', matchType: 'EXACT', responseType: 'TEXT',
   message: '', mediaUrl: '', metaTemplateKey: '',
-  startDate: '', endDate: '', isActive: true
+  startDate: '', endDate: '', isActive: true, allChannels: false
 })
 
 const resetForm = () => {
-  form.value = { keyword: '', matchType: 'EXACT', responseType: 'TEXT', message: '', mediaUrl: '', metaTemplateKey: '', startDate: '', endDate: '', isActive: true }
+  form.value = { keyword: '', matchType: 'EXACT', responseType: 'TEXT', message: '', mediaUrl: '', metaTemplateKey: '', startDate: '', endDate: '', isActive: true, allChannels: false }
   modalError.value = ''
 }
 
@@ -353,7 +369,8 @@ const editRule = (rule) => {
     metaTemplateKey: rule.metaTemplateName ? rule.metaTemplateName + '||' + (rule.metaTemplateLang || 'ar') : '',
     startDate: rule.startDate ? new Date(rule.startDate).toISOString().slice(0, 16) : '',
     endDate: rule.endDate ? new Date(rule.endDate).toISOString().slice(0, 16) : '',
-    isActive: rule.isActive
+    isActive: rule.isActive,
+    allChannels: !!rule.allChannels
   }
   modalError.value = ''
   showModal.value = true
@@ -380,7 +397,8 @@ const saveRule = async () => {
     metaTemplateLang: metaTemplateLang || 'ar',
     startDate: form.value.startDate || null,
     endDate: form.value.endDate || null,
-    isActive: form.value.isActive
+    isActive: form.value.isActive,
+    allChannels: !!form.value.allChannels
   }
 
   saving.value = true
