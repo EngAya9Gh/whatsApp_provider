@@ -20,7 +20,7 @@ const settings = requirePermission('can_manage_settings');
 
 router.get('/config', settings, handle(() => socialService.config()));
 router.get('/channels', requireAnyPermission('can_manage_settings', 'can_view_live_chat'), handle(req => socialService.listChannels(req.tenant.id)));
-router.post('/connect/start', settings, handle(req => socialService.startConnect(req.tenant.id, req.body?.code)));
+router.post('/connect/start', settings, handle(req => socialService.startConnect(req.tenant.id, { code: req.body?.code, accessToken: req.body?.accessToken })));
 router.post('/connect/finish', settings, handle(req => socialService.finishConnect(req.tenant.id, req.body || {})));
 router.delete('/channels/:id', settings, handle(req => socialService.disconnect(req.tenant.id, req.params.id)));
 

@@ -138,13 +138,16 @@ function loadSdk(appId) {
 // The popup must open straight from the click (popup blockers), so no await before FB.login
 function login() {
   if (!window.FB) return Swal.fire({ icon: 'info', title: isAr.value ? 'لحظة، يتم تحميل فيسبوك… حاول مرة أخرى' : 'Facebook is still loading, try again' })
+  // A "User access token" configuration hands back the user token itself; the server checks with Meta that
+  // it was issued to our app. (A code from the JavaScript SDK is tied to the SDK's own redirect address.)
   window.FB.login((response) => {
+    const accessToken = response?.authResponse?.accessToken
     const code = response?.authResponse?.code
-    if (!code) return
+    if (!accessToken && !code) return
     ;(async () => {
       busy.value = true
       try {
-        const res = await axios.post('/api/v1/social/connect/start', { code })
+        const res = await axios.post('/api/v1/social/connect/start', accessToken ? { accessToken } : { code })
         session.value = res.data.data
         pick.value = Object.fromEntries(session.value.pages.map(p => [p.id, {
           messenger: p.messenger === 'FREE',
@@ -156,7 +159,7 @@ function login() {
         busy.value = false
       }
     })()
-  }, { config_id: config.value.configId, response_type: 'code', override_default_response_type: true })
+  }, { config_id: config.value.configId })
 }
 
 async function finish(page) {

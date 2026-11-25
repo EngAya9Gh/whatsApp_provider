@@ -8,10 +8,26 @@ const GRAPH = `https://graph.facebook.com/${VERSION}`;
 const appId = () => process.env.META_FB_APP_ID;
 const appSecret = () => process.env.META_APP_SECRET;
 
-/** The one-time code from the login popup → a user access token */
+/** The one-time code from the login popup → a user access token. A code that the JavaScript SDK issued is
+ *  tied to the SDK's own redirect address, which Graph accepts as an empty redirect_uri. */
 async function exchangeCode(code) {
-  const res = await axios.get(`${GRAPH}/oauth/access_token`, { params: { client_id: appId(), client_secret: appSecret(), code }, timeout: 20000 });
-  return res.data.access_token;
+  const params = { client_id: appId(), client_secret: appSecret(), code };
+  try {
+    const res = await axios.get(`${GRAPH}/oauth/access_token`, { params, timeout: 20000 });
+    return res.data.access_token;
+  } catch (err) {
+    if (!/redirect_uri/i.test(err.response?.data?.error?.message || '')) throw err;
+    const res = await axios.get(`${GRAPH}/oauth/access_token`, { params: { ...params, redirect_uri: '' }, timeout: 20000 });
+    return res.data.access_token;
+  }
+}
+
+/** A user token from the login popup is only taken when Meta confirms it was issued to our app */
+async function checkUserToken(userToken) {
+  const res = await axios.get(`${GRAPH}/debug_token`, { params: { input_token: userToken, access_token: `${appId()}|${appSecret()}` }, timeout: 20000 });
+  const d = res.data?.data || {};
+  if (!d.is_valid || String(d.app_id) !== String(appId())) throw Object.assign(new Error('This Facebook login was not made for this app'), { status: 400 });
+  return userToken;
 }
 
 /** A long-lived user token, so the page tokens taken from it do not expire */
@@ -77,4 +93,4 @@ async function send(channel, recipientId, message) {
   return res.data;
 }
 
-module.exports = { GRAPH, exchangeCode, longLived, listPages, subscribePage, unsubscribePage, profile, send };
+module.exports = { GRAPH, exchangeCode, checkUserToken, longLived, listPages, subscribePage, unsubscribePage, profile, send };

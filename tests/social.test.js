@@ -11,7 +11,16 @@ inject('axios', {
   post: async (url, body, opts) => { posts.push({ url, body, params: opts?.params }); return { data: { message_id: 'm.out.1', success: true } }; },
   get: async (url, opts) => {
     gets.push({ url, params: opts?.params });
-    if (url.endsWith('/oauth/access_token')) return { data: { access_token: opts.params.fb_exchange_token ? 'long-user-token' : 'user-token' } };
+    if (url.endsWith('/debug_token')) {
+      return { data: { data: { is_valid: opts.params.input_token !== 'expired', app_id: opts.params.input_token === 'other-app-token' ? '999' : 'APP1' } } };
+    }
+    if (url.endsWith('/oauth/access_token')) {
+      // A code from the JavaScript SDK is accepted only with an empty redirect_uri
+      if (opts.params.code === 'sdk-code' && opts.params.redirect_uri !== '') {
+        throw Object.assign(new Error('400'), { response: { data: { error: { message: 'Error validating verification code. Please make sure your redirect_uri is identical to the one you used in the OAuth dialog request' } } } });
+      }
+      return { data: { access_token: opts.params.fb_exchange_token ? 'long-user-token' : 'user-token' } };
+    }
     if (url.endsWith('/me/accounts')) {
       return { data: { data: [{ id: 'PAGE1', name: 'Wakeel', access_token: 'page-token', picture: { data: { url: 'p.png' } }, instagram_business_account: { id: 'IG1', username: 'wakeel.cc', profile_picture_url: 'ig.png' } }] } };
     }
@@ -40,6 +49,7 @@ inject(fromRoot('src/modules/chatbot/autoReply'), { replyIfMatched: async () => 
 let knownThread = false;
 inject(fromRoot('src/models/mongo/ChatThread'), { exists: async () => knownThread });
 
+process.env.META_FB_APP_ID = 'APP1';
 const inbound = require(fromRoot('src/modules/social/social.inbound'));
 const sender = require(fromRoot('src/modules/social/social.sender'));
 const socialService = require(fromRoot('src/modules/social/social.service'));
@@ -113,4 +123,21 @@ test('connecting a page: its Messenger and Instagram become channels, subscribed
   await assert.rejects(socialService.finishConnect('OTHER', { sessionId: other.sessionId, pageId: 'PAGE1', messenger: true }), (e) => e.status === 409);
   // Someone else's login session cannot be used
   await assert.rejects(socialService.finishConnect('OTHER', { sessionId: start.sessionId, pageId: 'PAGE1', messenger: true }), (e) => e.code === 'SESSION_EXPIRED');
+});
+
+test('the login popup\'s user token is used only when Meta says it was issued to our app', async () => {
+  gets.length = 0;
+  const start = await socialService.startConnect('T', { accessToken: 'popup-token' });
+  assert.strictEqual(start.pages[0].id, 'PAGE1');
+  assert.strictEqual(gets[0].params.access_token, 'APP1|' + process.env.META_APP_SECRET, 'checked with the app token');
+  assert.strictEqual(gets.find(g => g.url.endsWith('/me/accounts')).params.access_token, 'long-user-token', 'pages come from the long-lived token');
+
+  await assert.rejects(socialService.startConnect('T', { accessToken: 'other-app-token' }), (e) => e.status === 400);
+  await assert.rejects(socialService.startConnect('T', { accessToken: 'expired' }), (e) => e.status === 400);
+  await assert.rejects(socialService.startConnect('T', {}), (e) => e.status === 400);
+});
+
+test('a code from the JavaScript SDK is exchanged with an empty redirect_uri', async () => {
+  const start = await socialService.startConnect('T', { code: 'sdk-code' });
+  assert.strictEqual(start.pages[0].id, 'PAGE1');
 });

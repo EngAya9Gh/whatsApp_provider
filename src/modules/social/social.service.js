@@ -65,12 +65,14 @@ class SocialService {
     return channels.map(c => view(c, prices));
   }
 
-  /** Step 1: the popup's code → the pages the person shared (and which are already connected) */
-  async startConnect(tenantId, code) {
-    if (!code) throw httpError(400, 'Missing the Facebook login code');
+  /** Step 1: the popup's login (a user token, or a code to exchange) → the pages the person shared
+   *  (and which are already connected) */
+  async startConnect(tenantId, login) {
+    const { code, accessToken } = typeof login === 'string' ? { code: login } : (login || {});
+    if (!code && !accessToken) throw httpError(400, 'Missing the Facebook login');
     let pages;
     try {
-      const userToken = await graph.exchangeCode(code);
+      const userToken = accessToken ? await graph.checkUserToken(accessToken) : await graph.exchangeCode(code);
       const token = await graph.longLived(userToken).catch(() => userToken);
       pages = await graph.listPages(token);
     } catch (err) {
