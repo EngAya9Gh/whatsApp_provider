@@ -9,7 +9,9 @@ const logger = require('../../utils/logger');
 const graph = require('./social.graph');
 const channelBilling = require('../channels/channel.billing');
 
-const PROVIDERS = ['MESSENGER', 'INSTAGRAM'];
+// Listed and disconnected from the same dashboard page; TikTok connects through tiktok/tiktok.service.js
+const PROVIDERS = ['MESSENGER', 'INSTAGRAM', 'TIKTOK'];
+const LABEL = { MESSENGER: 'Messenger', INSTAGRAM: 'Instagram', TIKTOK: 'TikTok' };
 const SESSION_TTL_S = 15 * 60;
 const httpError = (status, message, code) => Object.assign(new Error(message), { status, code });
 const metaMessage = (err) => err.response?.data?.error?.message || err.message;
@@ -54,7 +56,11 @@ class SocialService {
   }
 
   async _prices() {
-    return { MESSENGER: await channelBilling.priceNow('MESSENGER'), INSTAGRAM: await channelBilling.priceNow('INSTAGRAM') };
+    return {
+      MESSENGER: await channelBilling.priceNow('MESSENGER'),
+      INSTAGRAM: await channelBilling.priceNow('INSTAGRAM'),
+      TIKTOK: await channelBilling.priceNow('TIKTOK')
+    };
   }
 
   async listChannels(tenantId) {
@@ -135,12 +141,13 @@ class SocialService {
     return connected.map(c => view(c, prices));
   }
 
-  async _upsert(tenantId, providerType, externalId, { name, token, settings }) {
+  /** Saves a connected account as a channel of this Wakeel account (also used by tiktok/tiktok.service.js) */
+  async _upsert(tenantId, providerType, externalId, { name, token, settings, extra = {} }) {
     const existing = await prisma.whatsAppChannel.findFirst({ where: { providerType, externalId }, select: FIELDS });
     if (existing && existing.tenantId !== tenantId && existing.status === 'CONNECTED') {
       throw httpError(409, `${name} is already connected to another Wakeel account`, 'TAKEN');
     }
-    const data = { name: String(name || '').slice(0, 80), metaAccessToken: token, status: 'CONNECTED', settings };
+    const data = { name: String(name || '').slice(0, 80), metaAccessToken: token, status: 'CONNECTED', settings, ...extra };
     if (existing && existing.tenantId === tenantId) {
       return prisma.whatsAppChannel.update({ where: { id: existing.id }, data, select: FIELDS });
     }
@@ -150,7 +157,7 @@ class SocialService {
     const billing = await channelBilling.chargeChannel(channel);
     if (billing.insufficient) {
       await prisma.whatsAppChannel.delete({ where: { id: channel.id } }).catch(() => {});
-      throw httpError(402, `${providerType === 'INSTAGRAM' ? 'Instagram' : 'Messenger'} costs ${billing.price} per month from your wallet, and the balance does not cover it. Top up the wallet first.`, 'INSUFFICIENT_BALANCE');
+      throw httpError(402, `${LABEL[providerType] || providerType} costs ${billing.price} per month from your wallet, and the balance does not cover it. Top up the wallet first.`, 'INSUFFICIENT_BALANCE');
     }
     return { ...channel, paidUntil: billing.paidUntil, billingState: billing.state };
   }
@@ -166,7 +173,7 @@ class SocialService {
 
     const tickets = await prisma.ticket.count({ where: { channelId: id } });
     if (tickets > 0) {
-      await prisma.whatsAppChannel.update({ where: { id }, data: { status: 'DISCONNECTED', metaAccessToken: null, billingState: null } });
+      await prisma.whatsAppChannel.update({ where: { id }, data: { status: 'DISCONNECTED', metaAccessToken: null, refreshToken: null, tokenExpiresAt: null, billingState: null } });
       return { disconnected: true, kept: true };
     }
     await prisma.whatsAppChannel.delete({ where: { id } });

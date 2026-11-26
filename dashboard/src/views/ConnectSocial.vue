@@ -1,10 +1,10 @@
 <template>
   <div class="p-6 max-w-5xl mx-auto pb-24" :dir="isAr ? 'rtl' : 'ltr'">
     <div class="mb-6">
-      <h1 class="text-2xl font-bold text-slate-800">{{ isAr ? 'انستغرام وماسنجر' : 'Instagram & Messenger' }}</h1>
+      <h1 class="text-2xl font-bold text-slate-800">{{ isAr ? 'انستغرام وماسنجر وتيك توك' : 'Instagram, Messenger & TikTok' }}</h1>
       <p class="text-slate-500 mt-1 max-w-3xl leading-relaxed">{{ isAr
-        ? 'اربط صفحة فيسبوك وحساب انستغرام المربوط بها، فتصل الرسائل الخاصة إلى المحادثات المباشرة مثل رسائل واتساب: بتذكرة وفريق ودوام وسير وموظف ذكي.'
-        : 'Connect a Facebook Page and its Instagram account: direct messages reach Live Chat like WhatsApp messages, with tickets, teams, hours, flows and the AI agent.' }}</p>
+        ? 'اربط صفحة فيسبوك وحساب انستغرام المربوط بها، وحساب تيك توك، فتصل الرسائل الخاصة إلى المحادثات المباشرة مثل رسائل واتساب: بتذكرة وفريق ودوام وسير وموظف ذكي.'
+        : 'Connect a Facebook Page and its Instagram account, and a TikTok account: direct messages reach Live Chat like WhatsApp messages, with tickets, teams, hours, flows and the AI agent.' }}</p>
     </div>
 
     <div v-if="loading" class="flex justify-center py-16 text-slate-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div>
@@ -83,12 +83,36 @@
           </button>
         </div>
       </section>
+
+      <!-- TikTok: the business approves our app on TikTok's page and comes back here -->
+      <section class="card">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <h2 class="card-title !mb-0"><i class="fab fa-tiktok text-slate-900"></i>TikTok</h2>
+          <button type="button" class="primary tiktok" :disabled="!tiktok.enabled || busy" @click="connectTikTok">
+            <i class="fas" :class="busy ? 'fa-spinner fa-spin' : 'fa-plug'"></i>{{ isAr ? 'ربط حساب تيك توك' : 'Connect TikTok' }}
+          </button>
+        </div>
+        <ol class="checklist">
+          <li><b>{{ isAr ? 'حساب أعمال موثّق:' : 'A verified business account:' }}</b> {{ isAr ? 'حساب تيك توك للأعمال موثّق، أو عليه «الوصول المتقدم». الحسابات الشخصية لا تدعم الرسائل عبر الربط.' : 'A Verified Business Account, or a TikTok account with Advanced Access. Personal accounts cannot use messaging through an integration.' }}</li>
+          <li><b>{{ isAr ? 'استقبال الرسائل من الجميع:' : 'Messages from everyone:' }}</b> {{ isAr ? 'من إعدادات الخصوصية في تيك توك اسمح بالرسائل المباشرة من الجميع، وإلا تحتاج كل رسالة جديدة لقبول يدوي في التطبيق.' : 'In TikTok privacy settings allow direct messages from everyone; otherwise each new message request must be accepted in the app first.' }}</li>
+          <li><b>{{ isAr ? 'البلد:' : 'Country:' }}</b> {{ isAr ? 'الرسائل متاحة لكل حسابات تيك توك عدا المسجّلة في أمريكا والاتحاد الأوروبي وبريطانيا وسويسرا.' : 'Messaging works for TikTok accounts everywhere except those signed up in the US, the EU (EEA), the UK and Switzerland.' }}</li>
+          <li><b>{{ isAr ? 'نافذة الرد:' : 'Reply window:' }}</b> {{ isAr ? 'حتى 10 ردود خلال 48 ساعة من آخر رسالة للعميل، ولا يمكن بدء محادثة جديدة مع عميل.' : 'Up to 10 replies within 48 hours of the customer\'s last message; a business cannot start a conversation.' }}</li>
+        </ol>
+        <div v-if="!tiktok.enabled" class="warn !mb-0 mt-3">
+          <i class="fas fa-circle-info"></i>
+          <span>{{ isAr ? 'ربط تيك توك غير مفعّل على المنصة بعد. تواصل مع الدعم.' : 'TikTok is not enabled on the platform yet. Contact support.' }}
+            <small class="block opacity-70 mt-1" dir="ltr">TIKTOK_APP_ID · TIKTOK_APP_SECRET · TIKTOK_AUTH_URL</small>
+          </span>
+        </div>
+        <p v-if="tiktok.price" class="text-xs text-slate-500 mt-3"><i class="fas fa-wallet me-1"></i>{{ tiktok.price }} {{ isAr ? 'ر.س شهرياً من المحفظة' : 'SAR / month from the wallet' }}</p>
+      </section>
     </template>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import Swal from 'sweetalert2'
@@ -102,16 +126,26 @@ const config = ref({})
 const channels = ref([])
 const session = ref(null)
 const pick = ref({})
+const tiktok = ref({ enabled: false })
+const route = useRoute()
+const router = useRouter()
 
-const kindIcon = (kind) => (kind === 'INSTAGRAM' ? 'fab fa-instagram text-pink-600' : 'fab fa-facebook-messenger text-blue-600')
-const kindLabel = (kind) => (kind === 'INSTAGRAM' ? 'Instagram' : 'Messenger')
+const KIND_ICON = { INSTAGRAM: 'fab fa-instagram text-pink-600', MESSENGER: 'fab fa-facebook-messenger text-blue-600', TIKTOK: 'fab fa-tiktok text-slate-900' }
+const KIND_LABEL = { INSTAGRAM: 'Instagram', MESSENGER: 'Messenger', TIKTOK: 'TikTok' }
+const kindIcon = (kind) => KIND_ICON[kind] || KIND_ICON.MESSENGER
+const kindLabel = (kind) => KIND_LABEL[kind] || 'Messenger'
 const errorText = (err) => err?.response?.data?.error?.message || err?.message || ''
 
 async function load() {
   try {
-    const [cfg, list] = await Promise.all([axios.get('/api/v1/social/config'), axios.get('/api/v1/social/channels')])
+    const [cfg, list, tt] = await Promise.all([
+      axios.get('/api/v1/social/config'),
+      axios.get('/api/v1/social/channels'),
+      axios.get('/api/v1/tiktok/config').catch(() => null)
+    ])
     config.value = cfg.data.data || {}
     channels.value = list.data.data || []
+    tiktok.value = tt?.data?.data || { enabled: false }
     if (config.value.appId) loadSdk(config.value.appId)
   } catch (err) {
     Swal.fire({ icon: 'error', title: isAr.value ? 'تعذّر التحميل' : 'Could not load', text: errorText(err) })
@@ -205,11 +239,54 @@ async function disconnect(channel) {
   }
 }
 
-onMounted(load)
+// TikTok: its own authorization page, then back here with ?code=…&state=…
+async function connectTikTok() {
+  busy.value = true
+  try {
+    const res = await axios.post('/api/v1/tiktok/connect/start')
+    window.location.href = res.data.data.url
+  } catch (err) {
+    busy.value = false
+    Swal.fire({ icon: 'error', title: isAr.value ? 'لم يكتمل الربط' : 'Not connected', text: errorText(err) })
+  }
+}
+
+async function finishTikTok(code, state) {
+  busy.value = true
+  // The code works once: take it out of the address so a refresh does not send it again
+  router.replace({ path: route.path, query: {} })
+  try {
+    const res = await axios.post('/api/v1/tiktok/connect/finish', { code, state })
+    const list = await axios.get('/api/v1/social/channels')
+    channels.value = list.data.data || []
+    const done = res.data.data || {}
+    Swal.fire(done.webhook === false
+      ? { icon: 'warning', title: isAr.value ? 'تم ربط الحساب' : 'Account connected', text: isAr.value ? 'لكن تيك توك لم يفعّل استقبال الرسائل بعد. تواصل مع الدعم.' : 'But TikTok did not turn on message delivery yet. Contact support.' }
+      : { toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, icon: 'success', title: isAr.value ? `تم ربط ${done.name || 'تيك توك'}` : `${done.name || 'TikTok'} connected` })
+  } catch (err) {
+    const code = err?.response?.data?.error?.code
+    Swal.fire({
+      icon: 'error',
+      title: isAr.value ? 'لم يكتمل ربط تيك توك' : 'TikTok not connected',
+      text: code === 'SESSION_EXPIRED' ? (isAr.value ? 'انتهت صلاحية الربط، اضغط «ربط حساب تيك توك» من جديد.' : errorText(err))
+        : code === 'INSUFFICIENT_BALANCE' ? (isAr.value ? 'رصيد المحفظة لا يغطي اشتراك القناة. اشحن الرصيد من «الاستهلاك والفواتير».' : errorText(err))
+          : errorText(err)
+    })
+  } finally {
+    busy.value = false
+  }
+}
+
+onMounted(async () => {
+  await load()
+  const { code, state } = route.query
+  if (code && state) await finishTikTok(String(code), String(state))
+})
 </script>
 
 <style scoped>
 .card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); padding: 20px; margin-bottom: 16px; }
+.primary.tiktok { background: #0f172a; }
 .card-title { display: flex; align-items: center; gap: 10px; font-weight: 800; color: #1e293b; font-size: 15px; margin-bottom: 14px; }
 .checklist { margin: 0; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #475569; line-height: 1.7; }
 .checklist b { color: #1e293b; }

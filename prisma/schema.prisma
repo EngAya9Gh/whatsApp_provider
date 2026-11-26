@@ -69,8 +69,9 @@ model Tenant {
 model WhatsAppChannel {
   id           String  @id @default(uuid())
   tenantId     String  @map("tenant_id")
-  providerType String  @default("BAILEYS") @map("provider_type") // BAILEYS, META_CLOUD, WEBCHAT, MESSENGER, INSTAGRAM (channels/channel.kinds.js)
-  // The channel's own id at its platform: Facebook Page id (MESSENGER), Instagram account id (INSTAGRAM)
+  providerType String  @default("BAILEYS") @map("provider_type") // BAILEYS, META_CLOUD, WEBCHAT, MESSENGER, INSTAGRAM, TIKTOK (channels/channel.kinds.js)
+  // The channel's own id at its platform: Facebook Page id (MESSENGER), Instagram account id (INSTAGRAM),
+  // the account's open_id for our app (TIKTOK)
   externalId   String? @map("external_id")
   phoneNumber  String? @map("phone_number")
   status       String  @default("DISCONNECTED")
@@ -80,6 +81,9 @@ model WhatsAppChannel {
   metaWabaId         String? @map("meta_waba_id")
   metaAccessToken    String? @map("meta_access_token") @db.Text
   metaAppSecret      String? @map("meta_app_secret") @db.Text // Required for HMAC validation
+  // Channels whose access token expires (TikTok: one day): renewed with the refresh token before use
+  refreshToken       String?   @map("refresh_token") @db.Text
+  tokenExpiresAt     DateTime? @map("token_expires_at")
   // Human-readable label for this channel (e.g. "Support Line", "+966500000000")
   name               String? @default("") @map("name")
   displayPhoneNumber String? @map("display_phone_number") // from Meta Business Manager

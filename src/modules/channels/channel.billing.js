@@ -12,12 +12,13 @@ const logger = require('../../utils/logger');
 const PRICE_KEYS = {
   WEBCHAT: 'channelPriceWebchat',
   INSTAGRAM: 'channelPriceInstagram',
-  MESSENGER: 'channelPriceMessenger'
+  MESSENGER: 'channelPriceMessenger',
+  TIKTOK: 'channelPriceTiktok'
 };
 const PAID_PROVIDERS = Object.keys(PRICE_KEYS);
-const LABEL_AR = { WEBCHAT: 'ويدجت الموقع', INSTAGRAM: 'انستغرام', MESSENGER: 'ماسنجر', WHATSAPP: 'واتساب', WHATSAPP_QR: 'واتساب (باركود)' };
+const LABEL_AR = { WEBCHAT: 'ويدجت الموقع', INSTAGRAM: 'انستغرام', MESSENGER: 'ماسنجر', TIKTOK: 'تيك توك', WHATSAPP: 'واتساب', WHATSAPP_QR: 'واتساب (باركود)' };
 // Kind of a channel in the wallet (WhatsApp Cloud numbers are "WHATSAPP")
-const KIND_OF_PROVIDER = { META_CLOUD: 'WHATSAPP', BAILEYS: 'WHATSAPP_QR', WEBCHAT: 'WEBCHAT', INSTAGRAM: 'INSTAGRAM', MESSENGER: 'MESSENGER' };
+const KIND_OF_PROVIDER = { META_CLOUD: 'WHATSAPP', BAILEYS: 'WHATSAPP_QR', WEBCHAT: 'WEBCHAT', INSTAGRAM: 'INSTAGRAM', MESSENGER: 'MESSENGER', TIKTOK: 'TIKTOK' };
 
 const round2 = (n) => Math.round(n * 100) / 100;
 const round4 = (n) => Math.round(n * 10000) / 10000;

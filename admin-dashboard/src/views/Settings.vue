@@ -232,6 +232,10 @@
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Messenger, per page</label>
                 <input v-model="form.channelPriceMessenger" type="number" step="0.01" min="0" placeholder="Free" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
               </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">TikTok, per account</label>
+                <input v-model="form.channelPriceTiktok" type="number" step="0.01" min="0" placeholder="Free" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
             </div>
             <p class="text-xs text-slate-500 mt-2">Empty = free. Charged from the tenant's wallet when the channel is created, then every month (hourly check). A channel the wallet cannot pay for stops, and starts again by itself after a top-up. Nothing is charged to accounts with wallet deduction off. Every charge shows its channel in the tenant's wallet history.</p>
           </div>
@@ -326,7 +330,8 @@ const form = ref({
   addonNumberPrice: '',
   channelPriceWebchat: '',
   channelPriceInstagram: '',
-  channelPriceMessenger: ''
+  channelPriceMessenger: '',
+  channelPriceTiktok: ''
 })
 
 const fetchSettings = async () => {
@@ -363,7 +368,7 @@ const saveSettings = async () => {
     dataToSave.serviceBaseCost = parseFloat(dataToSave.serviceBaseCost)
     dataToSave.serviceMarkupPercent = parseFloat(dataToSave.serviceMarkupPercent)
     // Empty AI prices stay empty (the AI usage page then shows no cost)
-    for (const k of ['aiInputPricePerMillionUsd', 'aiOutputPricePerMillionUsd', 'addonUserPrice', 'addonNumberPrice', 'channelPriceWebchat', 'channelPriceInstagram', 'channelPriceMessenger']) {
+    for (const k of ['aiInputPricePerMillionUsd', 'aiOutputPricePerMillionUsd', 'addonUserPrice', 'addonNumberPrice', 'channelPriceWebchat', 'channelPriceInstagram', 'channelPriceMessenger', 'channelPriceTiktok']) {
       dataToSave[k] = dataToSave[k] === '' || dataToSave[k] === null ? null : parseFloat(dataToSave[k])
     }
 

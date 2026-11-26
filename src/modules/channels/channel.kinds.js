@@ -77,6 +77,21 @@ const PROVIDERS = {
     media: true,
     metered: false,
     addressPrefix: 'ig:'
+  },
+  // TikTok account (TikTok API for Business, Business Messaging): the address is the conversation id
+  TIKTOK: {
+    kind: 'TIKTOK',
+    liveChat: true,
+    hasPhone: false,
+    templates: false,
+    campaigns: false,
+    windowHours: 48, // TikTok: up to 10 replies within 48h of the customer's last message
+    replyButtons: 3, // Q&A button card
+    listRows: 3,
+    linkButton: false, // sent as a text with the link
+    media: false, // images need TikTok's own upload; sent as a link for now
+    metered: false,
+    addressPrefix: 'tt:'
   }
 };
 
@@ -94,6 +109,7 @@ function capabilitiesOf(channelOrProvider) {
 
 const isWebchat = (channel) => channel?.providerType === 'WEBCHAT';
 const isSocial = (channel) => ['MESSENGER', 'INSTAGRAM'].includes(channel?.providerType);
+const isTikTok = (channel) => channel?.providerType === 'TIKTOK';
 const isWhatsAppCloud = (channel) => capabilitiesOf(channel).providerType === 'META_CLOUD';
 
 /**
@@ -106,4 +122,4 @@ function phoneOf(thread, channel) {
   return thread.contactInfo?.phone || null;
 }
 
-module.exports = { PROVIDERS, LIVE_CHAT_PROVIDERS, capabilitiesOf, isWebchat, isSocial, isWhatsAppCloud, phoneOf };
+module.exports = { PROVIDERS, LIVE_CHAT_PROVIDERS, capabilitiesOf, isWebchat, isSocial, isTikTok, isWhatsAppCloud, phoneOf };

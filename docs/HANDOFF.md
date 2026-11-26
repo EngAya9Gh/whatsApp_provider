@@ -221,8 +221,20 @@
   1. حساب TikTok Business لوكيل.
   2. بوابة TikTok API for Business (`business-api.tiktok.com/portal`) بحساب TikTok For Business: تسجيل الشركة ثم إنشاء App ثم طلب **Business Messaging API**، مع وصف الاستخدام ورابط سياسة الخصوصية.
   3. توثيق الشركة إذا طُلب: مستند رسمي فيه الاسم ورقم التسجيل والعنوان مطابقة تماماً. شهادة الضريبة عليها عنوان حي الوادي.
-- **غير متاح** في أوروبا وبريطانيا.
-- **التطوير بعد الموافقة:** نفس وصفة إضافة قناة في القسم ٨.
+- **غير متاح** لحسابات تيك توك المسجّلة في أوروبا وبريطانيا وسويسرا، ولا في أمريكا بدون مراجعة أمريكية إضافية. السعودية متاحة.
+- **الكود مبني (2026-11-26)** في `src/modules/tiktok/`، والاختبارات في `tests/tiktok.test.js`:
+  - **الربط:** زر «ربط حساب تيك توك» في صفحة `/connect-social` يفتح صفحة موافقة تيك توك (`TIKTOK_AUTH_URL` + state لمرة واحدة + `disable_auto_auth=1`). بعدها يرجع العميل للصفحة نفسها ومعه `?code&state`، ويُستبدل الكود بالتوكنات عبر `/tt_user/oauth2/token/`.
+  - **التوكن:** صالح يوماً واحداً، ويتجدد قبل الاستعمال بالـ refresh token (صالح سنة). الأعمدة `refresh_token` و`token_expires_at`، والـ migration هو `20261126000000`.
+  - **الاستقبال:** `POST /api/v1/tiktok/webhook`، يُتحقق من توقيع `TikTok-Signature` بسر التطبيق، ثم يدخل الطابور بنوع `TIKTOK_EVENT`. عنوان المحادثة `tt:<conversation_id>`. الاشتراك بالويب هوك على مستوى التطبيق (`/business/webhook/update/` بالنوع `DIRECT_MESSAGE`) ويتم عند كل ربط.
+  - **الإرسال:** `/business/message/send/`. الأزرار (حتى 3، وكل عنوان حتى 20 حرفاً) تُرسل كبطاقة Q&A، والأكثر قائمة مرقّمة، والروابط والصور نص فيه رابط.
+  - **السعر:** `channelPriceTiktok` في إعدادات الأدمن.
+- **مسار الموافقة:**
+  1. حساب المطوّر: انقبل، ثم عُدّل لشرح الدومينين.
+  2. نموذج «Accounts API Access Application Form».
+  3. إعادة إرسال التطبيق بصلاحيات `TikTok accounts` (Account user + Auth code management).
+  4. بعد قبول التطبيق: نموذج مراجعة أمن البيانات للرسائل (`bytedance.sg.larkoffice.com/share/base/form/shrlg7vFArGhg9V20neYCEwIKrb`). بعده يصل استبيان DDQ بالإيميل، ثم يُفعَّل إذن Business Messaging في التطبيق.
+  5. نسخ `TIKTOK_APP_ID` و`TIKTOK_APP_SECRET` و`TIKTOK_AUTH_URL` إلى `.env` السيرفر، ثم إعادة التشغيل، ثم تجربة حقيقية.
+- **حساب الاختبار:** حساب تيك توك أعمال موثّق أو عليه Advanced Access، وصاحبه فوق 18، ويستقبل الرسائل من الجميع.
 
 ### المرحلة هـ: تحسينات ويدجت الموقع
 - اتصال لحظي (Socket.io أو SSE) بدل السؤال كل 3 ثوانٍ.
@@ -286,10 +298,11 @@
 | القنوات | `src/modules/channels/` |
 | ويدجت الموقع | `src/modules/webchat/` و`dashboard/src/views/WebchatWidgets.vue` |
 | انستغرام وماسنجر | `src/modules/social/` و`dashboard/src/views/ConnectSocial.vue` |
+| تيك توك | `src/modules/tiktok/` (الربط والإرسال والاستقبال) والصفحة نفسها `ConnectSocial.vue` |
 | التذاكر | `src/modules/tickets/` و`src/modules/workforce/routing.service.js` |
 | التحليلات | `src/modules/analytics/analytics.service.js` |
 | السير | `src/modules/flows/` (المحرك `flow.engine.js`) و`dashboard/src/views/FlowEditor.vue` |
 | الرد الآلي | `src/modules/chatbot/autoReply.js` و`src/modules/meta/meta.autoresponder.controller.js` |
 | المحفظة والأسعار | `src/modules/wallet/wallet.service.js` و`src/modules/channels/channel.billing.js` و`src/modules/campaign/campaign.billing.js` |
 | الحملات | `src/modules/campaign/` و`src/workers/meta.campaign.worker.js` |
-| متغيرات البيئة المهمة | `META_FB_APP_ID`، `META_APP_SECRET`، `META_VERIFY_TOKEN`، `META_FB_CONFIG_ID` (واتساب)، `META_FB_PAGES_CONFIG_ID` (انستغرام وماسنجر)، `APP_URL`، `JWT_SECRET`، `GEMINI_API_KEY`، `PROCESS_ROLE`، `ADMIN_PASSWORD_HASH`، `LOGS_USER`/`LOGS_PASS` |
+| متغيرات البيئة المهمة | `META_FB_APP_ID`، `META_APP_SECRET`، `META_VERIFY_TOKEN`، `META_FB_CONFIG_ID` (واتساب)، `META_FB_PAGES_CONFIG_ID` (انستغرام وماسنجر)، `TIKTOK_APP_ID`/`TIKTOK_APP_SECRET`/`TIKTOK_AUTH_URL` (تيك توك)، `APP_URL`، `JWT_SECRET`، `GEMINI_API_KEY`، `PROCESS_ROLE`، `ADMIN_PASSWORD_HASH`، `LOGS_USER`/`LOGS_PASS` |

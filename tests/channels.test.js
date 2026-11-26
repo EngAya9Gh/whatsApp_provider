@@ -68,7 +68,7 @@ beforeEach(() => {
 const visitor = { address: 'web:0123456789abcdef01234567', name: 'سارة', phone: null, info: { phone: '966500000001', pageUrl: 'https://shop.com/p/1', ref: 'W-012345' } };
 
 test('what each channel can do', () => {
-  assert.deepStrictEqual([...kinds.LIVE_CHAT_PROVIDERS].sort(), ['INSTAGRAM', 'MESSENGER', 'META_CLOUD', 'WEBCHAT']);
+  assert.deepStrictEqual([...kinds.LIVE_CHAT_PROVIDERS].sort(), ['INSTAGRAM', 'MESSENGER', 'META_CLOUD', 'TIKTOK', 'WEBCHAT']);
   assert.strictEqual(kinds.capabilitiesOf('INSTAGRAM').metered, false, 'no WhatsApp quota');
   assert.strictEqual(kinds.capabilitiesOf('META_CLOUD').metered, true);
   assert.strictEqual(kinds.capabilitiesOf(CHANNELS.web).templates, false);

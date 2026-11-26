@@ -647,12 +647,12 @@ const channelTag = (thread) => {
 }
 // Website widget conversations: the customer's address is an internal visitor id, so show what they told us
 const isWebThread = (thread) => threadKind(thread) === 'WEBCHAT'
-// Under the name: the phone on WhatsApp, @username on Instagram, the channel on Messenger, what a visitor told us
+// Under the name: the phone on WhatsApp, @username on Instagram and TikTok, the channel on Messenger, what a visitor told us
 const contactSub = (thread) => {
   if (!thread) return ''
   const kind = threadKind(thread)
   if (kind === 'META_CLOUD') return thread.contactPhone || ''
-  if (kind === 'INSTAGRAM') return thread.contactInfo?.username ? `@${thread.contactInfo.username}` : kindLabel(kind, isAr.value)
+  if (kind === 'INSTAGRAM' || kind === 'TIKTOK') return thread.contactInfo?.username ? `@${thread.contactInfo.username}` : kindLabel(kind, isAr.value)
   if (kind === 'MESSENGER') return kindLabel(kind, isAr.value)
   const info = thread.contactInfo || {}
   const parts = [info.phone ? `+${info.phone}` : '', info.email || ''].filter(Boolean)

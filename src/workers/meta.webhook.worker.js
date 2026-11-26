@@ -37,6 +37,9 @@ async function processJob(job) {
   } else if (type === 'SOCIAL_EVENT') {
     // Instagram and Messenger messages (social/social.inbound.js)
     await require('../modules/social/social.inbound').processEntry(channelId, payload);
+  } else if (type === 'TIKTOK_EVENT') {
+    // TikTok direct messages (tiktok/tiktok.inbound.js)
+    await require('../modules/tiktok/tiktok.inbound').processEvent(payload);
   } else if (type === 'META_AI_EVENT') {
     // Meta Business Agent: read-only copies of the conversations it answers, and its handovers to the team
     await require('../modules/meta/meta.agent.inbox').processAgentEvent(channelId, payload);
