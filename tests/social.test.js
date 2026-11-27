@@ -141,3 +141,12 @@ test('a code from the JavaScript SDK is exchanged with an empty redirect_uri', a
   const start = await socialService.startConnect('T', { code: 'sdk-code' });
   assert.strictEqual(start.pages[0].id, 'PAGE1');
 });
+
+test('a reply after 24h carries Meta\'s HUMAN_AGENT tag; normal replies are RESPONSE', async () => {
+  const fb = { id: 'c1', providerType: 'MESSENGER', metaAccessToken: 'page-token' };
+  posts.length = 0;
+  await sender.sendText(fb, 'fb:9', 'hello');
+  await sender.sendText(fb, 'fb:9', 'late reply', { humanAgent: true });
+  await sender.sendButtons(fb, 'fb:9', 'pick', [{ id: 'a', text: 'A' }], { humanAgent: true });
+  assert.deepStrictEqual(posts.map(p => [p.body.messaging_type, p.body.tag]), [['RESPONSE', undefined], ['MESSAGE_TAG', 'HUMAN_AGENT'], ['MESSAGE_TAG', 'HUMAN_AGENT']]);
+});

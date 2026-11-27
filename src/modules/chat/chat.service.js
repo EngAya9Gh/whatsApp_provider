@@ -2,7 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const metaService = require('../meta/meta.service');
 const channelSender = require('../channels/channel.sender');
-const { capabilitiesOf } = require('../channels/channel.kinds');
+const { capabilitiesOf, replyWindow } = require('../channels/channel.kinds');
 const { metaErrorInfo, metaErrorText } = require('../meta/meta.errors');
 const socketService = require('../../services/socket.service');
 const billingService = require('../billing/billing.service');
@@ -318,6 +318,18 @@ class ChatService {
 
     // Determine type
     const msgType = payload.type || 'text'; // text, image, document, audio, video
+
+    // Instagram / Messenger / TikTok: replies only within the platform's window after the customer's last
+    // message; a person may still reply on Instagram / Messenger for 7 days (Meta's Human Agent tag)
+    const win = payload.isInternal ? { ok: true } : replyWindow(channel, thread.lastInboundAt, { human: !payload.isAutomated });
+    if (!win.ok) {
+      throw {
+        status: 400,
+        code: 'REPLY_WINDOW_CLOSED',
+        message: `This platform allows replies only within ${win.hours} hours of the customer's last message. The conversation continues when the customer writes again.`
+      };
+    }
+    const sendOpts = win.humanAgent ? { humanAgent: true } : undefined;
     
 
     // Sync Contact with CRM if not yet synced
@@ -365,6 +377,7 @@ class ChatService {
       socketService.emitToTenant(tenantId, 'thread_updated', { id: threadId, flowState: null });
     }
 
+
     let metaResponse;
     try {
       if (payload.isInternal) {
@@ -377,13 +390,15 @@ class ChatService {
             thread.contactPhone,
             msgType,
             payload.mediaUrl,
-            payload.content
+            payload.content,
+            sendOpts
           );
         } else {
           metaResponse = await channelSender.sendText(
             channel,
             thread.contactPhone,
-            payload.content
+            payload.content,
+            sendOpts
           );
         }
         if (capabilitiesOf(channel).metered) await billingService.incrementUsage(tenantId, 'sent');
@@ -453,6 +468,11 @@ class ChatService {
       const failedMsgData = failedMessage.toObject();
       failedMsgData.id = failedMsgData._id.toString();
       socketService.emitToTenant(tenantId, 'new_chat_message', failedMsgData);
+      // A reply after 24h needs the app's Human Agent feature at Meta: say so instead of a bare Meta error
+      if (sendOpts?.humanAgent) {
+        const why = error.response?.data?.error?.message || error.message;
+        throw { status: 400, code: 'HUMAN_AGENT_REFUSED', message: `Meta refused this reply sent after 24 hours (Human Agent): ${why}` };
+      }
       throw error;
     }
   }

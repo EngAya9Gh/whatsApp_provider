@@ -56,6 +56,7 @@ const PROVIDERS = {
     templates: false,
     campaigns: false,
     windowHours: 24, // Meta: free replies within 24h of the customer's last message
+    humanAgentHours: 168, // a person (not automation) may still reply for 7 days: Meta's Human Agent tag
     replyButtons: 13, // quick replies
     listRows: 13,
     linkButton: true,
@@ -71,6 +72,7 @@ const PROVIDERS = {
     templates: false,
     campaigns: false,
     windowHours: 24,
+    humanAgentHours: 168, // Human Agent tag, as on Messenger
     replyButtons: 13,
     listRows: 13,
     linkButton: false, // sent as a text with the link
@@ -122,4 +124,24 @@ function phoneOf(thread, channel) {
   return thread.contactInfo?.phone || null;
 }
 
-module.exports = { PROVIDERS, LIVE_CHAT_PROVIDERS, capabilitiesOf, isWebchat, isSocial, isTikTok, isWhatsAppCloud, phoneOf };
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Whether a reply can go out now on a channel without templates (Instagram, Messenger, TikTok), counted
+ * from the customer's last message: { ok, humanAgent } or { ok: false, hours }.
+ *   Inside the window (24h, TikTok 48h) → a normal reply.
+ *   After it, a reply a person writes (human) → sent with Meta's Human Agent tag, up to 7 days.
+ *   Later, or an automated message after the window → refused (the platform would refuse it too).
+ * WhatsApp is not limited here: its closed window is handled with templates. Without a known last
+ * message (older conversations) the platform decides.
+ */
+function replyWindow(channel, lastInboundAt, { human = false, now = Date.now() } = {}) {
+  const caps = capabilitiesOf(channel);
+  if (caps.templates || !caps.windowHours || !lastInboundAt) return { ok: true, humanAgent: false };
+  const age = now - new Date(lastInboundAt).getTime();
+  if (age <= caps.windowHours * HOUR_MS) return { ok: true, humanAgent: false };
+  if (human && caps.humanAgentHours && age <= caps.humanAgentHours * HOUR_MS) return { ok: true, humanAgent: true };
+  return { ok: false, hours: human && caps.humanAgentHours ? caps.humanAgentHours : caps.windowHours };
+}
+
+module.exports = { PROVIDERS, LIVE_CHAT_PROVIDERS, capabilitiesOf, isWebchat, isSocial, isTikTok, isWhatsAppCloud, phoneOf, replyWindow };

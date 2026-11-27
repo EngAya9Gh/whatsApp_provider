@@ -5,25 +5,30 @@
 //   WhatsApp Cloud → Meta's API.
 //   Website widget → nothing to send: the widget reads its conversation from Live Chat (the message is
 //                    saved by the caller), so the id is only ours.
-//   Instagram / Messenger → the Messenger Platform Send API.
+//   Instagram / Messenger → the Messenger Platform Send API. opts.humanAgent sends a person's reply after
+//                    the 24h window with Meta's Human Agent tag (channel.kinds replyWindow decides).
 //   TikTok → TikTok's Business Messaging API.
 const crypto = require('crypto');
 const metaService = require('../meta/meta.service');
 const { isWebchat, isSocial, isTikTok } = require('./channel.kinds');
 
 const kept = () => ({ messages: [{ id: `web.${crypto.randomBytes(8).toString('hex')}` }] });
-// Instagram / Messenger go through the Messenger Platform (social/social.sender.js), TikTok through tiktok/
-const senderOf = (channel) => {
-  if (isSocial(channel)) return require('../social/social.sender');
-  if (isTikTok(channel)) return require('../tiktok/tiktok.sender');
-  return metaService;
-};
+const social = () => require('../social/social.sender');
+const tiktok = () => require('../tiktok/tiktok.sender');
+
+/** Calls the channel's sender; only Instagram / Messenger take the extra options */
+function route(channel, name, args, opts) {
+  if (isWebchat(channel)) return kept();
+  if (isSocial(channel)) return social()[name](channel, ...args, opts || {});
+  if (isTikTok(channel)) return tiktok()[name](channel, ...args);
+  return metaService[name](channel, ...args);
+}
 
 module.exports = {
-  sendText: (channel, to, text) => (isWebchat(channel) ? kept() : senderOf(channel).sendText(channel, to, text)),
-  sendMedia: (channel, to, type, url, caption) => (isWebchat(channel) ? kept() : senderOf(channel).sendMedia(channel, to, type, url, caption)),
+  sendText: (channel, to, text, opts) => route(channel, 'sendText', [to, text], opts),
+  sendMedia: (channel, to, type, url, caption, opts) => route(channel, 'sendMedia', [to, type, url, caption], opts),
   /** buttons: [{ id, text }] */
-  sendButtons: (channel, to, body, buttons) => (isWebchat(channel) ? kept() : senderOf(channel).sendButtons(channel, to, body, buttons)),
-  sendList: (channel, to, header, body, buttonLabel, sections) => (isWebchat(channel) ? kept() : senderOf(channel).sendList(channel, to, header, body, buttonLabel, sections)),
-  sendLinkButton: (channel, to, body, buttonText, url) => (isWebchat(channel) ? kept() : senderOf(channel).sendLinkButton(channel, to, body, buttonText, url))
+  sendButtons: (channel, to, body, buttons, opts) => route(channel, 'sendButtons', [to, body, buttons], opts),
+  sendList: (channel, to, header, body, buttonLabel, sections, opts) => route(channel, 'sendList', [to, header, body, buttonLabel, sections], opts),
+  sendLinkButton: (channel, to, body, buttonText, url, opts) => route(channel, 'sendLinkButton', [to, body, buttonText, url], opts)
 };

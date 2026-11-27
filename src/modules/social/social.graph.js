@@ -84,9 +84,14 @@ async function profile(channel, customerId) {
   return { name, username: d.username || null, avatarUrl: d.profile_pic || null };
 }
 
-/** Send API (works for Messenger and for Instagram with the linked page's token) */
-async function send(channel, recipientId, message) {
-  const res = await axios.post(`${GRAPH}/me/messages`, { recipient: { id: recipientId }, messaging_type: 'RESPONSE', message }, {
+/**
+ * Send API (works for Messenger and for Instagram with the linked page's token). A reply inside the 24h
+ * window is a RESPONSE; a person's reply after it carries the HUMAN_AGENT tag (Meta: up to 7 days, needs
+ * the app's Human Agent feature).
+ */
+async function send(channel, recipientId, message, { humanAgent = false } = {}) {
+  const kind = humanAgent ? { messaging_type: 'MESSAGE_TAG', tag: 'HUMAN_AGENT' } : { messaging_type: 'RESPONSE' };
+  const res = await axios.post(`${GRAPH}/me/messages`, { recipient: { id: recipientId }, ...kind, message }, {
     params: { access_token: channel.metaAccessToken },
     timeout: 20000
   });

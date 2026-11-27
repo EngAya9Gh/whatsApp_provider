@@ -11,7 +11,8 @@ let threads = [];
 let messages = [];
 const CHANNELS = {
   web: { id: 'web', tenantId: 'T', providerType: 'WEBCHAT' },
-  wa: { id: 'wa', tenantId: 'T', providerType: 'META_CLOUD' }
+  wa: { id: 'wa', tenantId: 'T', providerType: 'META_CLOUD' },
+  fb: { id: 'fb', tenantId: 'T', providerType: 'MESSENGER' }
 };
 
 const asDoc = (data) => ({ ...data, toObject: () => ({ ...data }) });
@@ -55,6 +56,11 @@ inject(fromRoot('src/modules/flows/flow.engine'), { wouldHandle: async () => fal
 inject(fromRoot('src/modules/workforce/hours.service'), { sendAwayMessageIfClosed: async () => {} });
 inject(fromRoot('src/services/socket.service'), { emitToTenant() {} });
 inject(fromRoot('src/utils/keyLock'), { withLock: async (key, fn) => fn() });
+const socialSends = [];
+const socialCall = (name) => async (...args) => { socialSends.push({ name, opts: args[args.length - 1] }); return { messages: [{ id: `mid.${name}` }] }; };
+inject(fromRoot('src/modules/social/social.sender'), {
+  sendText: socialCall('text'), sendMedia: socialCall('media'), sendButtons: socialCall('buttons'), sendList: socialCall('list'), sendLinkButton: socialCall('link')
+});
 
 const chatService = require(fromRoot('src/modules/chat/chat.service'));
 const kinds = require(fromRoot('src/modules/channels/channel.kinds'));
@@ -63,6 +69,7 @@ beforeEach(() => {
   threads = [];
   messages = [];
   calls.meta = []; calls.billing = []; calls.crm = []; calls.contacts = 0;
+  socialSends.length = 0;
 });
 
 const visitor = { address: 'web:0123456789abcdef01234567', name: 'سارة', phone: null, info: { phone: '966500000001', pageUrl: 'https://shop.com/p/1', ref: 'W-012345' } };
@@ -125,4 +132,40 @@ test('templates are refused outside WhatsApp', async () => {
   await chatService.receiveMessage('T', 'web', visitor, { id: 'webin.1', type: 'TEXT', content: 'مرحبا' });
   await assert.rejects(chatService.sendTemplateMessage('T', threads[0]._id.toString(), { templateName: 'promo', language: 'ar' }), (e) => e.status === 400);
   assert.deepStrictEqual(calls.meta, []);
+});
+
+const DAY = 24 * 60 * 60 * 1000;
+
+test('reply window: 24h, then a person may reply for 7 days on Messenger / Instagram; WhatsApp is left to templates', () => {
+  const now = Date.now();
+  const ago = (ms) => new Date(now - ms);
+  const fb = CHANNELS.fb;
+  assert.deepStrictEqual(kinds.replyWindow(fb, ago(DAY / 2), { human: true, now }), { ok: true, humanAgent: false });
+  assert.deepStrictEqual(kinds.replyWindow(fb, ago(3 * DAY), { human: true, now }), { ok: true, humanAgent: true });
+  assert.deepStrictEqual(kinds.replyWindow(fb, ago(3 * DAY), { human: false, now }), { ok: false, hours: 24 }, 'automation never uses the human tag');
+  assert.deepStrictEqual(kinds.replyWindow(fb, ago(8 * DAY), { human: true, now }), { ok: false, hours: 168 });
+  assert.deepStrictEqual(kinds.replyWindow({ providerType: 'TIKTOK' }, ago(3 * DAY), { human: true, now }), { ok: false, hours: 48 }, 'TikTok has no human tag');
+  assert.strictEqual(kinds.replyWindow(CHANNELS.wa, ago(3 * DAY), { human: true, now }).ok, true, 'WhatsApp: templates');
+  assert.strictEqual(kinds.replyWindow(CHANNELS.web, ago(30 * DAY), { human: true, now }).ok, true, 'the widget has no window');
+  assert.strictEqual(kinds.replyWindow(fb, null, { human: true, now }).ok, true, 'unknown last message: the platform decides');
+});
+
+test('a Messenger reply after 24h goes out with the Human Agent tag; after 7 days it is refused before Meta', async () => {
+  const customer = { address: 'fb:123', name: 'Sara', phone: null, info: {} };
+  await chatService.receiveMessage('T', 'fb', customer, { id: 'mid.in1', type: 'TEXT', content: 'hi' });
+  const threadId = threads[0]._id.toString();
+
+  await chatService.sendMessage('T', threadId, { content: 'inside 24h', type: 'text', senderId: 'A1' });
+  assert.deepStrictEqual(socialSends.map(s => s.opts), [{}]);
+
+  threads[0].lastInboundAt = new Date(Date.now() - 3 * DAY);
+  await chatService.sendMessage('T', threadId, { content: 'after 3 days', type: 'text', senderId: 'A1' });
+  assert.deepStrictEqual(socialSends[1].opts, { humanAgent: true });
+  await assert.rejects(chatService.sendMessage('T', threadId, { content: 'bot', type: 'text', isAutomated: true }), (e) => e.code === 'REPLY_WINDOW_CLOSED');
+
+  threads[0].lastInboundAt = new Date(Date.now() - 8 * DAY);
+  await assert.rejects(chatService.sendMessage('T', threadId, { content: 'too late', type: 'text', senderId: 'A1' }), (e) => e.code === 'REPLY_WINDOW_CLOSED' && /168 hours/.test(e.message));
+  await chatService.sendMessage('T', threadId, { content: 'team note', type: 'text', senderId: 'A1', isInternal: true });
+  assert.strictEqual(socialSends.length, 2, 'refused replies and notes send nothing');
+  assert.deepStrictEqual(calls.meta, [], 'nothing went to WhatsApp');
 });

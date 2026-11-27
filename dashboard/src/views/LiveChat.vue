@@ -392,6 +392,25 @@
             <i class="far fa-clock"></i> {{ windowRemainingLabel }}
           </div>
 
+          <!-- Instagram / Messenger / TikTok reply window (server: channel.kinds replyWindow) -->
+          <div v-if="socialWindow && !isInternal" class="window-banner" :class="{ 'human-banner': socialWindow.state === 'HUMAN' }">
+            <i class="fas" :class="socialWindow.state === 'HUMAN' ? 'fa-user-clock' : 'fa-lock'"></i>
+            <div class="window-banner-text">
+              <template v-if="socialWindow.state === 'HUMAN'">
+                <strong>{{ isAr ? 'مضى أكثر من 24 ساعة على آخر رسالة من العميل' : 'More than 24 hours since the customer last wrote' }}</strong>
+                <span>{{ isAr
+                  ? `يمكنك الرد بنفسك حتى 7 أيام من آخر رسالة له (ميزة «الموظف البشري» من Meta)، والردود الآلية لا تُرسل. متبقٍ: ${socialWindow.left}.`
+                  : `You can still reply yourself for up to 7 days after it (Meta's Human Agent); automated replies are not sent. Left: ${socialWindow.left}.` }}</span>
+              </template>
+              <template v-else>
+                <strong>{{ isAr ? 'انتهت مدة الرد على هذه المحادثة' : 'The reply period for this conversation is over' }}</strong>
+                <span>{{ isAr
+                  ? `لا تسمح ${kindLabel(threadKind(selectedThread), true)} بالرد بعد ${socialWindow.limit} من آخر رسالة للعميل. تستمر المحادثة عندما يكتب العميل من جديد.`
+                  : `${kindLabel(threadKind(selectedThread), false)} does not allow replies more than ${socialWindow.limit} after the customer's last message. The conversation continues when the customer writes again.` }}</span>
+              </template>
+            </div>
+          </div>
+
           <!-- AI reply draft: the agent reviews it, then uses it in the composer -->
           <div v-if="replyDraft.open" class="reply-draft" :dir="isAr ? 'rtl' : 'ltr'">
             <div class="reply-draft-head">
@@ -483,7 +502,7 @@
               <i class="fas fa-file-lines"></i>
             </button>
             <button
-              v-if="aiConfigured && !isInternal && !channelMissing && !windowExpired"
+              v-if="aiConfigured && !isInternal && !channelMissing && !windowExpired && !socialClosed"
               type="button"
               class="btn-attach btn-ai-reply"
               :disabled="replyDraft.loading"
@@ -510,17 +529,17 @@
               v-model="newMessage"
               @input="handleInput"
               @keydown.enter.exact.prevent="sendMessage"
-              :placeholder="isRecording ? 'جاري التسجيل...' : (isInternal ? 'اكتب ملاحظة داخلية لفريق العمل (لن يراها العميل)… استخدم @ للإشارة إلى زميل' : (windowExpired ? (isAr ? 'أرسل قالباً، أو فعّل الملاحظة الداخلية 🔒' : 'Send a template, or switch to an internal note 🔒') : 'Type a message...'))"
+              :placeholder="isRecording ? 'جاري التسجيل...' : (isInternal ? 'اكتب ملاحظة داخلية لفريق العمل (لن يراها العميل)… استخدم @ للإشارة إلى زميل' : (windowExpired ? (isAr ? 'أرسل قالباً، أو فعّل الملاحظة الداخلية 🔒' : 'Send a template, or switch to an internal note 🔒') : (socialClosed ? (isAr ? 'انتهت مدة الرد، يمكنك كتابة ملاحظة داخلية 🔒' : 'Reply period over; you can write an internal note 🔒') : 'Type a message...')))"
               class="form-control msg-input"
               :class="{ 'input-internal': isInternal }"
-              :disabled="isRecording || channelMissing || (windowExpired && !isInternal)"
+              :disabled="isRecording || channelMissing || ((windowExpired || socialClosed) && !isInternal)"
             ></textarea>
             
             <button 
               type="submit" 
               class="btn-send" 
               :class="{ 'btn-send-internal': isInternal }"
-              :disabled="isRecording || channelMissing || (!newMessage.trim() && !attachment) || (windowExpired && !isInternal)"
+              :disabled="isRecording || channelMissing || (!newMessage.trim() && !attachment) || ((windowExpired || socialClosed) && !isInternal)"
               :title="isInternal ? 'حفظ ملاحظة داخلية' : 'إرسال'"
             >
               <i class="fas fa-lock" v-if="isInternal"></i>
@@ -982,6 +1001,27 @@ const windowRemainingLabel = computed(() => {
   const m = Math.floor((left % 3600000) / 60000)
   return isAr.value ? `تنتهي نافذة المحادثة خلال ${h}س ${m}د` : `Conversation window closes in ${h}h ${m}m`
 })
+
+// Instagram / Messenger / TikTok: same rule as the server (channel.kinds replyWindow). After the window a
+// person can still reply on Instagram / Messenger for 7 days (Meta's Human Agent tag); later nothing goes out.
+const SOCIAL_WINDOW = { MESSENGER: { hours: 24, humanAgentHours: 168 }, INSTAGRAM: { hours: 24, humanAgentHours: 168 }, TIKTOK: { hours: 48 } }
+const HOUR = 60 * 60 * 1000
+const durationLabel = (ms) => {
+  const days = Math.floor(ms / (24 * HOUR))
+  const hours = Math.max(1, Math.ceil((ms % (24 * HOUR)) / HOUR))
+  if (isAr.value) return days ? `${days} يوم${hours && days < 7 ? ` و${hours} ساعة` : ''}` : `${hours} ساعة`
+  return days ? `${days}d${hours && days < 7 ? ` ${hours}h` : ''}` : `${hours}h`
+}
+const socialWindow = computed(() => {
+  const w = SOCIAL_WINDOW[threadKind(selectedThread.value)]
+  if (!w || !selectedThread.value || loadingMessages.value || !lastInboundTime.value) return null
+  const age = nowTick.value - lastInboundTime.value
+  if (age <= w.hours * HOUR) return null
+  if (w.humanAgentHours && age <= w.humanAgentHours * HOUR) return { state: 'HUMAN', left: durationLabel(w.humanAgentHours * HOUR - age) }
+  const limitHours = w.humanAgentHours || w.hours
+  return { state: 'CLOSED', limit: limitHours % 24 === 0 && limitHours > 24 ? (isAr.value ? `${limitHours / 24} أيام` : `${limitHours / 24} days`) : (isAr.value ? `${limitHours} ساعة` : `${limitHours} hours`) }
+})
+const socialClosed = computed(() => socialWindow.value?.state === 'CLOSED')
 
 const onTemplateSent = (msg) => {
   if (msg && !messages.value.find(m => m.id === msg.id)) messages.value.push(msg)
@@ -2243,6 +2283,16 @@ onUnmounted(() => {
   border-radius: 12px;
   color: #92400e;
   font-size: 0.8rem;
+}
+
+.human-banner {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.human-banner > i {
+  color: #2563eb !important;
 }
 
 .ai-banner {
