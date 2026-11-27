@@ -12,6 +12,7 @@
           <div class="feature-item">✅ {{ $t('login.features.f2') }}</div>
           <div class="feature-item">✅ {{ $t('login.features.f3') }}</div>
         </div>
+        <TechProviderBadge class="tp-login" />
       </div>
       <div class="brand-decoration"></div>
     </div>
@@ -78,6 +79,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
+import TechProviderBadge from '../components/TechProviderBadge.vue'
 
 const { locale } = useI18n()
 // Arrows point in the reading direction: left in Arabic
@@ -157,6 +159,7 @@ const handleLogin = async () => {
 
 .brand-features { display: flex; flex-direction: column; gap: 0.75rem; }
 .feature-item { color: #CBD5E1; font-size: 0.9rem; font-weight: 500; }
+.tp-login { margin-top: 2rem; }
 
 .brand-decoration {
   position: absolute;

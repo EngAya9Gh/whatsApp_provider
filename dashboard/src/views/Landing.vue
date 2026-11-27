@@ -50,6 +50,7 @@
             </router-link>
             <a href="#pricing" class="btn-secondary btn-large">{{ c.hero.ctaSecondary }}</a>
           </div>
+          <TechProviderBadge class="tp-hero" />
         </div>
 
         <!-- Hero Visual: shared inbox mockup -->
@@ -388,6 +389,7 @@
               <a :href="`tel:${COMPANY.phone}`" dir="ltr">{{ COMPANY.phoneDisplay }}</a>
             </p>
           </div>
+          <TechProviderBadge class="tp-footer" />
         </div>
 
         <div class="footer-links">
@@ -415,6 +417,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
+import TechProviderBadge from '../components/TechProviderBadge.vue'
 
 import { setLanguage } from '../i18n'
 import { COMPANY } from '../data/company'
@@ -794,6 +797,8 @@ const fetchPlans = async () => {
 .hero-points li { display: flex; align-items: center; gap: 0.6rem; font-weight: 600; color: #E2E8F0; }
 .hero-points i { color: #34D399; }
 .hero-cta-group { display: flex; gap: 1rem; flex-wrap: wrap; }
+.tp-hero { margin-top: 1.75rem; }
+.tp-footer { margin-top: 1.25rem; }
 
 /* Hero inbox mockup */
 .hero-visual { position: relative; padding: 2rem 0; }

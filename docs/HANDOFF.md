@@ -164,7 +164,7 @@
 |---|---|
 | تطبيق Meta | «wakeel pro»، `App ID 29665408596382680`، **منشور (Live)** |
 | محفظة الأعمال الموثّقة | **wakeel.cc**. محفظة «Rushd Ai» **غير موثّقة** |
-| مراجعة التطبيق (App Review) | قُدّمت في 2026-11-09 لـ `whatsapp_business_messaging` و`whatsapp_business_management` (+ `email` و`public_profile`)، و**ما زالت قيد المراجعة** في 2026-11-18. حتى تُقبل: فقط من له دور في التطبيق يكمل Embedded Signup |
+| مراجعة التطبيق (App Review) | **قُبلت في 2026-11-26**: `whatsapp_business_messaging` و`whatsapp_business_management` و`email` و`public_profile`. وكيل صار **Tech Provider** (2 من 2 خطوات). أي عميل يقدر يكمل Embedded Signup. التالي: مراجعة انستغرام وماسنجر (طلب منفصل) |
 | حساب المراجِع | مستخدم فرعي في حساب demo. **لا تغيّر كلمة سره قبل نتيجة المراجعة**، ثم غيّرها فوراً لأنها ضعيفة |
 | حالة استخدام Messenger | أُضيفت في 2026-11-18. `pages_messaging` و`pages_manage_metadata` و`pages_show_list` و`business_management` و`instagram_basic` و`instagram_manage_messages` كلها «Ready for testing»، أي تعمل لأصحاب الأدوار في التطبيق بدون مراجعة |
 | حساب واتساب «Rushd Ai» | **بدون طريقة دفع**: القوالب والحملات لن تُرسل حتى تُضاف من WhatsApp Manager |
