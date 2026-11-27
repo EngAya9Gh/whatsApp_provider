@@ -108,6 +108,7 @@
             </div>
           </div>
 
+          <TechProviderBadge variant="card" class="card-meta float-anim-slow" />
           <div class="floating-card card-route float-anim">
             <span class="floating-icon green"><i class="fas fa-shuffle"></i></span>
             <span><b>{{ c.mock.routeTitle }}</b><small>{{ c.mock.routeMeta }}</small></span>
@@ -870,6 +871,7 @@ const fetchPlans = async () => {
 .stars { color: #FBBF24; letter-spacing: 1px; }
 .card-route { top: -4px; inset-inline-start: -28px; }
 .card-rated { bottom: -6px; inset-inline-end: -28px; }
+.card-meta { position: absolute; z-index: 5; top: -18px; inset-inline-end: -24px; }
 
 /* Stats Banner */
 .stats-banner { background: #1E293B; border-top: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -995,8 +997,9 @@ const fetchPlans = async () => {
 @keyframes typing { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-3px); opacity: 1; } }
 .float-anim { animation: float 5s ease-in-out infinite; }
 .float-anim-delayed { animation: float 5s ease-in-out infinite 2.5s; }
+.float-anim-slow { animation: float 6s ease-in-out infinite 1.2s; }
 @media (prefers-reduced-motion: reduce) {
-  .float-anim, .float-anim-delayed, .typing i { animation: none; }
+  .float-anim, .float-anim-delayed, .float-anim-slow, .typing i { animation: none; }
 }
 
 /* Responsive */
@@ -1011,6 +1014,7 @@ const fetchPlans = async () => {
   .hero-visual { margin-top: 1rem; }
   .card-route { inset-inline-start: 0; }
   .card-rated { inset-inline-end: 0; }
+  .card-meta { inset-inline-end: 0; }
   .bento-grid { grid-template-columns: 1fr; }
   .bento-large, .bento-large-horizontal, .bento-full { grid-column: span 1; grid-row: auto; }
   .bento-large-horizontal, .bento-full { flex-direction: column; align-items: stretch; }
@@ -1037,5 +1041,6 @@ const fetchPlans = async () => {
   .threads { display: none; }
   .floating-card { padding: 10px 12px; }
   .floating-card b { font-size: 0.8rem; }
+  .card-meta { display: none; } /* phones: the badge under the buttons shows it */
 }
 </style>
