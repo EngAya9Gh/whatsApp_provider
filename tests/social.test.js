@@ -46,8 +46,22 @@ inject('@prisma/client', { PrismaClient: class { constructor() { return fakePris
 const received = [];
 inject(fromRoot('src/modules/chat/chat.service'), { receiveMessage: async (...args) => { received.push(args); return { flowHandled: false, threadId: 'th1' }; } });
 inject(fromRoot('src/modules/chatbot/autoReply'), { replyIfMatched: async () => null });
-let knownThread = false;
-inject(fromRoot('src/models/mongo/ChatThread'), { exists: async () => knownThread });
+let knownThread = null;
+inject(fromRoot('src/models/mongo/ChatThread'), { findOne: () => ({ lean: async () => knownThread }) });
+let retryAllowed = true;
+const redisStore = new Map();
+inject(fromRoot('src/config/redis'), {
+  redisClient: {
+    status: 'ready',
+    get: async (key) => redisStore.get(key) ?? null,
+    del: async (key) => { redisStore.delete(key); return 1; },
+    set: async (key, value) => {
+      if (key.startsWith('social:profile:')) return retryAllowed ? 'OK' : null;
+      redisStore.set(key, value);
+      return 'OK';
+    }
+  }
+});
 
 process.env.META_FB_APP_ID = 'APP1';
 const inbound = require(fromRoot('src/modules/social/social.inbound'));
@@ -59,7 +73,8 @@ beforeEach(() => {
   gets.length = 0;
   received.length = 0;
   channels = [];
-  knownThread = false;
+  knownThread = null;
+  retryAllowed = true;
 });
 
 test('webhook events in the common message shape; our own echoes are skipped', () => {
@@ -83,10 +98,24 @@ test('an Instagram message reaches Live Chat as "ig:<id>" with the person\'s nam
   assert.strictEqual(message.content, 'مرحبا');
   assert.strictEqual(gets.at(-1).params.fields, 'name,username,profile_pic');
 
-  knownThread = true;
+  knownThread = { contactName: 'Sara Ali' };
   gets.length = 0;
   await inbound.processEntry('ig', { entry: { id: 'IG1', messaging: [{ sender: { id: '777' }, message: { mid: 'm2', text: 'ثاني' } }] } });
-  assert.strictEqual(gets.length, 0, 'the profile is read once');
+  assert.strictEqual(gets.length, 0, 'a named conversation is not looked up again');
+});
+
+test('a conversation still without a name reads the profile again, at most every few hours', async () => {
+  channels = [{ id: 'fb', tenantId: 'T', providerType: 'MESSENGER', externalId: 'PAGE1', metaAccessToken: 'page-token' }];
+  knownThread = { contactName: 'fb:42' };
+  await inbound.processEntry('fb', { entry: { id: 'PAGE1', messaging: [{ sender: { id: '42' }, message: { mid: 'm1', text: 'hi' } }] } });
+  assert.strictEqual(gets.at(-1).params.fields, 'first_name,last_name,profile_pic');
+  assert.strictEqual(received[0][2].name, 'Sara Ali');
+
+  retryAllowed = false;
+  gets.length = 0;
+  await inbound.processEntry('fb', { entry: { id: 'PAGE1', messaging: [{ sender: { id: '42' }, message: { mid: 'm2', text: 'hi again' } }] } });
+  assert.strictEqual(gets.length, 0, 'tried recently');
+  assert.strictEqual(received[1][2].name, null);
 });
 
 test('replies: text, buttons as quick replies, a Messenger link button, Instagram link as text', async () => {

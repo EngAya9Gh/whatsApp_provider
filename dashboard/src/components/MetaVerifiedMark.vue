@@ -14,7 +14,7 @@
       </defs>
       <path fill="url(#wk-meta-gradient)" :d="META_PATH" />
     </svg>
-    <svg class="tick" viewBox="0 0 24 24" :width="tick" :height="tick" :style="{ insetInlineEnd: `${-Math.round(tick * 0.38)}px`, bottom: `${-Math.round(tick * 0.28)}px` }">
+    <svg class="tick" viewBox="0 0 24 24" :width="tick" :height="tick" :style="{ insetInlineEnd: `${-Math.round(tick * 0.38)}px`, top: `${-Math.round(tick * 0.32)}px` }">
       <path :d="BADGE_PATH" fill="#0866FF" stroke="white" stroke-width="2" stroke-linejoin="round" />
       <path d="m9 12 2 2 4-4" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
     </svg>

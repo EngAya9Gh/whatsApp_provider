@@ -60,11 +60,15 @@ async function processEntry(channelId, { entry }) {
     if (n.kind !== 'message') continue;
     const address = `${PREFIX[channel.providerType]}${n.customerId}`;
 
-    // First message from this person: their name and picture, instead of a number
+    // Their name and picture instead of a number: read with the first message, and read again (at most every
+    // few hours) while the conversation still has no name. Before Meta approves "Business Asset User Profile
+    // Access" the lookup works only for people with a role on the app, so a customer who wrote then gets
+    // their name with a later message.
     let name = null;
     let info;
-    const known = await ChatThread.exists({ tenantId: channel.tenantId, channelId: channel.id, contactPhone: address });
-    if (!known) {
+    const thread = await ChatThread.findOne({ tenantId: channel.tenantId, channelId: channel.id, contactPhone: address }, { contactName: 1 }).lean();
+    const named = thread?.contactName && thread.contactName !== address;
+    if (!named && (!thread || await mayRetryProfile(channel.id, address))) {
       try {
         const p = await graph.profile(channel, n.customerId);
         name = p.name;
@@ -79,6 +83,19 @@ async function processEntry(channelId, { entry }) {
     if (result?.threadId && !result.flowHandled && !result.duplicate && n.message.content) {
       await require('../chatbot/autoReply').replyIfMatched(channel.tenantId, channel, result.threadId, n.message.content);
     }
+  }
+}
+
+const PROFILE_RETRY_S = 6 * 60 * 60;
+
+/** Once per PROFILE_RETRY_S per person (no retry without Redis) */
+async function mayRetryProfile(channelId, address) {
+  try {
+    const { redisClient } = require('../../config/redis');
+    if (redisClient.status !== 'ready') return false;
+    return (await redisClient.set(`social:profile:${channelId}:${address}`, '1', 'EX', PROFILE_RETRY_S, 'NX')) === 'OK';
+  } catch {
+    return false;
   }
 }
 
