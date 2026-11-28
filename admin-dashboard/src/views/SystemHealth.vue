@@ -24,6 +24,38 @@
         </div>
       </div>
 
+      <!-- Platform speed (services/metrics.js) -->
+      <div class="card p-0 overflow-hidden mb-5">
+        <div class="px-5 py-4 border-b border-slate-100">
+          <h2 class="font-bold text-slate-800">{{ isAr ? `سرعة المنصة خلال آخر ${windowMinutes} دقائق` : `Platform speed over the last ${windowMinutes} minutes` }}</h2>
+          <p class="text-xs text-slate-500 mt-1">{{ isAr ? 'الأرقام بالميلي ثانية. p50 = نصف الحالات كانت أسرع من هذا الرقم، وp95 = 95% منها. الأحمر يعني أبطأ من الهدف.' : 'Milliseconds. p50 = half of the cases were faster than this, p95 = 95% of them. Red means slower than the target.' }}</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs text-slate-500 bg-slate-50">
+                <th class="th text-start">{{ isAr ? 'المسار' : 'Path' }}</th>
+                <th class="th">{{ isAr ? 'العدد' : 'Count' }}</th>
+                <th class="th">p50</th>
+                <th class="th">p95</th>
+                <th class="th">{{ isAr ? 'الأقصى' : 'Max' }}</th>
+                <th class="th">{{ isAr ? 'الهدف (p95)' : 'Target (p95)' }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="m in health.latency || []" :key="m.name" class="border-t border-slate-100">
+                <td class="td font-medium text-slate-800">{{ isAr ? m.ar : m.en }}</td>
+                <td class="td text-center" dir="ltr">{{ m.count }}</td>
+                <td class="td text-center" dir="ltr">{{ m.count ? m.p50 : '—' }}</td>
+                <td class="td text-center" dir="ltr" :class="m.count && m.p95 > targetOf(m.name) ? 'text-red-600 font-bold' : ''">{{ m.count ? m.p95 : '—' }}</td>
+                <td class="td text-center" dir="ltr">{{ m.count ? m.max : '—' }}</td>
+                <td class="td text-center text-slate-400" dir="ltr">{{ targetOf(m.name) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="grid lg:grid-cols-[1fr_340px] gap-5">
         <!-- Queues -->
         <div class="card p-0 overflow-hidden">
@@ -133,6 +165,10 @@ const isAr = computed(() => locale.value === 'ar')
 
 const health = ref(null)
 const loading = ref(false)
+// What each path should stay under at p95 (ms); above it the number turns red
+const TARGETS = { 'webhook.handle': 500, 'inbound.wait': 1000, 'inbound.total': 2000, 'status.total': 3000, 'inbox.list': 300, 'inbox.messages': 300 }
+const targetOf = (name) => TARGETS[name] || 1000
+const windowMinutes = computed(() => health.value?.latency?.[0]?.windowMinutes || 5)
 const error = ref('')
 let timer = null
 

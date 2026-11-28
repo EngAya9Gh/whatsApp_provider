@@ -1,6 +1,7 @@
 const logger = require('../../utils/logger');
 const axios = require('axios');
 const prisma = require('../../config/prisma');
+const metrics = require('../../services/metrics');
 
 const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'wakeel_meta_secret_1234';
 // Secret of the platform's own Meta app (signs webhooks of Embedded Signup channels)
@@ -98,7 +99,16 @@ class MetaController {
   async handleWebhook(req, res) {
     // ✅ Respond 200 immediately — Meta requires fast response (< 20s) to avoid retries
     res.sendStatus(200);
+    const receivedAt = Date.now();
+    try {
+      await this._routeWebhook(req, receivedAt);
+    } finally {
+      metrics.record('webhook.handle', Date.now() - receivedAt);
+    }
+  }
 
+  /** Finds the channel of each event in the webhook body and queues it; receivedAt travels with the job */
+  async _routeWebhook(req, receivedAt) {
     const body = req.body;
     // Instagram and Messenger channels (Messenger Platform) come on the same webhook
     if (body && (body.object === 'page' || body.object === 'instagram')) return this._handleSocial(req, body);
@@ -181,6 +191,7 @@ class MetaController {
               type: 'INCOMING_MESSAGE',
               channelId: channel.id,
               tenantId: channel.tenantId,
+              receivedAt,
               payload: { msg, contacts, channel: { id: channel.id } }
             }, msg.id ? { jobId: `in-${String(msg.id).replace(/:/g, '_')}` } : undefined).catch(e => logger.error(`[MetaWebhook] Failed to queue message from ${msg.from}: ${e.message}`));
           }
@@ -194,6 +205,7 @@ class MetaController {
               type: 'STATUS_UPDATE',
               channelId: channel.id,
               tenantId: channel.tenantId,
+              receivedAt,
               payload: { statusUpdate, channel: { id: channel.id } }
             }).catch(e => logger.error(`[MetaWebhook] Failed to queue status for ${statusUpdate.id}: ${e.message}`));
           }

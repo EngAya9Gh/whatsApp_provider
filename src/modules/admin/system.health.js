@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const config = require('../../config/env');
 const { redisClient, bullConnection } = require('../../config/redis');
 const { role } = require('../../config/processRole');
+const metrics = require('../../services/metrics');
 
 const prisma = require('../../config/prisma');
 
@@ -103,13 +104,16 @@ async function cleanFailed(name) {
 }
 
 async function getHealth() {
-  const [redis, queueList, mysql] = await Promise.all([
+  const [redis, queueList, mysql, latency] = await Promise.all([
     redisHealth(),
     Promise.all(QUEUES.map(queueHealth)),
-    timed(() => prisma.$queryRaw`SELECT 1`).then(r => ({ connected: true, pingMs: r.ms })).catch(err => ({ connected: false, error: err.message }))
+    timed(() => prisma.$queryRaw`SELECT 1`).then(r => ({ connected: true, pingMs: r.ms })).catch(err => ({ connected: false, error: err.message })),
+    metrics.summary().catch(() => [])
   ]);
   return {
     checkedAt: new Date().toISOString(),
+    // How fast the platform was over the last minutes (services/metrics.js)
+    latency,
     process: {
       role,
       pid: process.pid,

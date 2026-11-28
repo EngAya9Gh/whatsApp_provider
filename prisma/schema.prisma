@@ -116,6 +116,7 @@ model WhatsAppChannel {
 
   @@index([tenantId], map: "whatsapp_channels_tenant_id_fkey")
   @@index([providerType, externalId], map: "whatsapp_channels_provider_external_idx")
+  @@index([metaPhoneNumberId], map: "whatsapp_channels_meta_phone_number_id_idx") // every Meta webhook finds its number by this
   @@map("whatsapp_channels")
 }
 

@@ -7,6 +7,7 @@ const socketService = require('../../services/socket.service');
 const billingService = require('../billing/billing.service');
 const logger = require('../../utils/logger');
 const { withLock } = require('../../utils/keyLock');
+const metrics = require('../../services/metrics');
 const ChatThread = require('../../models/mongo/ChatThread');
 const ChatMessage = require('../../models/mongo/ChatMessage');
 
@@ -17,6 +18,8 @@ const FLOW_SOURCES = ['FLOW', 'FLOW_AI', 'FLOW_HANDOFF'];
 // Campaign messages added to a conversation when the customer replies: at most this many, this recent
 const CAMPAIGN_CHAT_DAYS = 30;
 const CAMPAIGN_CHAT_MAX = 10;
+// Text typed in the inbox search box, made safe to use as a regular expression
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * A WhatsApp message (Meta webhook) in the shape every channel hands to receiveMessage():
@@ -84,7 +87,12 @@ class ChatService {
     });
   }
 
-  async getThreads(tenantId, page = 1, limit = 50, search = '', channelId = null, filters = {}) {
+  /** The inbox list; timed for System health (inbox.list) */
+  getThreads(...args) {
+    return metrics.timed('inbox.list', () => this._getThreads(...args));
+  }
+
+  async _getThreads(tenantId, page = 1, limit = 50, search = '', channelId = null, filters = {}) {
     const skip = (page - 1) * limit;
 
     let where = { tenantId };
@@ -100,9 +108,10 @@ class ChatService {
       where.stageId = String(filters.stageId);
     }
     if (search) {
+      const term = escapeRegex(String(search).trim().slice(0, 60));
       where.$or = [
-        { contactPhone: { $regex: search, $options: 'i' } },
-        { contactName: { $regex: search, $options: 'i' } }
+        { contactPhone: { $regex: term, $options: 'i' } },
+        { contactName: { $regex: term, $options: 'i' } }
       ];
     }
     if (filters.access) {
@@ -262,7 +271,12 @@ class ChatService {
     return { ...thread, id: thread._id.toString(), channel: channel || null };
   }
 
-  async getMessages(tenantId, threadId, page = 1, limit = 50) {
+  /** A conversation's messages; timed for System health (inbox.messages) */
+  getMessages(...args) {
+    return metrics.timed('inbox.messages', () => this._getMessages(...args));
+  }
+
+  async _getMessages(tenantId, threadId, page = 1, limit = 50) {
     const skip = (page - 1) * limit;
 
     const thread = await ChatThread.findOne({ _id: threadId, tenantId });

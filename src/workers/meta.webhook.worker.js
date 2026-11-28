@@ -2,6 +2,7 @@ const { Queue, Worker } = require('bullmq');
 const logger = require('../utils/logger');
 const { bullConnection } = require('../config/redis');
 const { runsBackground } = require('../config/processRole');
+const metrics = require('../services/metrics');
 
 const prisma = require('../config/prisma');
 
@@ -21,11 +22,13 @@ const metaWebhookQueue = new Queue('meta-webhook-queue', {
 });
 
 async function processJob(job) {
-  const { type, channelId, tenantId, payload } = job.data;
+  const { type, channelId, tenantId, payload, receivedAt } = job.data;
   if (type === 'INCOMING_MESSAGE') {
-    await processIncomingMessage(channelId, tenantId, payload);
+    if (receivedAt) metrics.record('inbound.wait', Date.now() - receivedAt);
+    await processIncomingMessage(channelId, tenantId, payload, receivedAt);
   } else if (type === 'STATUS_UPDATE') {
     await processStatusUpdate(channelId, tenantId, payload);
+    if (receivedAt) metrics.record('status.total', Date.now() - receivedAt);
   } else if (type === 'COEX_EVENT') {
     // WhatsApp Business app numbers: messages sent from the app, old chats, the app's contacts
     await require('../modules/meta/meta.coexistence').processEvent(channelId, payload);
@@ -50,7 +53,7 @@ const worker = runsBackground
   ? new Worker('meta-webhook-queue', processJob, { connection: bullConnection, concurrency: 10 })
   : null;
 
-async function processIncomingMessage(channelId, tenantId, payload) {
+async function processIncomingMessage(channelId, tenantId, payload, receivedAt = null) {
   const { msg, contacts } = payload;
   const chatService = require('../modules/chat/chat.service');
   const metaService = require('../modules/meta/meta.service');
@@ -62,6 +65,8 @@ async function processIncomingMessage(channelId, tenantId, payload) {
   // 1. Save to Live Chat (throw to trigger retry if fails)
   const intake = await chatService.handleIncomingMessage(tenantId, channelId, from, contactName, msg);
   logger.info(`[MetaWebhookWorker] ✅ Live chat saved message from ${from}`);
+  // Saved and shown to the team: the time the customer's message took from Meta to the agent's screen
+  if (receivedAt) metrics.record('inbound.total', Date.now() - receivedAt);
 
   // 2. Track button/text interactions
   let buttonId = null, buttonText = null, incomingText = null;
