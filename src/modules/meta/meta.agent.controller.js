@@ -2,8 +2,7 @@
  * /api/v1/meta/agent/:channelId/... — the "Meta Business Agent" page relays to Meta's Agent Platform.
  * Inputs are checked against Meta's documented limits before they are sent.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const agent = require('./meta.agent');
 
 const SKILL_TITLE = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/; // Meta: max 64, lowercase letters, digits, hyphens

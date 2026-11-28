@@ -4,9 +4,8 @@ const pino = require('pino');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../../utils/logger');
-const { PrismaClient } = require('@prisma/client');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const SESSIONS_DIR = path.join(__dirname, '../../../sessions');
 
 // Ensure sessions directory exists

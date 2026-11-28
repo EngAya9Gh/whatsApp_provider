@@ -1,6 +1,5 @@
 const https = require('https');
 const { Queue, Worker, UnrecoverableError, DelayedError } = require('bullmq');
-const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
 const logger = require('../utils/logger');
 const { bullConnection } = require('../config/redis');
@@ -9,7 +8,7 @@ const { metaErrorInfo, metaErrorText } = require('../modules/meta/meta.errors');
 const { templatePreview } = require('../modules/campaign/campaign.preview');
 const templateLookup = require('../modules/meta/meta.templateLookup');
 
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || 'v21.0';
 
 // Campaign messages per second, all Meta campaigns together (the safety cap of this server). The pace of each

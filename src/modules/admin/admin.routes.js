@@ -80,8 +80,7 @@ router.put('/referral-settings', adminAuth, async (req, res, next) => {
     const raw = req.body?.rewardAmount;
     const amount = raw === '' || raw === null || raw === undefined ? null : Number(raw);
     if (amount !== null && !(amount >= 0)) return res.status(400).json({ success: false, message: 'The reward must be 0 or more' });
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
+    const prisma = require('../../config/prisma');
     const settings = await prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } });
     const data = { ...(settings?.data || {}), referralRewardAmount: amount };
     await prisma.systemSetting.upsert({ where: { id: 'GLOBAL' }, update: { data }, create: { id: 'GLOBAL', data } });

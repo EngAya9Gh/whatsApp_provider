@@ -1,8 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
 
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 
 // Middleware to authenticate API requests from clients using their API Key
 const apiKeyMiddleware = async (req, res, next) => {

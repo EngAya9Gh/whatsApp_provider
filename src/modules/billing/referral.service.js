@@ -2,8 +2,7 @@
 // paid, the inviter's wallet gets the reward the admin set (system settings → referralRewardAmount, SAR).
 // No reward set = referrals are off (no invite card; sign-ups through old links stay PENDING).
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const config = require('../../config/env');
 const logger = require('../../utils/logger');
 

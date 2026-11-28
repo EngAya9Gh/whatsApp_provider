@@ -1,10 +1,9 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/env');
-const { PrismaClient } = require('@prisma/client');
 const logger = require('../utils/logger');
 const { resolvePermissions } = require('../modules/subuser/subuser.service');
 
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 
 /**
  * Middleware رئيسي للمصادقة — يدعم:

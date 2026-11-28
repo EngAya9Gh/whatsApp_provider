@@ -9,8 +9,7 @@
 // A campaign is charged up front for every recipient. settle() then makes the money match the
 // recipients that were not failed or cancelled (a stopped campaign): those are refunded, and retrying
 // failed ones charges again.
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const walletService = require('../wallet/wallet.service');
 const { TYPES } = require('../wallet/wallet.service');
 const { withLock } = require('../../utils/keyLock');

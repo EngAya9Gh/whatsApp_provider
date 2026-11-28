@@ -10,10 +10,10 @@
 //  - when Meta says a number sends too fast, only that number waits.
 // Scheduled campaigns start here when their time comes. A campaign is COMPLETED when nothing is left to
 // send, and its failed messages are refunded then.
-const { PrismaClient, Prisma } = require('@prisma/client');
+const { Prisma } = require('@prisma/client');
 const logger = require('../../utils/logger');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 const positive = (v, fallback) => (Number(v) > 0 ? Number(v) : fallback);
 function config() {

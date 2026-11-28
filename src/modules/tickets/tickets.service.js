@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
 const { LIVE_CHAT_PROVIDERS } = require('../channels/channel.kinds');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const logger = require('../../utils/logger');
 const webhookService = require('../webhook/webhook.service');
 const { withLock } = require('../../utils/keyLock');

@@ -1,11 +1,10 @@
-const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const config = require('../../config/env');
 const logger = require('../../utils/logger');
 const axios = require('axios');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 // Admin credentials are stored in env variables (no DB table needed for single admin)
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@wakeel.tech';

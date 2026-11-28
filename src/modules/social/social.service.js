@@ -3,8 +3,7 @@
 // channels of the account. Each page / Instagram account belongs to one account only (webhooks are routed
 // by its id). Monthly fees, if the admin set prices, come from the wallet (channels/channel.billing.js).
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const logger = require('../../utils/logger');
 const graph = require('./social.graph');
 const channelBilling = require('../channels/channel.billing');

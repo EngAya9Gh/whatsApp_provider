@@ -11,8 +11,7 @@
  *   messaging_handovers   value.{sender.phone_number, recipient.phone_number_id, control_passed | control_taken}
  *                         control_passed = the agent handed the conversation to us (the team must answer)
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const logger = require('../../utils/logger');
 const socketService = require('../../services/socket.service');
 const ChatThread = require('../../models/mongo/ChatThread');

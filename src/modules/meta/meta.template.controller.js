@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const metaTemplateService = require('./meta.template.service');
 const logger = require('../../utils/logger');
 

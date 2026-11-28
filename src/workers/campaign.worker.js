@@ -1,7 +1,6 @@
 const { Queue, Worker } = require('bullmq');
 const Redis = require('ioredis');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 const messageService = require('../modules/message/message.service');
 const fs = require('fs');
 const logger = require('../utils/logger');

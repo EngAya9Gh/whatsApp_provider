@@ -1,9 +1,8 @@
 const sessionManager = require('./session.manager');
 const logger = require('../../utils/logger');
-const { PrismaClient } = require('@prisma/client');
 const { generateWAMessageFromContent, proto, prepareWAMessageMedia } = require('@whiskeysockets/baileys');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 function formatPhoneOrGroup(phone) {
   if (!phone) return phone;

@@ -1,10 +1,9 @@
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
 const AiAgent = require('../../models/mongo/AiAgent');
 const ChatFlow = require('../../models/mongo/ChatFlow');
 const aiClient = require('./ai.client');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 const MAX_KNOWLEDGE_CHARS = 40000;
 const MAX_ENTRIES = 60;

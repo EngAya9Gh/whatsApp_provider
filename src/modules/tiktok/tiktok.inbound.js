@@ -2,8 +2,7 @@
 // common shape (chat.service receiveMessage) on the conversation "tt:<conversation id>" of the TikTok
 // channel whose account it was sent to (user_openid = the channel's externalId). Our own sends come back as
 // "im_send_msg" and are skipped, like Instagram echoes.
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const logger = require('../../utils/logger');
 
 const parse = (content) => {

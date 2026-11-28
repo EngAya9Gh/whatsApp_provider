@@ -1,8 +1,7 @@
 // AI usage reports from the ai_usage rows that ai.client.js writes for every Gemini answer.
 // Only recording for now: nothing is blocked. The estimated cost uses the per-million-token prices an
 // admin enters in Settings (Google's price list for the model), and only counts the shared platform key.
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 const FEATURES = ['agent_reply', 'suggest_reply', 'chat_summary', 'ticket_summary', 'stage_suggestion', 'other'];
 

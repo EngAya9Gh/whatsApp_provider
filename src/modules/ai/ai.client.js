@@ -1,7 +1,6 @@
 const axios = require('axios');
-const { PrismaClient } = require('@prisma/client');
 const logger = require('../../utils/logger');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 // Google's stable Flash model; override with GEMINI_MODEL when Google moves on again
 const DEFAULT_MODEL = 'gemini-3.6-flash';

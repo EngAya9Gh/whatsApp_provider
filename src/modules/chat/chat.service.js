@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const metaService = require('../meta/meta.service');
 const channelSender = require('../channels/channel.sender');
 const { capabilitiesOf, replyWindow } = require('../channels/channel.kinds');

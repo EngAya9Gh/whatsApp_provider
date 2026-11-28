@@ -2,10 +2,9 @@ const whatsappService = require('../whatsapp/whatsapp.service');
 const metaService = require('../meta/meta.service');
 const { metaErrorText } = require('../meta/meta.errors');
 const billingService = require('../billing/billing.service');
-const { PrismaClient } = require('@prisma/client');
 const logger = require('../../utils/logger');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 class MessageService {
   async _getChannel(channelId) {

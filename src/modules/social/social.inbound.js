@@ -1,7 +1,6 @@
 // Instagram / Messenger webhooks → Live Chat. Each messaging event becomes a customer message in the
 // common shape (chat.service receiveMessage), on the conversation "fb:<id>" / "ig:<id>" of the channel.
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const logger = require('../../utils/logger');
 const ChatThread = require('../../models/mongo/ChatThread');
 const graph = require('./social.graph');

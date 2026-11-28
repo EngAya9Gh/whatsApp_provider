@@ -1,10 +1,9 @@
 const { redisClient } = require('../../config/redis');
 const whatsappService = require('../whatsapp/whatsapp.service');
 const billingService = require('../billing/billing.service');
-const { PrismaClient } = require('@prisma/client');
 const logger = require('../../utils/logger');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 class OTPService {
   async sendOTP(tenantId, phone) {

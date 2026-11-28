@@ -1,11 +1,10 @@
 const { Queue } = require('bullmq');
 const mongoose = require('mongoose');
-const { PrismaClient } = require('@prisma/client');
 const config = require('../../config/env');
 const { redisClient, bullConnection } = require('../../config/redis');
 const { role } = require('../../config/processRole');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 // The background queues and what they carry
 const QUEUES = [

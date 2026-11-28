@@ -1,7 +1,6 @@
 const logger = require('../../utils/logger');
-const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'wakeel_meta_secret_1234';
 // Secret of the platform's own Meta app (signs webhooks of Embedded Signup channels)

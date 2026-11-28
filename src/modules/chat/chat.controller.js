@@ -2,8 +2,7 @@ const chatService = require('./chat.service');
 const { memberKey } = require('../../middleware/auth.middleware');
 const accessService = require('../workforce/access.service');
 const logger = require('../../utils/logger');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 class ChatController {
   async getQuickReplies(req, res, next) {
@@ -166,9 +165,6 @@ class ChatController {
         return res.status(400).json({ success: false, message: 'channelId is required' });
       }
 
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-      
       const channel = await prisma.whatsAppChannel.findUnique({
         where: { id: channelId }
       });

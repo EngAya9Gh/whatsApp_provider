@@ -1,8 +1,7 @@
 // Team tasks: follow-ups with a due time and a person in charge, optionally on a Live Chat conversation.
 // People are 'owner' or a sub-user id. The owner and ADMIN / MANAGER members see every task; an AGENT sees
 // the tasks given to them or created by them.
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 const bad = (message, status = 400) => ({ status, message });
 const LIMIT = 300;

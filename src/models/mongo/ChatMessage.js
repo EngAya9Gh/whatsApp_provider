@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const ChatMessageSchema = new mongoose.Schema({
-  threadId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatThread', required: true, index: true },
+  threadId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatThread', required: true },
   direction: { type: String, enum: ['INBOUND', 'OUTBOUND'], required: true },
   type: { type: String, default: 'TEXT' }, 
   content: { type: String },
@@ -33,5 +33,10 @@ const ChatMessageSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'chat_messages'
 });
+
+// A conversation's messages newest first (the chat's pages, the AI's context, flows). Replaces the
+// index on threadId alone, which this one also serves; a database that has the old `threadId_1`
+// index keeps it until someone drops it.
+ChatMessageSchema.index({ threadId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('ChatMessage', ChatMessageSchema);

@@ -230,6 +230,7 @@ model CampaignTarget {
 
   @@index([campaignId], map: "campaign_targets_campaign_id_fkey")
   @@index([campaignId, status], map: "campaign_targets_campaign_status_idx")
+  @@index([phone], map: "campaign_targets_phone_idx") // a customer's reply is matched to the campaign that messaged them
   @@map("campaign_targets")
 }
 

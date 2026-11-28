@@ -3,8 +3,7 @@
 // token lasts one day and is renewed with the refresh token (one year) right before it is needed.
 // The channel is listed, billed and disconnected like Instagram and Messenger (social/social.service.js).
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const logger = require('../../utils/logger');
 const api = require('./tiktok.api');
 

@@ -176,8 +176,7 @@ class AdminController {
 
   async updateWalletBalance(req, res, next) {
     try {
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
+      const prisma = require('../../config/prisma');
       const walletService = require('../wallet/wallet.service');
 
       const { amount, action, note } = req.body; // action: 'ADD', 'SET', 'DEDUCT'

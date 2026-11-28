@@ -1,8 +1,8 @@
 // Coupons on subscription invoices. There is no payment gateway: subscriptions are paid by bank transfer and
 // invoices are issued by the admin, so a coupon is applied to an unpaid invoice — it gets a discount line,
 // and its VAT and total are recalculated. One coupon per invoice, and each account uses a coupon once.
-const { PrismaClient, Prisma } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { Prisma } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 
 const PLANS = ['FREE', 'STARTER', 'ADVANCED', 'PRO', 'ENTERPRISE'];
 const OPEN_STATUSES = ['UNPAID', 'PENDING'];

@@ -1,8 +1,7 @@
 // Monthly AI quota on the shared platform key (GEMINI_API_KEY), counted in tokens (input + output).
 // Set per plan by the admin (system settings → aiQuotaByPlan), or for one account (customFeatures.aiQuota).
 // No number = no limit (the default). An account with its own Gemini key is never limited: it pays Google.
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 const PLANS = ['FREE', 'STARTER', 'ADVANCED', 'PRO', 'ENTERPRISE'];
 

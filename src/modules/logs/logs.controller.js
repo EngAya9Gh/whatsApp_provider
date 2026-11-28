@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
 const logger = require('../../utils/logger');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 class LogsController {
   async getLogs(req, res, next) {

@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const Team = require('../../models/mongo/Team');
 
 const MODES = ['ROUND_ROBIN', 'LEAST_BUSY', 'MANUAL'];

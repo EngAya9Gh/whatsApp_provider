@@ -1,10 +1,9 @@
-const { PrismaClient } = require('@prisma/client');
 const fs = require('fs');
 const csv = require('csv-parser');
 const xlsx = require('xlsx');
 const path = require('path');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 class ContactService {
   // ─── Contact Groups ─────────────────────────────────────────────────────────

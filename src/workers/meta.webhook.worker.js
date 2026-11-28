@@ -1,10 +1,9 @@
 const { Queue, Worker } = require('bullmq');
-const { PrismaClient } = require('@prisma/client');
 const logger = require('../utils/logger');
 const { bullConnection } = require('../config/redis');
 const { runsBackground } = require('../config/processRole');
 
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 
 /**
  * Meta Webhook Queue — ensures webhook events are never lost.
@@ -77,12 +76,25 @@ async function processIncomingMessage(channelId, tenantId, payload) {
     buttonId = msg.button?.payload || msg.button?.text || null;
     buttonText = msg.button?.text || msg.button?.payload || null;
   }
+  // The campaign that last messaged this customer, for its reply analytics. Target phones are stored as
+  // digits (campaign.audience.js; older rows may start with "+"), so an exact match uses the phone index.
+  // A "contains" search read the whole table, and did so up to three times per incoming message.
+  let targetLookup = null;
+  const latestTarget = () => {
+    if (!targetLookup) {
+      targetLookup = prisma.campaignTarget.findFirst({
+        where: { phone: { in: [from, `+${from}`] }, campaign: { tenantId } },
+        orderBy: { sentAt: 'desc' }
+      }).catch(() => null);
+    }
+    return targetLookup;
+  };
   if (buttonId) {
-    const target = await prisma.campaignTarget.findFirst({ where: { phone: { contains: from }, campaign: { tenantId } }, orderBy: { id: 'desc' } }).catch(() => null);
+    const target = await latestTarget();
     await prisma.buttonInteraction.create({ data: { tenantId, campaignId: target ? target.campaignId : 'UNKNOWN', campaignTargetId: target?.id || null, phone: from, buttonId, buttonText, interactionType: 'BUTTON' } }).catch(() => {});
   } else if (msg.type === 'text') {
     incomingText = msg.text.body;
-    const target = await prisma.campaignTarget.findFirst({ where: { phone: { contains: from }, campaign: { tenantId } }, orderBy: { id: 'desc' } }).catch(() => null);
+    const target = await latestTarget();
     if (target) {
       await prisma.buttonInteraction.create({ data: { tenantId, campaignId: target.campaignId, campaignTargetId: target.id, phone: from, buttonId: 'TEXT_REPLY', buttonText: incomingText.substring(0, 200), interactionType: 'TEXT' } }).catch(() => {});
     }
@@ -94,7 +106,7 @@ async function processIncomingMessage(channelId, tenantId, payload) {
     const channelRecord = await prisma.whatsAppChannel.findUnique({ where: { id: channelId } }).catch(() => null);
     if (channelRecord) {
       const rules = await prisma.autoResponder.findMany({ where: { tenantId, isActive: true, OR: [{ channelId }, { channelId: null }, { allChannels: true }] } }).catch(() => []);
-      const target = await prisma.campaignTarget.findFirst({ where: { phone: { contains: from }, campaign: { tenantId } }, orderBy: { id: 'desc' } }).catch(() => null);
+      const target = await latestTarget();
       // Same rule choice as the other channels (chatbot/autoReply.js); WhatsApp can also answer with templates and files
       const rule = require('../modules/chatbot/autoReply').pickRule(rules, textForBot, { campaignId: target?.campaignId || null });
       if (rule) {

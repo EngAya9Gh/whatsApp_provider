@@ -123,8 +123,7 @@ router.delete('/channel/:channelId/meta-templates/:templateName', canWriteTempla
 // Upload media to Meta servers and get a media handle for use in header examples
 router.post('/channel/:channelId/upload-media', canUploadMedia, uploadTmp.single('file'), async (req, res, next) => {
   try {
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
+    const prisma = require('../../config/prisma');
     const metaService = require('./meta.service');
     const channel = await prisma.whatsAppChannel.findFirst({
       where: { id: req.params.channelId, tenantId: req.tenant.id, providerType: 'META_CLOUD' }
@@ -175,8 +174,7 @@ router.post('/channel/:channelId/header-media', canSendTemplateMedia, uploadTmp.
   const fs = require('fs');
   const removeTmp = () => { if (req.file?.path) fs.promises.unlink(req.file.path).catch(() => {}); };
   try {
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
+    const prisma = require('../../config/prisma');
     const metaService = require('./meta.service');
     const { checkUpload } = require('./meta.templateMedia');
     const channel = await prisma.whatsAppChannel.findFirst({

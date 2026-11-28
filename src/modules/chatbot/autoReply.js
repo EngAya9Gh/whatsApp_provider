@@ -1,8 +1,7 @@
 // Keyword auto-replies («الرد الآلي»): which rule answers a customer's text, shared by every channel.
 // WhatsApp numbers reply from the Meta webhook worker (templates, media); the website widget, Instagram
 // and Messenger reply here, through Live Chat (texts and media links; templates are WhatsApp-only).
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const logger = require('../../utils/logger');
 
 const matches = (rule, text) => {

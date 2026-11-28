@@ -1,6 +1,5 @@
 const axios = require('axios');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const { metaErrorInfo, metaErrorText } = require('./meta.errors');
 const coexistence = require('./meta.coexistence');
 const metaAgent = require('./meta.agent');

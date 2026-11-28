@@ -1,8 +1,7 @@
 // "Set up your account" checklist on the dashboard home: each step is ticked from the account's own data,
 // so it stays right without the customer marking anything. Steps carry the feature they need; the dashboard
 // hides the ones the plan does not include.
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 const STEPS = ['connect', 'contacts', 'team', 'hours', 'aiAgent', 'firstMessage'];
 

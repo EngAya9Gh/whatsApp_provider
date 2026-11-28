@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 const TYPES = {
   TOP_UP: 'TOP_UP',                     // money added (admin top-up)

@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const Shift = require('../../models/mongo/Shift');
 const ShiftAssignment = require('../../models/mongo/ShiftAssignment');
 const ChatSettings = require('../../models/mongo/ChatSettings');

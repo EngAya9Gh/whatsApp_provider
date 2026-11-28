@@ -15,8 +15,7 @@
  *     history:  { requestId, requestedAt, error, lastAttemptAt, declined, progress, completedAt } }
  */
 const axios = require('axios');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const logger = require('../../utils/logger');
 const { metaErrorInfo, metaErrorText } = require('./meta.errors');
 const socketService = require('../../services/socket.service');

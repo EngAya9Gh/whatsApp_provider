@@ -5,8 +5,7 @@
 // Prices are set by the admin (Settings → Channel prices, SAR per month); no price = free. The fee is
 // charged when the channel is created and then every month; when the wallet does not cover it the channel
 // is stopped (UNPAID) and starts again by itself once the wallet is topped up (hourly retry, or "Renew").
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const logger = require('../../utils/logger');
 
 const PRICE_KEYS = {

@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const ChatFlow = require('../../models/mongo/ChatFlow');
 const ChatThread = require('../../models/mongo/ChatThread');
 const Team = require('../../models/mongo/Team');

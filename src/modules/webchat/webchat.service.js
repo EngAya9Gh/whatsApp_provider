@@ -2,8 +2,7 @@
 // conversation is an ordinary Live Chat conversation (address `web:<visitor id>`) with tickets, teams,
 // hours, flows and the AI agent. The widget reads the conversation through the public API (polling).
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const ChatThread = require('../../models/mongo/ChatThread');
 const ChatMessage = require('../../models/mongo/ChatMessage');
 const socketService = require('../../services/socket.service');

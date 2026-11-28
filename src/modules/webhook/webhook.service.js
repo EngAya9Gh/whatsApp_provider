@@ -1,7 +1,6 @@
 const axios = require('axios');
 const logger = require('../../utils/logger');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 class WebhookService {
   /**

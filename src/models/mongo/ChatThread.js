@@ -43,5 +43,9 @@ const ChatThreadSchema = new mongoose.Schema({
 
 // Compound index for finding unique thread per contact
 ChatThreadSchema.index({ tenantId: 1, channelId: 1, contactPhone: 1 }, { unique: true });
+// The inbox: an account's conversations newest first, for all numbers or one (chat.service.js getThreads).
+// Without these MongoDB read every conversation of the account and sorted them in memory on each open.
+ChatThreadSchema.index({ tenantId: 1, lastMessageAt: -1 });
+ChatThreadSchema.index({ tenantId: 1, channelId: 1, lastMessageAt: -1 });
 
 module.exports = mongoose.model('ChatThread', ChatThreadSchema);

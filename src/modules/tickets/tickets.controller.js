@@ -1,7 +1,6 @@
 const ticketsService = require('./tickets.service');
 const accessService = require('../workforce/access.service');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const logger = require('../../utils/logger');
 
 const STATUSES = ['OPEN', 'PENDING', 'RESOLVED', 'CLOSED'];

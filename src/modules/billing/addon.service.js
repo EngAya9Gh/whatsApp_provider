@@ -3,8 +3,7 @@
 // account's ACTIVE add-ons. Add-on prices (SAR per month, before VAT) are set by the admin in Settings; no price
 // = not for sale. Buying creates an invoice for the rest of this month + VAT; the add-on turns on when the
 // invoice is marked paid, and stays until an admin cancels it.
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 const KINDS = {
   USERS: { priceKey: 'addonUserPrice', planKey: 'maxUsers', ar: 'موظف إضافي', en: 'Extra team member' },

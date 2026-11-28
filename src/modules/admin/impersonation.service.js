@@ -4,11 +4,10 @@
 // Changes made during the session are listed on it (the first MAX_ACTIONS); the password, email and API keys
 // cannot be changed.
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
 const config = require('../../config/env');
 const logger = require('../../utils/logger');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const SESSION_MINUTES = 30;
 const MAX_ACTIONS = 300;
 

@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
 const crypto = require('crypto');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 
 class ApiKeyService {
   async generateKey(tenantId, label) {

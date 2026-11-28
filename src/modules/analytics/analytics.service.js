@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
 const { LIVE_CHAT_PROVIDERS } = require('../channels/channel.kinds');
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const ChatThread = require('../../models/mongo/ChatThread');
 const ChatMessage = require('../../models/mongo/ChatMessage');
 const ChatTag = require('../../models/mongo/ChatTag');

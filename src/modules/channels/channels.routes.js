@@ -1,11 +1,10 @@
 // The tenant's Live Chat channels of every kind (WhatsApp numbers, website widgets), for the pages that
 // work per channel: Live Chat, teams and shifts, working hours, team members' channel
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { authMiddleware } = require('../../middleware/auth.middleware');
 const { LIVE_CHAT_PROVIDERS } = require('./channel.kinds');
 
-const prisma = new PrismaClient();
+const prisma = require('../../config/prisma');
 const router = express.Router();
 router.use(authMiddleware);
 
