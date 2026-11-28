@@ -368,10 +368,14 @@ class AdminService {
   }
 
   async updateSystemSettings(data) {
+    // Merged over what is stored: the pages that save a part of the settings (the Settings page, AI
+    // quotas, the referral reward) must not wipe each other's keys
+    const current = await prisma.systemSetting.findUnique({ where: { id: 'GLOBAL' } });
+    const merged = { ...(current?.data || {}), ...(data || {}) };
     return prisma.systemSetting.upsert({
       where: { id: 'GLOBAL' },
-      update: { data },
-      create: { id: 'GLOBAL', data }
+      update: { data: merged },
+      create: { id: 'GLOBAL', data: merged }
     });
   }
 

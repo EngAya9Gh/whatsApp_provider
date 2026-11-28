@@ -274,4 +274,16 @@ class WhatsAppService {
   }
 }
 
-module.exports = new WhatsAppService();
+const service = new WhatsAppService();
+
+// In a process that does not hold the sessions (PROCESS_ROLE=api with QR_SESSIONS=remote) every call on
+// them runs in the sessions process (session.rpc.js). getStatus reads the database and stays local.
+const { runsSessions } = require('../../config/processRole');
+if (!runsSessions) {
+  const sessionRpc = require('./session.rpc');
+  for (const method of ['connect', 'disconnect', 'getQr', 'getGroups', 'sendTextMessage', 'sendMediaMessage', 'sendButtons', 'sendList', 'sendLocation']) {
+    service[method] = (...args) => sessionRpc.call(method, args);
+  }
+}
+
+module.exports = service;

@@ -6,13 +6,14 @@
 // very paths it measures.
 const { redisClient } = require('../config/redis');
 
+// targetMs: what p95 should stay under (System health shows it in red above that; alerts fire at twice it)
 const METRICS = [
-  { name: 'webhook.handle', ar: 'استلام Webhook من ميتا ووضعه في الطابور', en: 'Meta webhook: received and queued' },
-  { name: 'inbound.wait', ar: 'رسالة واردة: الانتظار في الطابور', en: 'Incoming message: queue wait' },
-  { name: 'inbound.total', ar: 'رسالة واردة: من ميتا حتى شاشة الموظف', en: 'Incoming message: Meta → agent screen' },
-  { name: 'status.total', ar: 'حالة تسليم: من ميتا حتى تحديثها', en: 'Delivery status: Meta → updated' },
-  { name: 'inbox.list', ar: 'فتح قائمة المحادثات', en: 'Opening the inbox' },
-  { name: 'inbox.messages', ar: 'فتح محادثة', en: 'Opening a conversation' }
+  { name: 'webhook.handle', ar: 'استلام Webhook من ميتا ووضعه في الطابور', en: 'Meta webhook: received and queued', targetMs: 500 },
+  { name: 'inbound.wait', ar: 'رسالة واردة: الانتظار في الطابور', en: 'Incoming message: queue wait', targetMs: 1000 },
+  { name: 'inbound.total', ar: 'رسالة واردة: من ميتا حتى شاشة الموظف', en: 'Incoming message: Meta → agent screen', targetMs: 2000 },
+  { name: 'status.total', ar: 'حالة تسليم: من ميتا حتى تحديثها', en: 'Delivery status: Meta → updated', targetMs: 3000 },
+  { name: 'inbox.list', ar: 'فتح قائمة المحادثات', en: 'Opening the inbox', targetMs: 300 },
+  { name: 'inbox.messages', ar: 'فتح محادثة', en: 'Opening a conversation', targetMs: 300 }
 ];
 const WINDOW_MINUTES = 5;
 const KEEP_SECONDS = 15 * 60;

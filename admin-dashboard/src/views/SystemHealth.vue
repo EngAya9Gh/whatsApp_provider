@@ -47,9 +47,9 @@
                 <td class="td font-medium text-slate-800">{{ isAr ? m.ar : m.en }}</td>
                 <td class="td text-center" dir="ltr">{{ m.count }}</td>
                 <td class="td text-center" dir="ltr">{{ m.count ? m.p50 : '—' }}</td>
-                <td class="td text-center" dir="ltr" :class="m.count && m.p95 > targetOf(m.name) ? 'text-red-600 font-bold' : ''">{{ m.count ? m.p95 : '—' }}</td>
+                <td class="td text-center" dir="ltr" :class="m.count && m.p95 > targetOf(m) ? 'text-red-600 font-bold' : ''">{{ m.count ? m.p95 : '—' }}</td>
                 <td class="td text-center" dir="ltr">{{ m.count ? m.max : '—' }}</td>
-                <td class="td text-center text-slate-400" dir="ltr">{{ targetOf(m.name) }}</td>
+                <td class="td text-center text-slate-400" dir="ltr">{{ targetOf(m) }}</td>
               </tr>
             </tbody>
           </table>
@@ -165,9 +165,8 @@ const isAr = computed(() => locale.value === 'ar')
 
 const health = ref(null)
 const loading = ref(false)
-// What each path should stay under at p95 (ms); above it the number turns red
-const TARGETS = { 'webhook.handle': 500, 'inbound.wait': 1000, 'inbound.total': 2000, 'status.total': 3000, 'inbox.list': 300, 'inbox.messages': 300 }
-const targetOf = (name) => TARGETS[name] || 1000
+// What each path should stay under at p95 (ms, from services/metrics.js); above it the number turns red
+const targetOf = (m) => m.targetMs || 1000
 const windowMinutes = computed(() => health.value?.latency?.[0]?.windowMinutes || 5)
 const error = ref('')
 let timer = null
@@ -207,7 +206,8 @@ const evictionOk = computed(() => !health.value?.redis?.evictionPolicy || health
 const roleLabel = computed(() => ({
   all: isAr.value ? 'عملية واحدة (الواجهة + العمل في الخلفية)' : 'Single process (API + background)',
   api: isAr.value ? 'الواجهة فقط (العمل في الخلفية بعملية منفصلة)' : 'API only (background in a separate process)',
-  worker: isAr.value ? 'عامل الخلفية' : 'Background worker'
+  worker: isAr.value ? 'عامل الخلفية' : 'Background worker',
+  sessions: isAr.value ? 'أرقام الباركود (جلسات واتساب)' : 'QR numbers (WhatsApp sessions)'
 }[health.value?.process?.role] || health.value?.process?.role))
 
 const summary = computed(() => {
@@ -224,7 +224,12 @@ const summary = computed(() => {
 
 const queueWarning = (q) => {
   if (q.error) return q.error
-  if (q.workers === 0 && q.name !== 'campaign-queue') return isAr.value ? 'لا يوجد عامل يعالج هذا الطابور. هل عملية العامل (wakeel-worker) تعمل؟' : 'No worker is handling this queue. Is the worker process running?'
+  if (q.name === 'wa-session-rpc') {
+    // Expected to have a worker only when the QR numbers run in the whatsapp-sessions process
+    if (health.value?.process?.qrSessionsRemote && q.workers === 0) return isAr.value ? 'لا تجيب عملية الجلسات. هل whatsapp-sessions تعمل؟' : 'The sessions process is not answering. Is whatsapp-sessions running?'
+    return ''
+  }
+  if (q.workers === 0 && q.name !== 'campaign-queue') return isAr.value ? 'لا يوجد عامل يعالج هذا الطابور. هل عملية العامل (whatsapp-worker) تعمل؟' : 'No worker is handling this queue. Is the worker process (whatsapp-worker) running?'
   if (q.paused) return isAr.value ? 'الطابور متوقف مؤقتاً' : 'The queue is paused'
   return ''
 }

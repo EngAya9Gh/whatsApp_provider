@@ -94,6 +94,13 @@ class SocketService {
     logger.info(`Emitted '${event}' to room '${room}'`);
   }
 
+  /** An event to one room by name (QR session events: tenant_X:settings for the QR itself, tenant_X for status) */
+  emitToRoom(room, event, data) {
+    const out = this._out();
+    if (!out) return;
+    out.to(room).emit(event, data);
+  }
+
   emitToMember(tenantId, memberKey, event, data) {
     const out = this._out();
     if (!out) return;

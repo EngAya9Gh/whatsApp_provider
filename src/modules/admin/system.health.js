@@ -11,7 +11,9 @@ const prisma = require('../../config/prisma');
 const QUEUES = [
   { name: 'meta-webhook-queue', ar: 'رسائل العملاء الواردة من Meta', en: 'Incoming Meta messages' },
   { name: 'meta-campaign-queue', ar: 'حملات Meta', en: 'Meta campaigns' },
-  { name: 'campaign-queue', ar: 'حملات الربط بالباركود', en: 'QR campaigns' }
+  { name: 'campaign-queue', ar: 'حملات الربط بالباركود', en: 'QR campaigns' },
+  // Has a worker only when the QR numbers run in their own process (QR_SESSIONS=remote)
+  { name: 'wa-session-rpc', ar: 'أوامر أرقام الباركود (من الواجهة إلى عملية الجلسات)', en: 'QR number calls (api → sessions process)' }
 ];
 const queues = new Map(); // one read-only Queue object per name, reused between calls
 
@@ -116,6 +118,8 @@ async function getHealth() {
     latency,
     process: {
       role,
+      // true: the QR numbers live in the whatsapp-sessions process, so 'wa-session-rpc' needs a worker
+      qrSessionsRemote: process.env.QR_SESSIONS === 'remote',
       pid: process.pid,
       uptimeSeconds: Math.round(process.uptime()),
       memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024),

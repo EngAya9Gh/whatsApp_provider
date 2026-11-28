@@ -4,6 +4,7 @@ const pino = require('pino');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../../utils/logger');
+const socketService = require('../../services/socket.service');
 
 const prisma = require('../../config/prisma');
 const SESSIONS_DIR = path.join(__dirname, '../../../sessions');
@@ -18,11 +19,9 @@ class SessionManager {
     this.sessions = new Map(); // tenantId -> sock
     this.qrs = new Map(); // tenantId -> latest qr
     this.reconnectAttempts = new Map(); // tenantId -> attempt count
-    this.io = null; // Socket.io instance for emitting QR codes
-  }
-
-  setIo(ioInstance) {
-    this.io = ioInstance;
+    // Dashboard events (the QR, connection status, button replies) go through socket.service: this
+    // process's Socket.io server, or Redis when the sessions run in their own process (PROCESS_ROLE=sessions)
+    this.io = { to: (room) => ({ emit: (event, data) => socketService.emitToRoom(room, event, data) }) };
   }
 
   async createSession(tenantId) {

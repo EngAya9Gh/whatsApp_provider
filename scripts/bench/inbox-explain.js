@@ -8,7 +8,6 @@ const { MongoClient } = require('mongodb');
 
 const env = (name, fallback) => (process.env[name] === undefined || process.env[name] === '' ? fallback : process.env[name]);
 const MONGO_URI = env('MONGO_URI');
-const TENANT_ID = env('TENANT_ID', 'bench');
 const CREATE = process.argv.includes('--create-indexes');
 const LIMIT = 50;
 
@@ -74,20 +73,27 @@ async function explain(label, cursor) {
     }
   }
 
-  const sample = await threads.findOne({ tenantId: TENANT_ID }, { sort: { lastMessageAt: -1 } });
+  // Without TENANT_ID: the account with the most conversations
+  let tenantId = process.env.TENANT_ID;
+  if (!tenantId) {
+    const [top] = await threads.aggregate([{ $group: { _id: '$tenantId', n: { $sum: 1 } } }, { $sort: { n: -1 } }, { $limit: 1 }]).toArray();
+    tenantId = top?._id;
+  }
+  const sample = tenantId && await threads.findOne({ tenantId }, { sort: { lastMessageAt: -1 } });
   if (!sample) {
-    console.error(`No conversations of account ${TENANT_ID} in ${db.databaseName}: run seed-inbox.js first, or set TENANT_ID.`);
+    console.error(`No conversations${tenantId ? ` of account ${tenantId}` : ''} in ${db.databaseName}: run seed-inbox.js first, or set TENANT_ID.`);
     process.exit(1);
   }
-  const total = await threads.countDocuments({ tenantId: TENANT_ID });
-  console.log(`\nDatabase ${db.databaseName}, account ${TENANT_ID}: ${total} conversations. Existing indexes:`);
+  const total = await threads.countDocuments({ tenantId });
+  console.log(`\nDatabase ${db.databaseName}: ${await threads.estimatedDocumentCount()} conversations and ${await messages.estimatedDocumentCount()} messages in all.`);
+  console.log(`Account ${tenantId}: ${total} conversations. Existing indexes:`);
   console.log('  chat_threads:  ' + (await threads.indexes()).map(i => i.name).join(', '));
   console.log('  chat_messages: ' + (await messages.indexes()).map(i => i.name).join(', '));
 
   const rows = [
-    await explain('inbox list, all numbers', threads.find({ tenantId: TENANT_ID }).sort({ lastMessageAt: -1 }).limit(LIMIT)),
-    await explain('inbox list, one number', threads.find({ tenantId: TENANT_ID, channelId: sample.channelId }).sort({ lastMessageAt: -1 }).limit(LIMIT)),
-    await explain('inbox list, page 20', threads.find({ tenantId: TENANT_ID }).sort({ lastMessageAt: -1 }).skip(19 * LIMIT).limit(LIMIT)),
+    await explain('inbox list, all numbers', threads.find({ tenantId }).sort({ lastMessageAt: -1 }).limit(LIMIT)),
+    await explain('inbox list, one number', threads.find({ tenantId, channelId: sample.channelId }).sort({ lastMessageAt: -1 }).limit(LIMIT)),
+    await explain('inbox list, page 20', threads.find({ tenantId }).sort({ lastMessageAt: -1 }).skip(19 * LIMIT).limit(LIMIT)),
     await explain('one conversation, messages', messages.find({ threadId: sample._id }).sort({ createdAt: -1 }).limit(LIMIT)),
     await explain('one conversation, count', messages.find({ threadId: sample._id }))
   ];

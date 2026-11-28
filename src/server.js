@@ -7,7 +7,7 @@ const { Server } = require('socket.io');
 const sessionManager = require('./modules/whatsapp/session.manager');
 const socketService = require('./services/socket.service');
 const connectMongo = require('./config/mongo');
-const { role, runsBackground } = require('./config/processRole');
+const { role, runsBackground, runsSessions } = require('./config/processRole');
 
 const server = http.createServer(app);
 
@@ -18,7 +18,6 @@ const io = new Server(server, {
     methods: ['GET', 'POST']
   }
 });
-sessionManager.setIo(io);
 socketService.init(io);
 
 // Only authenticated dashboard users get a socket; the token decides which rooms they join
@@ -38,8 +37,9 @@ const startServer = async () => {
     await Promise.all([pubClient.connect(), subClient.connect()]);
     io.adapter(createAdapter(pubClient, subClient));
 
-    // Restore existing WhatsApp sessions
-    await sessionManager.restoreAllSessions();
+    // Restore the WhatsApp QR sessions, unless a separate sessions process holds them (QR_SESSIONS=remote)
+    if (runsSessions) await sessionManager.restoreAllSessions();
+    else logger.info('WhatsApp QR sessions run in the sessions process (src/sessions.js)');
 
     // Initialize default plans
     const planService = require('./modules/plan/plan.service');
@@ -59,6 +59,9 @@ const startServer = async () => {
       // Campaign completion + refunds of failed messages
       require('./services/campaignBillingScheduler').start();
       require('./services/channelBillingScheduler').start();
+      // Old rows out once a day; platform checks every minute (services/alertScheduler.js)
+      require('./services/retentionScheduler').start();
+      require('./services/alertScheduler').start();
       // Meta campaigns go out in waves per WhatsApp number
       require('./modules/campaign/campaign.dispatcher').start();
     }
@@ -83,6 +86,8 @@ const shutdown = () => {
     ticketScheduler.stop();
     require('./services/campaignBillingScheduler').stop();
     require('./services/channelBillingScheduler').stop();
+    require('./services/retentionScheduler').stop();
+    require('./services/alertScheduler').stop();
     if (runsBackground) require('./modules/campaign/campaign.dispatcher').stop();
   } catch (e) {}
 

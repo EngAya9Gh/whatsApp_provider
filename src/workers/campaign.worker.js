@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
 
 // Setup Redis Connection (same settings as the rest of the app, password included)
 const { bullConnection } = require('../config/redis');
-const { servesHttp } = require('../config/processRole');
+const { runsSessions } = require('../config/processRole');
 const connection = new Redis(bullConnection);
 
 // Initialize Queue
@@ -116,8 +116,8 @@ async function processJob(job) {
   }
 }
 
-// QR campaigns send through the WhatsApp sessions, which live in the API process (PROCESS_ROLE all / api)
-const campaignWorker = servesHttp
+// QR campaigns send through the WhatsApp sessions, so they run in the process that holds them (processRole.js)
+const campaignWorker = runsSessions
   ? new Worker('campaign-queue', processJob, { connection, concurrency: 1 }) // one by one
   : null;
 

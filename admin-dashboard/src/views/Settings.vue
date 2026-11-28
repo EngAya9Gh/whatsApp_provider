@@ -240,6 +240,30 @@
             <p class="text-xs text-slate-500 mt-2">Empty = free. Charged from the tenant's wallet when the channel is created, then every month (hourly check). A channel the wallet cannot pay for stops, and starts again by itself after a top-up. Nothing is charged to accounts with wallet deduction off. Every charge shows its channel in the tenant's wallet history.</p>
           </div>
 
+          <!-- Data retention (services/retentionScheduler.js): old rows are deleted once a day; empty = keep forever -->
+          <div class="p-4 border border-slate-100 rounded-lg bg-slate-50/50">
+            <h4 class="font-bold text-slate-800 mb-3 text-sm">Data retention (الاحتفاظ بالبيانات) — days; empty = keep forever</h4>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Message send logs (سجل الرسائل المرسلة من API وصفحة الإرسال)</label>
+                <input v-model="form.retentionMessageLogsDays" type="number" step="1" min="1" placeholder="Keep forever" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">AI request records (سجل طلبات الذكاء الاصطناعي)</label>
+                <input v-model="form.retentionAiUsageDays" type="number" step="1" min="1" placeholder="Keep forever" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Chat messages (رسائل المحادثات) — the conversations stay, only older messages go</label>
+                <input v-model="form.retentionChatMessagesDays" type="number" step="1" min="1" placeholder="Keep forever" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Campaign delivery ticks (حالات تسليم رسائل الحملات) — keep at least 30 (refunds need 14, chats show them for 30)</label>
+                <input v-model="form.retentionCampaignDeliveriesDays" type="number" step="1" min="30" placeholder="90" class="w-full bg-white border border-slate-200 text-slate-900 text-sm rounded-lg block p-2 outline-none font-mono" />
+              </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">Deleted once a day in small batches by the worker process. Usage counters, invoices, campaign totals and wallet history are never touched.</p>
+          </div>
+
           <!-- AI (Gemini) prices, for the AI usage page -->
           <div class="p-4 border border-slate-100 rounded-lg bg-slate-50/50">
             <h4 class="font-bold text-slate-800 mb-3 text-sm">AI (Gemini) prices — shared key</h4>
@@ -331,7 +355,11 @@ const form = ref({
   channelPriceWebchat: '',
   channelPriceInstagram: '',
   channelPriceMessenger: '',
-  channelPriceTiktok: ''
+  channelPriceTiktok: '',
+  retentionMessageLogsDays: '',
+  retentionAiUsageDays: '',
+  retentionChatMessagesDays: '',
+  retentionCampaignDeliveriesDays: 90
 })
 
 const fetchSettings = async () => {
@@ -370,6 +398,10 @@ const saveSettings = async () => {
     // Empty AI prices stay empty (the AI usage page then shows no cost)
     for (const k of ['aiInputPricePerMillionUsd', 'aiOutputPricePerMillionUsd', 'addonUserPrice', 'addonNumberPrice', 'channelPriceWebchat', 'channelPriceInstagram', 'channelPriceMessenger', 'channelPriceTiktok']) {
       dataToSave[k] = dataToSave[k] === '' || dataToSave[k] === null ? null : parseFloat(dataToSave[k])
+    }
+    // Retention periods are whole days; empty = keep forever
+    for (const k of ['retentionMessageLogsDays', 'retentionAiUsageDays', 'retentionChatMessagesDays', 'retentionCampaignDeliveriesDays']) {
+      dataToSave[k] = dataToSave[k] === '' || dataToSave[k] === null ? null : parseInt(dataToSave[k], 10)
     }
 
     await axios.put('/api/admin/settings', dataToSave, {
