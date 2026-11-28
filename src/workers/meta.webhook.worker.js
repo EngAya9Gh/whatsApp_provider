@@ -208,6 +208,15 @@ async function processStatusUpdate(channelId, tenantId, payload) {
     logger.error(`[MetaWebhookWorker] Failed to update campaign delivery status:`, e.message);
   }
 
+  // The customer's own system (Developer Tools → Webhook URL, statuses on): same envelope Meta sent us
+  const channelRecord = await prisma.whatsAppChannel.findUnique({ where: { id: channelId }, select: { metaWabaId: true, metaPhoneNumberId: true } }).catch(() => null);
+  if (channelRecord) {
+    await webhookService.dispatchDeliveryStatus(tenantId, {
+      object: 'whatsapp_business_account',
+      entry: [{ id: channelRecord.metaWabaId || 'unknown', changes: [{ value: { messaging_product: 'whatsapp', metadata: { phone_number_id: channelRecord.metaPhoneNumberId }, statuses: [statusUpdate] }, field: 'messages' }] }]
+    }, 'META').catch(e => logger.error('[MetaWebhookWorker] status dispatch error', e));
+  }
+
   logger.info(`[MetaWebhookWorker] ✅ Updated status for wamid ${wamid} → ${status}`);
 }
 

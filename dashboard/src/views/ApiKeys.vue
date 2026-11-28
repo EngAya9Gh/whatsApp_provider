@@ -112,7 +112,15 @@
 
         <!-- Auth Info Banner -->
         <h2 class="text-2xl font-extrabold text-slate-900 mb-2">API Documentation</h2>
-        <p class="text-slate-500 font-medium mb-6">Full API reference for integrating WhatsApp features into your projects (CRM, ERP, custom apps, etc.).</p>
+        <p class="text-slate-500 font-medium mb-4">Full API reference for integrating WhatsApp features into your projects (CRM, ERP, custom apps, etc.).</p>
+        <div class="flex flex-wrap gap-3 mb-6">
+          <a :href="`${baseUrl}/api/docs`" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg font-bold text-sm no-underline">
+            📘 Full interactive reference (every endpoint, webhooks, errors) ↗
+          </a>
+          <a :href="`${baseUrl}/api/openapi.json`" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold text-sm no-underline">
+            ⬇ OpenAPI file for Postman / Insomnia / code generators
+          </a>
+        </div>
 
         <div class="bg-slate-900 text-slate-200 rounded-xl p-5 mb-10 flex flex-col sm:flex-row gap-4 items-start">
           <div class="shrink-0 bg-orange-500 text-white rounded-lg p-2">
@@ -283,7 +291,7 @@
         <div v-if="activeCategory === 'otp'" class="flex flex-col gap-6">
 
           <ApiEndpoint number="1" method="POST" title="Send OTP" :url="`${baseUrl}/api/v1/otp/send`">
-            <template #description>Automatically generate and send a 6-digit OTP to a phone number via WhatsApp. The OTP is valid for 10 minutes. Rate limited to prevent abuse.</template>
+            <template #description>Automatically generate and send a 6-digit OTP to a phone number via WhatsApp. The OTP is valid for 5 minutes. At most 3 codes per 15 minutes to one phone number.</template>
             <template #body>{
   "phone": "966500000000"
 }</template>
@@ -297,7 +305,7 @@
             <template #description>Verify the OTP entered by the user. Returns success if the code is valid and not expired.</template>
             <template #body>{
   "phone": "966500000000",
-  "otp": "481726"
+  "code": "481726"
 }</template>
             <template #response>{
   "success": true,
@@ -322,44 +330,62 @@
             <template #body>No request body needed. Send as GET request.
 
 Optional query params:
-  ?page=1
-  ?limit=20</template>
+  ?page=1&limit=50
+  ?search=9665        (part of the name or phone)
+  ?channelId=...      (one number only)</template>
             <template #response>{
   "success": true,
-  "data": [
-    {
-      "id": "thread_abc",
-      "customerPhone": "966500000000",
-      "customerName": "Ahmed Ali",
-      "lastMessage": "When will my order arrive?",
-      "lastMessageAt": "2025-08-20T10:00:00Z",
-      "unreadCount": 2
-    }
-  ]
+  "data": {
+    "threads": [
+      {
+        "id": "66a1f2c3d4e5f67890123456",
+        "channelId": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e",
+        "contactPhone": "966500000000",
+        "contactName": "Ahmed Ali",
+        "lastMessageAt": "2026-11-28T10:00:00.000Z",
+        "unreadCount": 2,
+        "tagIds": [],
+        "stageId": null,
+        "channel": { "id": "2d0b5d6e-...", "name": "Support line", "displayPhoneNumber": "+966 50 000 0000", "providerType": "META_CLOUD" }
+      }
+    ],
+    "pagination": { "total": 128, "page": 1, "pages": 3 }
+  }
 }</template>
           </ApiEndpoint>
 
           <ApiEndpoint number="2" method="GET" title="Get Messages in a Thread" :url="`${baseUrl}/api/v1/chat/threads/{threadId}/messages`">
             <template #description>Fetch the full message history for a specific conversation thread. Use the <code class="bg-slate-700 px-1 py-0.5 rounded text-orange-300">id</code> from the threads list.</template>
             <template #body>No request body needed. Replace {threadId} in the URL.
+Optional: ?page=1&limit=50 (newest page first; each page is returned oldest → newest).
 
-Example: GET /api/v1/chat/threads/thread_abc/messages</template>
+Example: GET /api/v1/chat/threads/66a1f2c3d4e5f67890123456/messages</template>
             <template #response>{
   "success": true,
-  "data": [
-    {
-      "id": "msg_1",
-      "content": "When will my order arrive?",
-      "direction": "INCOMING",
-      "createdAt": "2025-08-20T10:00:00Z"
-    },
-    {
-      "id": "msg_2",
-      "content": "Your order will arrive tomorrow!",
-      "direction": "OUTGOING",
-      "createdAt": "2025-08-20T10:05:00Z"
-    }
-  ]
+  "data": {
+    "messages": [
+      {
+        "id": "66a1f2c3d4e5f67890123457",
+        "direction": "INBOUND",
+        "type": "TEXT",
+        "content": "When will my order arrive?",
+        "hasMedia": false,
+        "status": null,
+        "createdAt": "2026-11-28T10:00:00.000Z"
+      },
+      {
+        "id": "66a1f2c3d4e5f67890123458",
+        "direction": "OUTBOUND",
+        "type": "TEXT",
+        "content": "Your order will arrive tomorrow!",
+        "hasMedia": false,
+        "status": "READ",
+        "metaMessageId": "wamid.HBgM...",
+        "createdAt": "2026-11-28T10:05:00.000Z"
+      }
+    ],
+    "pagination": { "total": 2, "page": 1, "pages": 1 }
+  }
 }</template>
           </ApiEndpoint>
 
@@ -368,14 +394,27 @@ Example: GET /api/v1/chat/threads/thread_abc/messages</template>
             <template #body>{
   "content": "Hello! Your order #1234 will arrive tomorrow between 2-5 PM.",
   "type": "text"
+}
+
+// With a file (upload it first with POST /api/v1/chat/upload, or use any public URL):
+{
+  "content": "Your invoice",
+  "type": "document",
+  "hasMedia": true,
+  "mediaUrl": "https://yourshop.com/invoices/INV-001.pdf",
+  "mediaMime": "application/pdf"
 }</template>
             <template #response>{
   "success": true,
   "data": {
-    "id": "msg_new_001",
+    "id": "66a1f2c3d4e5f67890123459",
+    "threadId": "66a1f2c3d4e5f67890123456",
+    "direction": "OUTBOUND",
+    "type": "TEXT",
     "content": "Hello! Your order #1234 will arrive tomorrow between 2-5 PM.",
-    "direction": "OUTGOING",
-    "createdAt": "2025-08-20T11:00:00Z"
+    "status": "SENT",
+    "metaMessageId": "wamid.HBgM...",
+    "createdAt": "2026-11-28T11:00:00.000Z"
   }
 }</template>
           </ApiEndpoint>
@@ -399,11 +438,13 @@ Example: GET /api/v1/chat/threads/thread_abc/messages</template>
   "success": true,
   "data": [
     {
-      "id": "contact_123",
+      "id": "0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b",
       "name": "Ahmed Ali",
       "phone": "966500000000",
-      "groupId": "group_abc",
-      "tags": ["VIP", "repeat-customer"]
+      "email": null,
+      "groupId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "metadata": { "customerId": "C-1001", "city": "Riyadh" },
+      "createdAt": "2026-11-28T10:00:00.000Z"
     }
   ]
 }</template>
@@ -414,8 +455,9 @@ Example: GET /api/v1/chat/threads/thread_abc/messages</template>
             <template #body>{
   "name": "Sara Mohammed",
   "phone": "966501111111",
+  "email": "sara@example.com",
   "groupId": "optional-group-id",
-  "tags": ["new-customer"]
+  "metadata": { "customerId": "C-1002" }
 }</template>
             <template #response>{
   "success": true,
@@ -431,7 +473,7 @@ Example: GET /api/v1/chat/threads/thread_abc/messages</template>
             <template #description>Update an existing contact's details. Replace <code class="bg-slate-700 px-1 py-0.5 rounded text-orange-300">{id}</code> with the contact's ID.</template>
             <template #body>{
   "name": "Sara Ahmed",
-  "tags": ["VIP", "new-customer"]
+  "metadata": { "customerId": "C-1002", "vip": true }
 }</template>
             <template #response>{
   "success": true,
@@ -492,40 +534,57 @@ Example: GET /api/v1/chat/threads/thread_abc/messages</template>
 
           <div class="border border-slate-200 rounded-xl overflow-hidden">
             <div class="bg-slate-50 px-6 py-4 border-b border-slate-200">
-              <h4 class="font-bold text-slate-800">📩 Incoming Message Event Payload</h4>
-              <p class="text-sm text-slate-500 mt-1">Sent when a customer sends you a WhatsApp message.</p>
+              <h4 class="font-bold text-slate-800">📩 Incoming Message Payload</h4>
+              <p class="text-sm text-slate-500 mt-1">Sent when a customer writes to one of your Meta Cloud numbers. The body is the message exactly as Meta's Cloud API delivers it (one message per call). Answer 200 within 5 seconds.</p>
             </div>
             <div class="p-6 bg-slate-900 text-slate-300 overflow-x-auto">
               <pre class="font-mono text-sm m-0"><code>{
-  "event": "message.incoming",
-  "tenantId": "tenant_abc",
-  "data": {
-    "messageId": "wamid.xxx",
-    "from": "966500000000",
-    "customerName": "Ahmed Ali",
-    "type": "text",
-    "content": "I need help with my order",
-    "timestamp": "2025-08-20T10:30:00Z"
-  }
+  "object": "whatsapp_business_account",
+  "entry": [{
+    "id": "102290129340398",
+    "changes": [{
+      "field": "messages",
+      "value": {
+        "metadata": { "phone_number_id": "106540352242922" },
+        "contacts": [{ "profile": { "name": "Ahmed Ali" }, "wa_id": "966500000000" }],
+        "messages": [{
+          "from": "966500000000",
+          "id": "wamid.HBgM...",
+          "timestamp": "1764320000",
+          "type": "text",
+          "text": { "body": "I need help with my order" }
+        }]
+      }
+    }]
+  }]
 }</code></pre>
             </div>
           </div>
 
           <div class="border border-slate-200 rounded-xl overflow-hidden">
             <div class="bg-slate-50 px-6 py-4 border-b border-slate-200">
-              <h4 class="font-bold text-slate-800">📊 Message Status Event Payload</h4>
-              <p class="text-sm text-slate-500 mt-1">Sent when a message status changes (sent → delivered → read).</p>
+              <h4 class="font-bold text-slate-800">📊 Message Status Payload</h4>
+              <p class="text-sm text-slate-500 mt-1">Sent when Meta reports sent → delivered → read (or failed) for a message of a Meta Cloud number. Same envelope, with <code class="text-orange-300">statuses</code> instead of <code class="text-orange-300">messages</code>; <code class="text-orange-300">statuses[0].id</code> is the <code class="text-orange-300">metaMessageId</code> you got when sending.</p>
             </div>
             <div class="p-6 bg-slate-900 text-slate-300 overflow-x-auto">
               <pre class="font-mono text-sm m-0"><code>{
-  "event": "message.status",
-  "tenantId": "tenant_abc",
-  "data": {
-    "messageId": "wamid.yyy",
-    "to": "966500000000",
-    "status": "READ",
-    "timestamp": "2025-08-20T10:35:00Z"
-  }
+  "object": "whatsapp_business_account",
+  "entry": [{
+    "id": "102290129340398",
+    "changes": [{
+      "field": "messages",
+      "value": {
+        "messaging_product": "whatsapp",
+        "metadata": { "phone_number_id": "106540352242922" },
+        "statuses": [{
+          "id": "wamid.HBgM...",
+          "status": "delivered",
+          "timestamp": "1764320060",
+          "recipient_id": "966500000000"
+        }]
+      }
+    }]
+  }]
 }</code></pre>
             </div>
           </div>
@@ -583,12 +642,12 @@ const headers = {
             </div>
             <div class="p-6 bg-slate-900 text-slate-300 overflow-x-auto">
               <pre class="font-mono text-sm m-0"><code>// GET all chat threads (conversations)
-const response = await fetch(`${BASE_URL}/api/v1/chat/threads`, { headers });
-const { data: threads } = await response.json();
+const response = await fetch(`${BASE_URL}/api/v1/chat/threads?limit=50`, { headers });
+const { data } = await response.json();
 
-// Render threads in your CRM sidebar
-threads.forEach(thread => {
-  console.log(thread.customerName, thread.lastMessage);
+// Render conversations in your CRM sidebar
+data.threads.forEach(thread => {
+  console.log(thread.contactName, thread.contactPhone, thread.unreadCount);
 });</code></pre>
             </div>
           </div>
@@ -623,15 +682,22 @@ await fetch(`${BASE_URL}/api/v1/message/send-media`, {
             <div class="p-6 bg-slate-900 text-slate-300 overflow-x-auto">
               <pre class="font-mono text-sm m-0"><code>// Your CRM backend server (Node.js example)
 app.post('/webhook/whatsapp', (req, res) => {
-  const { event, data } = req.body;
+  res.sendStatus(200); // answer first: we wait at most 5 seconds
 
-  if (event === 'message.incoming') {
-    const { from, content, customerName } = data;
-    // Create or update a ticket in your CRM
-    CRM.createTicket({ phone: from, name: customerName, message: content });
+  if (req.body.event) {
+    // client.sync / ticket.sync / ticket.rated
+    return handleCrmEvent(req.body.event, req.body.data);
   }
-
-  res.sendStatus(200);
+  // A WhatsApp Cloud API envelope: a customer's message, or a delivery status
+  const value = req.body.entry?.[0]?.changes?.[0]?.value || {};
+  const message = value.messages?.[0];
+  if (message) {
+    const name = value.contacts?.[0]?.profile?.name;
+    CRM.createTicket({ phone: message.from, name, message: message.text?.body, type: message.type });
+  }
+  for (const s of value.statuses || []) {
+    CRM.updateMessage(s.id, s.status); // sent, delivered, read, failed
+  }
 });</code></pre>
             </div>
           </div>

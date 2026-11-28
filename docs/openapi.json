@@ -1,0 +1,4495 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Wakeel API",
+    "version": "1.0.0",
+    "description": "Wakeel's API lets your own system (CRM, ERP, online shop, custom app) send WhatsApp messages, run OTP\nverification, read and answer the conversations of your inbox, keep contacts in sync and follow tickets.\n\nواجهة وكيل تتيح لنظامك (CRM أو ERP أو متجر أو تطبيق) إرسال رسائل واتساب، والتحقق برمز OTP، وقراءة محادثات\nصندوق الوارد والرد عليها، ومزامنة جهات الاتصال، ومتابعة التذاكر.\n\n## Authentication\nCreate a key on the dashboard page **API Keys**. Send it with every request:\n\n```\nAuthorization: Bearer sk_your_api_key\n```\n\nA key acts as the account owner: it reaches every number and every conversation of the account. Keep it on\nyour server, never in a browser or mobile app. A dashboard login token (JWT) is accepted on the same\nendpoints, with that person's permissions.\n\n## Numbers (channels)\nAn account can have several numbers: QR-connected numbers (the WhatsApp app scanned a code) and Meta Cloud\nAPI numbers. `GET /api/v1/channels` lists them. Sending endpoints take an optional `channelId`; without it,\nthe message goes out from the QR-connected number. Meta Cloud numbers must be named with `channelId`.\n\n## Responses and errors\nSuccess answers are JSON with `\"success\": true`. Failures carry an HTTP status and one of two bodies:\n`{\"error\": {\"message\": \"...\", \"code\": \"...\"}}` (the `code` is present for some cases, e.g.\n`REPLY_WINDOW_CLOSED`, `CHANNEL_NOT_ALLOWED`), or `{\"error\": \"...\"}` for field validation.\n\n| Status | Meaning |\n|---|---|\n| 400 | A field is missing or invalid, or the action is not possible now |\n| 401 | Missing or invalid key |\n| 402 | The plan's monthly message limit is reached |\n| 403 | The account is disabled, the feature is not in the plan, or the number is not yours |\n| 404 | Not found |\n| 429 | Rate limit: 30 messages per minute to one recipient; 3 OTPs per 15 minutes to one phone. Headers X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset and Retry-After say when to retry |\n\n## Webhooks (Wakeel calling you)\nOn the dashboard page **Developer Tools** set a Webhook URL to receive customer messages and delivery\nstatuses, and a CRM base URL + token for contact and ticket sync. The payloads are described at the end of\nthis document under **Webhooks**.",
+    "contact": {
+      "name": "Wakeel support"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.example.com",
+      "description": "This server"
+    }
+  ],
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Messages",
+      "description": "Send a message to any phone number from one of your numbers"
+    },
+    {
+      "name": "Templates",
+      "description": "Your saved message templates (text with {{variables}}, optional image or PDF) and sending them"
+    },
+    {
+      "name": "OTP",
+      "description": "One-time codes over WhatsApp: generate, send and verify"
+    },
+    {
+      "name": "Inbox",
+      "description": "Read the conversations of Live Chat and reply from your own system (needs the Live Chat feature)"
+    },
+    {
+      "name": "Contacts",
+      "description": "Contacts and contact groups (the audience of campaigns)"
+    },
+    {
+      "name": "Channels",
+      "description": "Your numbers and channels"
+    },
+    {
+      "name": "Tickets",
+      "description": "Support tickets opened on conversations"
+    }
+  ],
+  "paths": {
+    "/api/v1/message/send": {
+      "post": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Send a text message",
+        "description": "Sends a plain text message (up to 4000 characters). The message is counted in the plan's monthly quota and recorded in the Live Chat conversation of Meta Cloud numbers.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "message"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Recipient in international format without + or spaces (country code first). On QR numbers a WhatsApp group id (…@g.us) also works.",
+                    "example": "966500000000"
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "channelId": {
+                    "type": "string",
+                    "description": "Which of your numbers sends it (id from GET /api/v1/channels). Omit it to send from your QR-connected number. Meta Cloud numbers need it.",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  }
+                }
+              },
+              "example": {
+                "phone": "966500000000",
+                "message": "Your order #1234 is on its way.",
+                "channelId": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Message sent successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/QuotaExceeded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/message/send-media": {
+      "post": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Send an image or PDF by URL",
+        "description": "The file is fetched from a public URL and sent with an optional caption. QR-connected numbers only (Meta Cloud numbers: use upload-media on the dashboard, or a template with media).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "type",
+                  "url"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Recipient in international format without + or spaces (country code first). On QR numbers a WhatsApp group id (…@g.us) also works.",
+                    "example": "966500000000"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "pdf"
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "caption": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "channelId": {
+                    "type": "string",
+                    "description": "Which of your numbers sends it (id from GET /api/v1/channels). Omit it to send from your QR-connected number. Meta Cloud numbers need it.",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  }
+                }
+              },
+              "example": {
+                "phone": "966500000000",
+                "type": "pdf",
+                "url": "https://yourshop.com/invoices/INV-001.pdf",
+                "caption": "Invoice INV-001"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Media message sent successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/QuotaExceeded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/message/upload-media": {
+      "post": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Upload and send a file",
+        "description": "Same as send-media, with the file in the request (multipart, up to 10 MB) instead of a URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "phone",
+                  "type"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "Recipient in international format without + or spaces (country code first). On QR numbers a WhatsApp group id (…@g.us) also works.",
+                    "example": "966500000000"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "pdf"
+                    ]
+                  },
+                  "caption": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "channelId": {
+                    "type": "string",
+                    "description": "Which of your numbers sends it (id from GET /api/v1/channels). Omit it to send from your QR-connected number. Meta Cloud numbers need it.",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Media message sent successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/QuotaExceeded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/message/send-buttons": {
+      "post": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Send a message with buttons",
+        "description": "Text with 1 to 3 buttons. `reply` buttons send their text back when tapped; `url` buttons open a link. Also accepts multipart/form-data with an `image` file and `buttons` as a JSON string.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "text",
+                  "buttons"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Recipient in international format without + or spaces (country code first). On QR numbers a WhatsApp group id (…@g.us) also works.",
+                    "example": "966500000000"
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "buttons": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 3,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "text"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "reply",
+                            "url"
+                          ],
+                          "default": "reply"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      }
+                    }
+                  },
+                  "channelId": {
+                    "type": "string",
+                    "description": "Which of your numbers sends it (id from GET /api/v1/channels). Omit it to send from your QR-connected number. Meta Cloud numbers need it.",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  }
+                }
+              },
+              "example": {
+                "phone": "966500000000",
+                "text": "Was your issue solved?",
+                "buttons": [
+                  {
+                    "id": "yes",
+                    "text": "Yes"
+                  },
+                  {
+                    "id": "no",
+                    "text": "No"
+                  },
+                  {
+                    "text": "Open ticket",
+                    "type": "url",
+                    "url": "https://yourshop.com/support"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Interactive message sent successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/QuotaExceeded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/message/send-list": {
+      "post": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Send a list message",
+        "description": "A message with a button that opens a list of options grouped in sections. The chosen row's `rowId` comes back as the customer's reply.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "title",
+                  "body",
+                  "buttonText",
+                  "sections"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Recipient in international format without + or spaces (country code first). On QR numbers a WhatsApp group id (…@g.us) also works.",
+                    "example": "966500000000"
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "body": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "buttonText": {
+                    "type": "string",
+                    "maxLength": 20
+                  },
+                  "sections": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "title",
+                        "rows"
+                      ],
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "maxLength": 24
+                        },
+                        "rows": {
+                          "type": "array",
+                          "minItems": 1,
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "rowId",
+                              "title"
+                            ],
+                            "properties": {
+                              "rowId": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string",
+                                "maxLength": 24
+                              },
+                              "description": {
+                                "type": "string",
+                                "maxLength": 72
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "channelId": {
+                    "type": "string",
+                    "description": "Which of your numbers sends it (id from GET /api/v1/channels). Omit it to send from your QR-connected number. Meta Cloud numbers need it.",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  }
+                }
+              },
+              "example": {
+                "phone": "966500000000",
+                "title": "Our menu",
+                "body": "Choose a dish",
+                "buttonText": "Show menu",
+                "sections": [
+                  {
+                    "title": "Main",
+                    "rows": [
+                      {
+                        "rowId": "kabsa",
+                        "title": "Kabsa",
+                        "description": "With chicken"
+                      },
+                      {
+                        "rowId": "mandi",
+                        "title": "Mandi"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "List message sent successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/QuotaExceeded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/message/send-location": {
+      "post": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Send a location",
+        "description": "A map pin with an optional name and address. QR-connected numbers only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "latitude",
+                  "longitude"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Recipient in international format without + or spaces (country code first). On QR numbers a WhatsApp group id (…@g.us) also works.",
+                    "example": "966500000000"
+                  },
+                  "latitude": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                  },
+                  "longitude": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "address": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "channelId": {
+                    "type": "string",
+                    "description": "Which of your numbers sends it (id from GET /api/v1/channels). Omit it to send from your QR-connected number. Meta Cloud numbers need it.",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  }
+                }
+              },
+              "example": {
+                "phone": "966500000000",
+                "latitude": 24.7136,
+                "longitude": 46.6753,
+                "name": "Our shop",
+                "address": "King Fahd Road, Riyadh"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Location sent successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/QuotaExceeded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/message/send-meta-template": {
+      "post": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Send an approved Meta template",
+        "description": "Meta Cloud numbers only: sends one of the templates approved in Meta Business Manager, by name and language. `components` follows the Meta Cloud API format for header, body and button parameters. Needed to start a conversation with a customer who has not written to you in the last 24 hours.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "templateName",
+                  "languageCode",
+                  "channelId"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Recipient in international format without + or spaces (country code first). On QR numbers a WhatsApp group id (…@g.us) also works.",
+                    "example": "966500000000"
+                  },
+                  "templateName": {
+                    "type": "string",
+                    "example": "order_update"
+                  },
+                  "languageCode": {
+                    "type": "string",
+                    "example": "ar"
+                  },
+                  "components": {
+                    "type": "array",
+                    "description": "Meta Cloud API template components (parameters of header, body, buttons)",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "channelId": {
+                    "type": "string",
+                    "description": "Which of your numbers sends it (id from GET /api/v1/channels). Omit it to send from your QR-connected number. Meta Cloud numbers need it.",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  },
+                  "previewText": {
+                    "type": "string",
+                    "maxLength": 4000,
+                    "description": "The text as the customer sees it, shown in the Live Chat conversation"
+                  }
+                }
+              },
+              "example": {
+                "phone": "966500000000",
+                "templateName": "order_update",
+                "languageCode": "ar",
+                "channelId": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e",
+                "components": [
+                  {
+                    "type": "body",
+                    "parameters": [
+                      {
+                        "type": "text",
+                        "text": "Sara"
+                      },
+                      {
+                        "type": "text",
+                        "text": "1234"
+                      }
+                    ]
+                  }
+                ],
+                "previewText": "مرحباً Sara، طلبك 1234 في الطريق"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "metaMessageId": {
+                      "type": "string",
+                      "description": "Meta's message id (wamid), the key of delivery status webhooks"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "message": "Template sent successfully",
+                  "metaMessageId": "wamid.HBgMOTY2NTAwMDAwMDAwFQIAERgSNzY4QUFCQzAwMDAwMDAwMAA="
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/QuotaExceeded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/message/send-flow": {
+      "post": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Send a WhatsApp Flow",
+        "description": "Meta Cloud numbers only: a message with a button that opens one of your published WhatsApp Flows (forms inside WhatsApp).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "flowId",
+                  "flowCta",
+                  "flowBody",
+                  "channelId"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Recipient in international format without + or spaces (country code first). On QR numbers a WhatsApp group id (…@g.us) also works.",
+                    "example": "966500000000"
+                  },
+                  "flowId": {
+                    "type": "string",
+                    "description": "The flow id in Meta"
+                  },
+                  "flowCta": {
+                    "type": "string",
+                    "description": "Button text",
+                    "example": "Book now"
+                  },
+                  "flowBody": {
+                    "type": "string",
+                    "description": "Message text above the button"
+                  },
+                  "flowFooter": {
+                    "type": "string"
+                  },
+                  "flowScreen": {
+                    "type": "string",
+                    "description": "The first screen of the flow to open"
+                  },
+                  "channelId": {
+                    "type": "string",
+                    "description": "Which of your numbers sends it (id from GET /api/v1/channels). Omit it to send from your QR-connected number. Meta Cloud numbers need it.",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Flow message sent successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/QuotaExceeded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/templates/send": {
+      "post": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "Send a saved template",
+        "description": "Sends one of your saved templates (GET /api/v1/templates), filling its `{{variables}}`. A template with media is sent as image or PDF with the text as caption. Goes out from your QR-connected number.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "templateId"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Recipient in international format without + or spaces (country code first). On QR numbers a WhatsApp group id (…@g.us) also works.",
+                    "example": "966500000000",
+                    "pattern": "^[0-9]{10,15}$"
+                  },
+                  "templateId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  },
+                  "variables": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Values for {{name}} placeholders",
+                    "example": {
+                      "name": "Sara",
+                      "order": "1234"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Message sent successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/QuotaExceeded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/templates": {
+      "get": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "List templates",
+        "description": "Your saved templates, newest first. Needs the Templates feature.",
+        "responses": {
+          "200": {
+            "description": "Templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Template"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PageMeta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 20
+            },
+            "description": "Items per page"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "Create a template",
+        "description": "A name, the text (with optional `{{variables}}`) and an optional image or PDF.",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Template"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "content"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "content": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "media": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/templates/{id}": {
+      "put": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "Update a template",
+        "description": "Name and text are required; a new file replaces the old one.",
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Template"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+            },
+            "description": "Template id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "content"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "media": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Templates"
+        ],
+        "summary": "Delete a template",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Template deleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+            },
+            "description": "Template id"
+          }
+        ]
+      }
+    },
+    "/api/v1/otp/send": {
+      "post": {
+        "tags": [
+          "OTP"
+        ],
+        "summary": "Send a one-time code",
+        "description": "Generates a 6-digit code, sends it over WhatsApp from your QR-connected number and keeps it for **5 minutes**. At most 3 codes per 15 minutes to one phone. The code itself is not returned: verify it with /api/v1/otp/verify.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^\\+?[1-9]\\d{1,14}$",
+                    "description": "E.164, with or without +",
+                    "example": "966500000000"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "OTP sent successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/QuotaExceeded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/otp/verify": {
+      "post": {
+        "tags": [
+          "OTP"
+        ],
+        "summary": "Verify a one-time code",
+        "description": "Checks the code the customer typed. A correct code is accepted once and then discarded. 400 when it is wrong, expired or was never sent.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "code"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^\\+?[1-9]\\d{1,14}$",
+                    "example": "966500000000"
+                  },
+                  "code": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6,
+                    "example": "481726"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "OTP verified successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Wrong, expired or unknown code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "message": "Invalid OTP code"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/chat/threads": {
+      "get": {
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "List conversations",
+        "description": "Conversations of all your channels, most recent first, 50 per page. `search` matches the customer's name or phone. Needs the Live Chat feature.",
+        "responses": {
+          "200": {
+            "description": "Conversations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "threads": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Thread"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "description": "Part of the name or phone"
+          },
+          {
+            "name": "channelId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only this number / channel"
+          },
+          {
+            "name": "tagId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only conversations with this tag"
+          },
+          {
+            "name": "stageId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only this pipeline stage (`none` = without a stage)"
+          }
+        ]
+      }
+    },
+    "/api/v1/chat/threads/{threadId}": {
+      "get": {
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "One conversation",
+        "description": "The conversation with its channel.",
+        "responses": {
+          "200": {
+            "description": "Conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Thread"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "66a1f2c3d4e5f67890123456"
+            },
+            "description": "Conversation id (`id` of an item of GET /api/v1/chat/threads)"
+          }
+        ]
+      }
+    },
+    "/api/v1/chat/threads/{threadId}/messages": {
+      "get": {
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "Messages of a conversation",
+        "description": "Newest page first, each page returned in chronological order (oldest to newest). Reading a page marks the conversation as read.",
+        "responses": {
+          "200": {
+            "description": "Messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "messages": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Message"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "66a1f2c3d4e5f67890123456"
+            },
+            "description": "Conversation id (`id` of an item of GET /api/v1/chat/threads)"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 50
+            },
+            "description": "Items per page"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "Reply in a conversation",
+        "description": "Sends a message to the customer of this conversation from the number it belongs to, and records it in Live Chat. For a file, upload it first with /api/v1/chat/upload (or use any public URL) and pass `hasMedia`, `mediaUrl`, `mediaMime` and the matching `type`. `isInternal: true` saves a team note that the customer never sees. Instagram, Messenger and TikTok conversations accept replies only within the platform's window after the customer's last message (`REPLY_WINDOW_CLOSED`).",
+        "responses": {
+          "200": {
+            "description": "The saved message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Message"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Reply window closed, or limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "REPLY_WINDOW_CLOSED",
+                    "message": "This platform allows replies only within 24 hours of the customer's last message. The conversation continues when the customer writes again."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "66a1f2c3d4e5f67890123456"
+            },
+            "description": "Conversation id (`id` of an item of GET /api/v1/chat/threads)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "Text, or the caption of a file"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "image",
+                      "document",
+                      "audio",
+                      "video"
+                    ],
+                    "default": "text"
+                  },
+                  "hasMedia": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "mediaUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "mediaMime": {
+                    "type": "string",
+                    "example": "application/pdf"
+                  },
+                  "isInternal": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "A team note, not sent to the customer"
+                  }
+                }
+              },
+              "example": {
+                "content": "Hello! Your order #1234 arrives tomorrow between 2 and 5 PM.",
+                "type": "text"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/threads/{threadId}/name": {
+      "put": {
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "Rename the customer",
+        "description": "Sets the customer's display name in the conversation and in Contacts. The name from their WhatsApp profile no longer replaces it.",
+        "responses": {
+          "200": {
+            "description": "Renamed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "contactName": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "66a1f2c3d4e5f67890123456"
+            },
+            "description": "Conversation id (`id` of an item of GET /api/v1/chat/threads)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                }
+              },
+              "example": {
+                "name": "Sara Mohammed"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/threads/{threadId}/tags": {
+      "put": {
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "Set the tags of a conversation",
+        "description": "Replaces the conversation's tags with these ids (tags are defined on the dashboard, GET /api/v1/chat/tags).",
+        "responses": {
+          "200": {
+            "description": "Tags set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "tagIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "66a1f2c3d4e5f67890123456"
+            },
+            "description": "Conversation id (`id` of an item of GET /api/v1/chat/threads)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "tagIds"
+                ],
+                "properties": {
+                  "tagIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "example": {
+                "tagIds": [
+                  "vip",
+                  "returns"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/threads/{threadId}/stage": {
+      "put": {
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "Move a conversation to a pipeline stage",
+        "description": "Sets the stage (`null` removes it). Stages are defined on the dashboard, GET /api/v1/chat/stages.",
+        "responses": {
+          "200": {
+            "description": "Stage set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "stageId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "66a1f2c3d4e5f67890123456"
+            },
+            "description": "Conversation id (`id` of an item of GET /api/v1/chat/threads)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "stageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "example": {
+                "stageId": "negotiation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chat/tags": {
+      "get": {
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "Conversation tags",
+        "description": "The tags defined for the account, to label conversations with.",
+        "responses": {
+          "200": {
+            "description": "Tags",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/chat/stages": {
+      "get": {
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "Pipeline stages",
+        "description": "The pipeline configuration: the stages conversations move through.",
+        "responses": {
+          "200": {
+            "description": "Stages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "stages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "color": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/chat/upload": {
+      "post": {
+        "tags": [
+          "Inbox"
+        ],
+        "summary": "Upload a file for a reply",
+        "description": "Stores a file and returns its URL, to pass as `mediaUrl` when replying.",
+        "responses": {
+          "200": {
+            "description": "Uploaded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "mediaUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "mimetype": {
+                      "type": "string"
+                    },
+                    "originalName": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "mediaUrl": "https://api.example.com/uploads/chat/chat-1764320000000.pdf",
+                  "mimetype": "application/pdf",
+                  "originalName": "invoice.pdf"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contacts": {
+      "get": {
+        "tags": [
+          "Contacts"
+        ],
+        "summary": "List contacts",
+        "description": "All contacts of the account, newest first (no paging). `groupId=unassigned` lists contacts without a group.",
+        "responses": {
+          "200": {
+            "description": "Contacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Contact"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Part of the name or phone"
+          },
+          {
+            "name": "groupId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "A group id, or `unassigned`"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Contacts"
+        ],
+        "summary": "Create a contact",
+        "description": "Name and phone are required. `metadata` holds your own fields (customer id, city, …) and they can be used as campaign variables. The name also updates the customer's conversations.",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Contact"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "phone"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "Recipient in international format without + or spaces (country code first). On QR numbers a WhatsApp group id (…@g.us) also works.",
+                    "example": "966500000000"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "groupId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              },
+              "example": {
+                "name": "Sara Mohammed",
+                "phone": "966501111111",
+                "email": "sara@example.com",
+                "metadata": {
+                  "customerId": "C-1001",
+                  "city": "Riyadh"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contacts/{id}": {
+      "put": {
+        "tags": [
+          "Contacts"
+        ],
+        "summary": "Update a contact",
+        "description": "Only the fields you send change.",
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Contact"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+            },
+            "description": "Contact id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "Recipient in international format without + or spaces (country code first). On QR numbers a WhatsApp group id (…@g.us) also works.",
+                    "example": "966500000000"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "groupId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              },
+              "example": {
+                "name": "Sara Ahmed",
+                "groupId": null
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Contacts"
+        ],
+        "summary": "Delete a contact",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Contact deleted successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+            },
+            "description": "Contact id"
+          }
+        ]
+      }
+    },
+    "/api/contacts/groups": {
+      "get": {
+        "tags": [
+          "Contacts"
+        ],
+        "summary": "List contact groups",
+        "description": "Groups with the number of contacts in each.",
+        "responses": {
+          "200": {
+            "description": "Groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ContactGroup"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Contacts"
+        ],
+        "summary": "Create a contact group",
+        "description": "",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContactGroup"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "name": "VIP customers"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/contacts/groups/{id}": {
+      "put": {
+        "tags": [
+          "Contacts"
+        ],
+        "summary": "Update a contact group",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ContactGroup"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+            },
+            "description": "Group id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Contacts"
+        ],
+        "summary": "Delete a contact group",
+        "description": "Its contacts stay, without a group.",
+        "responses": {
+          "200": {
+            "description": "Done",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Group deleted successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+            },
+            "description": "Group id"
+          }
+        ]
+      }
+    },
+    "/api/contacts/import": {
+      "post": {
+        "tags": [
+          "Contacts"
+        ],
+        "summary": "Import contacts from a file",
+        "description": "A CSV or Excel file with columns name, phone (and optional email); every row becomes a contact, in the group if one is given.",
+        "responses": {
+          "200": {
+            "description": "Imported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "message": "Imported 120 contacts successfully",
+                  "data": {
+                    "count": 120
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "groupId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "summary": "List your numbers and channels",
+        "description": "Every Live Chat channel of the account: QR-connected numbers (BAILEYS), Meta Cloud numbers (META_CLOUD), website widgets (WEBCHAT), Instagram, Messenger and TikTok accounts. Use the `id` as `channelId` elsewhere.",
+        "responses": {
+          "200": {
+            "description": "Channels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Channel"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/meta/channels": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "summary": "List Meta Cloud numbers",
+        "description": "Only the Meta Cloud API numbers, with their Meta ids (phone_number_id, WABA id).",
+        "responses": {
+          "200": {
+            "description": "Meta channels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MetaChannel"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/tickets": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "List tickets",
+        "description": "Tickets of the account, most recently updated first, with the customer's name and phone. Needs the Live Chat feature.",
+        "responses": {
+          "200": {
+            "description": "Tickets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Ticket"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "One or more of OPEN, PENDING, RESOLVED, CLOSED separated by commas, or ACTIVE (= OPEN and PENDING)",
+            "example": "ACTIVE"
+          },
+          {
+            "name": "channelId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedToId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "A team member id, or `none` for unassigned"
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "A category id, or `none`"
+          },
+          {
+            "name": "threadId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "example": "66a1f2c3d4e5f67890123456"
+            },
+            "description": "Tickets of one conversation"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "description": "Ticket number, subject, or the customer's name or phone"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 50,
+              "maximum": 100
+            },
+            "description": "Items per page"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Open a ticket",
+        "description": "Opens a ticket on a conversation by hand. 409 when the conversation already has an active ticket (its data is returned).",
+        "responses": {
+          "201": {
+            "description": "Opened",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ticket"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "An active ticket exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/ErrorBody"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ticket"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "channelId",
+                  "threadId"
+                ],
+                "properties": {
+                  "channelId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  },
+                  "threadId": {
+                    "type": "string",
+                    "example": "66a1f2c3d4e5f67890123456"
+                  },
+                  "subject": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "categoryId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  },
+                  "assignedToId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "A team member id, null for nobody; omitted = the team's routing"
+                  },
+                  "crmClientId": {
+                    "type": "string",
+                    "description": "The customer's id in your CRM"
+                  }
+                }
+              },
+              "example": {
+                "channelId": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e",
+                "threadId": "66a1f2c3d4e5f67890123456",
+                "subject": "Late delivery",
+                "crmClientId": "C-1001"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tickets/{id}": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "One ticket",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Ticket",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ticket"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+            },
+            "description": "Ticket id"
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Change category, priority or subject",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ticket"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+            },
+            "description": "Ticket id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "categoryId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "LOW",
+                      "NORMAL",
+                      "HIGH",
+                      "URGENT"
+                    ]
+                  },
+                  "subject": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                }
+              },
+              "example": {
+                "priority": "HIGH"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tickets/{id}/close": {
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Close a ticket",
+        "description": "Resolves the ticket. Unless `sendRating` is false, the customer gets the rating request configured in Ticket settings.",
+        "responses": {
+          "200": {
+            "description": "Closed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ticket"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+            },
+            "description": "Ticket id"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "description": "How it was solved"
+                  },
+                  "categoryId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+                  },
+                  "sendRating": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tickets/{id}/reopen": {
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Reopen a ticket",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Reopened",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ticket"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+            },
+            "description": "Ticket id"
+          }
+        ]
+      }
+    },
+    "/api/v1/tickets/{id}/assign": {
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Assign a ticket",
+        "description": "Gives the ticket to a team member (`assignedToId`), or to nobody (null).",
+        "responses": {
+          "200": {
+            "description": "Assigned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Ticket"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+            },
+            "description": "Ticket id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assignedToId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "example": {
+                "assignedToId": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {
+    "incomingMessage": {
+      "post": {
+        "summary": "A customer wrote to one of your Meta Cloud numbers",
+        "description": "POSTed to your Webhook URL (Developer Tools) for each message a customer sends to a **Meta Cloud** number, unless incoming messages are turned off there. The body is the message exactly as Meta's Cloud API delivers it (one message per call); `metadata.phone_number_id` says which number received it, `contacts[0].profile.name` the customer's WhatsApp name, `messages[0].from` their phone. Messages to QR-connected numbers are not forwarded. Answer 200 within 5 seconds; a failed delivery is not retried.\n\nAuthentication: the header you configured in Developer Tools (name and value), otherwise `X-Webhook-Key: <your API token>` when a CRM token is set.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetaEnvelope"
+              },
+              "example": {
+                "object": "whatsapp_business_account",
+                "entry": [
+                  {
+                    "id": "102290129340398",
+                    "changes": [
+                      {
+                        "field": "messages",
+                        "value": {
+                          "metadata": {
+                            "phone_number_id": "106540352242922"
+                          },
+                          "contacts": [
+                            {
+                              "profile": {
+                                "name": "Sara"
+                              },
+                              "wa_id": "966500000000"
+                            }
+                          ],
+                          "messages": [
+                            {
+                              "from": "966500000000",
+                              "id": "wamid.HBgMOTY2NTAwMDAwMDAwFQIAEhggNzY4QUFCQzAwMDAwMDAwMAA=",
+                              "timestamp": "1764320000",
+                              "type": "text",
+                              "text": {
+                                "body": "When does my order arrive?"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Received"
+          }
+        }
+      }
+    },
+    "messageStatus": {
+      "post": {
+        "summary": "Delivery status of a message you sent from a Meta Cloud number",
+        "description": "POSTed to your Webhook URL when Meta reports `sent`, `delivered`, `read` or `failed` for a message of a Meta Cloud number, unless statuses are turned off in Developer Tools. Same envelope as incoming messages, with `statuses` instead of `messages`; `statuses[0].id` is the `metaMessageId` returned when you sent it. A `failed` status carries Meta's `errors`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetaEnvelope"
+              },
+              "example": {
+                "object": "whatsapp_business_account",
+                "entry": [
+                  {
+                    "id": "102290129340398",
+                    "changes": [
+                      {
+                        "field": "messages",
+                        "value": {
+                          "messaging_product": "whatsapp",
+                          "metadata": {
+                            "phone_number_id": "106540352242922"
+                          },
+                          "statuses": [
+                            {
+                              "id": "wamid.HBgMOTY2NTAwMDAwMDAwFQIAERgSNzY4QUFCQzAwMDAwMDAwMAA=",
+                              "status": "delivered",
+                              "timestamp": "1764320060",
+                              "recipient_id": "966500000000"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Received"
+          }
+        }
+      }
+    },
+    "clientSync": {
+      "post": {
+        "summary": "A new customer: create or find them in your CRM",
+        "description": "Sent when a message goes to, or comes from, a phone that is new to the account. If a **CRM Base URL** and token are set in Developer Tools, Wakeel instead POSTs `{ \"phone\", \"name\" }` to `<CRM Base URL>/api/v1/integrations/provider/sync-contact` with `Authorization: Bearer <token>` and expects `{ \"client_id\": \"...\", \"is_new\": true|false }` back; the `client_id` is then stored on the conversation and sent with its tickets. Otherwise this event goes to the Webhook URL and your reply may carry `client_id` too.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Event"
+              },
+              "example": {
+                "event": "client.sync",
+                "data": {
+                  "phone": "966500000000",
+                  "name": "Sara"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Optional: the customer's id in your system",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "client_id": {
+                      "type": "string"
+                    },
+                    "is_new": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ticketSync": {
+      "post": {
+        "summary": "A ticket was opened, resolved or closed",
+        "description": "Sent to the Webhook URL when a ticket changes state, with the conversation and customer it belongs to. `status` is `open`, `resolved` or `closed`. If your reply contains a ticket id, Wakeel keeps it as the ticket's `crmTicketId`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Event"
+              },
+              "example": {
+                "event": "ticket.sync",
+                "data": {
+                  "phone": "966500000000",
+                  "name": "Sara",
+                  "thread_id": "66a1f2c3d4e5f67890123456",
+                  "ticket_id": "9b2f4c6e-1a3d-4e5f-8a7b-6c5d4e3f2a1b",
+                  "ticket_number": "T-1042",
+                  "category_name": "Delivery",
+                  "status": "resolved",
+                  "subject": "Late delivery",
+                  "description": "Order resent",
+                  "summary": null,
+                  "rating": null
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Received"
+          }
+        }
+      }
+    },
+    "ticketRated": {
+      "post": {
+        "summary": "The customer rated a closed ticket",
+        "description": "Sent to the Webhook URL when the customer answers the rating request after a ticket is closed. `rating` is 1 to 5.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Event"
+              },
+              "example": {
+                "event": "ticket.rated",
+                "data": {
+                  "ticket_id": "9b2f4c6e-1a3d-4e5f-8a7b-6c5d4e3f2a1b",
+                  "thread_id": "66a1f2c3d4e5f67890123456",
+                  "rating": 5
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Received"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "An API key from the API Keys page (`sk_…`), or a dashboard login token"
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "A field is missing or invalid, or the action is not possible",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "\"phone\" is required"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid API key",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "Unauthorized: Invalid API Key"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Account disabled, feature not in the plan, or a number that is not yours",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "code": "CHANNEL_NOT_ALLOWED",
+                "message": "You do not have access to this number"
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "message": "Not found"
+              }
+            }
+          }
+        }
+      },
+      "QuotaExceeded": {
+        "description": "The plan's monthly message limit is reached",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "message": "Monthly message limit reached. Please upgrade your plan."
+              }
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Too many requests to this recipient; retry after the seconds in Retry-After",
+        "headers": {
+          "X-RateLimit-Limit": {
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Requests allowed in the window"
+          },
+          "X-RateLimit-Remaining": {
+            "schema": {
+              "type": "integer"
+            }
+          },
+          "X-RateLimit-Reset": {
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "Retry-After": {
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Seconds"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "Too Many Requests",
+              "message": "Too many messages to this phone number. Limit: 30 per minute."
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Ok": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Present for some failures, e.g. REPLY_WINDOW_CLOSED, CHANNEL_NOT_ALLOWED, INSUFFICIENT_BALANCE"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "description": "Either `{ \"error\": { \"message\", \"code\"? } }` or, for field validation, `{ \"error\": \"message\" }`",
+        "properties": {
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pages": {
+            "type": "integer"
+          }
+        }
+      },
+      "PageMeta": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          }
+        }
+      },
+      "Channel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+          },
+          "providerType": {
+            "type": "string",
+            "enum": [
+              "BAILEYS",
+              "META_CLOUD",
+              "WEBCHAT",
+              "MESSENGER",
+              "INSTAGRAM",
+              "TIKTOK"
+            ],
+            "description": "BAILEYS = QR-connected number, META_CLOUD = Meta Cloud API number"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Support line"
+          },
+          "phoneNumber": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "966500000000"
+          },
+          "displayPhoneNumber": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "+966 50 000 0000"
+          },
+          "status": {
+            "type": "string",
+            "example": "CONNECTED"
+          },
+          "isCoexistence": {
+            "type": "boolean",
+            "description": "A Meta number that also keeps working in the WhatsApp Business app"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z"
+          }
+        }
+      },
+      "MetaChannel": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Channel"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "metaPhoneNumberId": {
+                "type": "string",
+                "example": "106540352242922"
+              },
+              "metaWabaId": {
+                "type": "string",
+                "example": "102290129340398"
+              },
+              "autoCreateTickets": {
+                "type": "boolean"
+              }
+            }
+          }
+        ]
+      },
+      "Thread": {
+        "type": "object",
+        "description": "A conversation with one customer on one channel",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "66a1f2c3d4e5f67890123456"
+          },
+          "channelId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+          },
+          "contactPhone": {
+            "type": "string",
+            "example": "966500000000"
+          },
+          "contactName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Sara"
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z"
+          },
+          "lastInboundAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z",
+            "description": "The customer's last message"
+          },
+          "unreadCount": {
+            "type": "integer"
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stageId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crmClientId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The customer's id in your CRM, from client.sync"
+          },
+          "channel": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+              },
+              "phoneNumber": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "displayPhoneNumber": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "providerType": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "66a1f2c3d4e5f67890123456"
+          },
+          "threadId": {
+            "type": "string",
+            "example": "66a1f2c3d4e5f67890123456"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "INBOUND",
+              "OUTBOUND"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "example": "TEXT",
+            "description": "TEXT, IMAGE, DOCUMENT, AUDIO, VIDEO, TEMPLATE, INTERACTIVE, INTERNAL_NOTE, …"
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasMedia": {
+            "type": "boolean"
+          },
+          "mediaUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mediaMime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SENT, DELIVERED, READ or FAILED for outbound messages"
+          },
+          "metaMessageId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Meta's wamid"
+          },
+          "ticketId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isInternal": {
+            "type": "boolean",
+            "description": "A team note the customer did not receive"
+          },
+          "isAutomated": {
+            "type": "boolean",
+            "description": "Sent by a bot, flow or campaign"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "CAMPAIGN"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z"
+          }
+        }
+      },
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "groupId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metadata": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z"
+          }
+        }
+      },
+      "ContactGroup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z"
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "contacts": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "Template": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string",
+            "example": "Hello {{name}}, your order {{order}} is ready."
+          },
+          "mediaPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mediaMime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z"
+          }
+        }
+      },
+      "Ticket": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+          },
+          "ticketNumber": {
+            "type": "string",
+            "example": "T-1042"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "PENDING",
+              "RESOLVED",
+              "CLOSED"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "NORMAL",
+              "HIGH",
+              "URGENT"
+            ]
+          },
+          "channelId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+          },
+          "threadId": {
+            "type": "string",
+            "example": "66a1f2c3d4e5f67890123456"
+          },
+          "assignedToId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "categoryId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rating": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 5
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "AI summary of the conversation, when enabled"
+          },
+          "crmTicketId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crmClientId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resolvedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z"
+          },
+          "firstResponseAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-28T09:30:00.000Z"
+          },
+          "channel": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+              },
+              "phoneNumber": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "displayPhoneNumber": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "assignee": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            }
+          },
+          "category": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "example": "2d0b5d6e-7f3c-4a2b-9c1e-8f4a6b7c8d9e"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "contact": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "In list responses: the customer of the conversation",
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "phone": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "MetaEnvelope": {
+        "type": "object",
+        "description": "The WhatsApp Cloud API webhook format",
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "whatsapp_business_account"
+          },
+          "entry": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "WhatsApp Business Account id"
+                },
+                "changes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "const": "messages"
+                      },
+                      "value": {
+                        "type": "object",
+                        "properties": {
+                          "messaging_product": {
+                            "type": "string"
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "phone_number_id": {
+                                "type": "string"
+                              },
+                              "display_phone_number": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "contacts": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "wa_id": {
+                                  "type": "string"
+                                },
+                                "profile": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "messages": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "description": "A Cloud API message: from, id, timestamp, type (text, image, audio, video, document, location, interactive, button, reaction, …) and the field of that type"
+                            }
+                          },
+                          "statuses": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "sent",
+                                    "delivered",
+                                    "read",
+                                    "failed"
+                                  ]
+                                },
+                                "timestamp": {
+                                  "type": "string"
+                                },
+                                "recipient_id": {
+                                  "type": "string"
+                                },
+                                "errors": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "code": {
+                                        "type": "integer"
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      },
+                                      "message": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": [
+              "client.sync",
+              "ticket.sync",
+              "ticket.rated"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "event",
+          "data"
+        ]
+      }
+    }
+  }
+}

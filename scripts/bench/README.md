@@ -39,3 +39,30 @@ node scripts/bench/seed-inbox.js
 MONGO_URI=mongodb://127.0.0.1:27017/wakeel_bench TENANT_ID=bench node scripts/bench/inbox-explain.js
 MONGO_URI=mongodb://127.0.0.1:27017/wakeel_bench TENANT_ID=bench node scripts/bench/inbox-explain.js --create-indexes
 ```
+
+## Measured on 2026-11-28 (a laptop: Docker MongoDB 7, MySQL 8, Redis 7; one api + one worker process)
+
+Inbox, 100,000 conversations and 500,000 messages of one account, 50 results asked for:
+
+| Query | Without the indexes | With the indexes of `src/models/mongo` |
+|---|---|---|
+| inbox list, all numbers | reads 100,000 documents, sorts in memory, 26 ms | reads 50, 0 ms |
+| inbox list, one number | reads 100,000, sorts in memory, 27 ms | reads 50, 0 ms |
+| inbox list, page 20 | reads 100,000, sorts in memory, 25 ms | reads 50 (1,000 index keys), 1 ms |
+| one conversation, messages | reads 500,000, sorts in memory, 138 ms | reads 5, 0 ms |
+| one conversation, count | reads 500,000, 91 ms | reads 5, 0 ms |
+
+Production had single-field indexes (`tenantId`, `channelId`, `threadId`) before, so its "before" sat between the
+two columns: no full scan, but every inbox page still sorted all of the account's conversations in memory.
+
+Incoming messages (`inbound-load.js`, worker concurrency 10):
+
+| Load | Webhook acknowledged (p50 / p95 / max) | Message saved in the conversation (p50 / p95 / max) | Queue after the run |
+|---|---|---|---|
+| 50 messages/s for 60 s, 500 customers (3,000 messages) | 18 / 25 / 34 ms | 94 / 252 / 448 ms | empty, 0 failed |
+| 150 messages/s for 30 s, 1,500 customers (4,500 messages) | 22 / 36 / 114 ms | 258 / 742 / 896 ms | empty, 0 failed |
+
+At 150/s the time is mostly waiting in the queue (p95 691 ms): one worker process with concurrency 10 is
+near its limit there. Raising the Meta webhook worker's concurrency, or a second `whatsapp-worker` process,
+is the next step when real traffic approaches that. Targets (2 s for a message to reach the agent's screen)
+held in both runs.

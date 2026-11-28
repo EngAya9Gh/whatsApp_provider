@@ -8,6 +8,7 @@
     "dev": "node src/server.js",
     "worker": "node src/worker.js",
     "sessions": "node src/sessions.js",
+    "openapi:export": "node -e \"require('fs').writeFileSync('docs/openapi.json', JSON.stringify(require('./src/docs/openapi').buildSpec('https://api.example.com'), null, 2) + '\\n')\"",
     "test": "node --test --test-concurrency=1 --test-force-exit \"tests/*.test.js\""
   },
   "repository": {

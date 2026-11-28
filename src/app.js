@@ -83,6 +83,9 @@ app.use('/api/v1/webchat', require('./modules/webchat/webchat.routes'));
 app.use('/api/v1/social', require('./modules/social/social.routes'));
 app.use('/api/v1/tiktok', require('./modules/tiktok/tiktok.routes'));
 
+// The public API reference: /api/docs (interactive page) and /api/openapi.json
+app.use('/api', require('./docs/docs.routes'));
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
