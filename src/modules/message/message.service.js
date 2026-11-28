@@ -7,10 +7,11 @@ const logger = require('../../utils/logger');
 const prisma = require('../../config/prisma');
 
 class MessageService {
-  async _getChannel(channelId) {
+  /** The company's own number only: an id of another company's number is ignored */
+  async _getChannel(channelId, tenantId) {
     if (!channelId || channelId === 'default' || String(channelId).trim() === '') return null;
     try {
-      return await prisma.whatsAppChannel.findUnique({ where: { id: channelId } });
+      return await prisma.whatsAppChannel.findFirst({ where: { id: String(channelId), tenantId } });
     } catch(e) {
       return null;
     }
@@ -29,7 +30,7 @@ class MessageService {
     const canSend = options.campaign || await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached. Please upgrade your plan.' };
 
-    const channel = await this._getChannel(channelId);
+    const channel = await this._getChannel(channelId, tenantId);
     channelId = channel ? channel.id : null;
     try {
       let metaMessageId = null;
@@ -60,7 +61,7 @@ class MessageService {
     const canSend = options.campaign || await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
-    const channel = await this._getChannel(channelId);
+    const channel = await this._getChannel(channelId, tenantId);
     channelId = channel ? channel.id : null;
     if (!channel || channel.providerType !== 'META_CLOUD') {
       throw { status: 400, message: 'Invalid Meta Cloud channel' };
@@ -90,7 +91,7 @@ class MessageService {
     const canSend = options.campaign || await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
-    const channel = await this._getChannel(channelId);
+    const channel = await this._getChannel(channelId, tenantId);
     channelId = channel ? channel.id : null;
     try {
       if (channel && channel.providerType === 'META_CLOUD') {
@@ -114,7 +115,7 @@ class MessageService {
     const canSend = options.campaign || await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
-    const channel = await this._getChannel(channelId);
+    const channel = await this._getChannel(channelId, tenantId);
     channelId = channel ? channel.id : null;
     let metaMessageId = null;
     try {
@@ -140,7 +141,7 @@ class MessageService {
     const canSend = await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
-    const channel = await this._getChannel(channelId);
+    const channel = await this._getChannel(channelId, tenantId);
     channelId = channel ? channel.id : null;
     let metaMessageId = null;
     try {
@@ -166,7 +167,7 @@ class MessageService {
     const canSend = await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
-    const channel = await this._getChannel(channelId);
+    const channel = await this._getChannel(channelId, tenantId);
     channelId = channel ? channel.id : null;
     let metaMessageId = null;
     try {
@@ -192,7 +193,7 @@ class MessageService {
     const canSend = await billingService.checkLimit(tenantId);
     if (!canSend) throw { status: 402, message: 'Monthly message limit reached.' };
 
-    const channel = await this._getChannel(channelId);
+    const channel = await this._getChannel(channelId, tenantId);
     channelId = channel ? channel.id : null;
     try {
       if (channel && channel.providerType === 'META_CLOUD') {

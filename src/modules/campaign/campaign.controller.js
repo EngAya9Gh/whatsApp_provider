@@ -123,7 +123,8 @@ exports.getCampaigns = async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 20;
     const campaignType = req.query.campaignType;
     const channelId = req.query.channelId;
-    const campaigns = await campaignService.getCampaigns(tenantId, { page, limit, campaignType, channelId });
+    const channelIds = channelId ? null : await require('../channels/channel.access').allowedChannelIds(req);
+    const campaigns = await campaignService.getCampaigns(tenantId, { page, limit, campaignType, channelId, channelIds });
     res.status(200).json({ 
       success: true, 
       data: campaigns.data, 

@@ -4,6 +4,8 @@ const path = require('path');
 const campaignController = require('./campaign.controller');
 const { authMiddleware, requirePermission, requireAnyPermission } = require('../../middleware/auth.middleware');
 const requireFeature = require('../../middleware/requireFeature');
+const prisma = require('../../config/prisma');
+const { allowedChannelIds, channelGuard } = require('../channels/channel.access');
 
 const router = express.Router();
 
@@ -44,14 +46,29 @@ router.use((req, res, next) => {
   }
 });
 
+// Employees limited to some numbers: only those numbers' campaigns (the number in the body/query, or the
+// campaign's own number for /:id routes; campaigns without a number stay open)
+router.use(channelGuard);
+router.param('id', async (req, res, next, id) => {
+  try {
+    const ids = await allowedChannelIds(req);
+    if (!ids) return next();
+    const campaign = await prisma.campaign.findFirst({ where: { id, tenantId: req.tenant.id }, select: { channelId: true } });
+    if (!campaign?.channelId || ids.includes(campaign.channelId)) return next();
+    return res.status(403).json({ error: { code: 'CHANNEL_NOT_ALLOWED', message: 'You do not have access to this number' } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 const canView = requirePermission('can_view_campaigns');
 const canList = requireAnyPermission('can_view_campaigns', 'can_view_chatbot');
 const canCreate = requirePermission('can_create_campaigns');
 
-router.post('/', canCreate, upload.fields([{ name: 'file', maxCount: 1 }, { name: 'image', maxCount: 1 }]), campaignController.createCampaign);
-router.post('/audience-preview', canCreate, upload.single('file'), campaignController.previewAudience);
+router.post('/', canCreate, upload.fields([{ name: 'file', maxCount: 1 }, { name: 'image', maxCount: 1 }]), channelGuard, campaignController.createCampaign);
+router.post('/audience-preview', canCreate, upload.single('file'), channelGuard, campaignController.previewAudience);
 router.get('/sample-file', canCreate, campaignController.sampleFile);
-router.put('/:id', canCreate, upload.fields([{ name: 'image', maxCount: 1 }]), campaignController.updateCampaign);
+router.put('/:id', canCreate, upload.fields([{ name: 'image', maxCount: 1 }]), channelGuard, campaignController.updateCampaign);
 router.post('/:id/start', canCreate, campaignController.startCampaign);
 router.post('/:id/retry', canCreate, campaignController.retryFailed);
 router.post('/:id/pause', canCreate, campaignController.pauseCampaign);

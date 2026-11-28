@@ -5,6 +5,7 @@ const { validate, sendMessageSchema, sendMediaSchema, uploadMediaSchema, sendBut
 const { apiKeyMiddleware } = require('../../middleware/apiKey.middleware');
 const { requirePermission } = require('../../middleware/auth.middleware');
 const { messageRateLimiter } = require('../../middleware/rateLimiter.middleware');
+const { channelGuard } = require('../channels/channel.access');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -12,13 +13,15 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 // All message routes require a valid API Key
 router.use(apiKeyMiddleware);
 router.use(requirePermission('can_send_message'));
+// Employees limited to some numbers send only from those (multipart routes check again after multer)
+router.use(channelGuard);
 
 router.post('/send', validate(sendMessageSchema), messageRateLimiter, messageController.sendMessage);
 router.post('/send-media', validate(sendMediaSchema), messageRateLimiter, messageController.sendMedia);
-router.post('/upload-media', upload.single('file'), validate(uploadMediaSchema), messageRateLimiter, messageController.uploadMedia);
+router.post('/upload-media', upload.single('file'), channelGuard, validate(uploadMediaSchema), messageRateLimiter, messageController.uploadMedia);
 
 // Interactive message routes
-router.post('/send-buttons', upload.single('image'), messageController.sendButtons);
+router.post('/send-buttons', upload.single('image'), channelGuard, messageController.sendButtons);
 router.post('/send-list', messageController.sendList);
 router.post('/send-location', messageController.sendLocation);
 router.post('/send-meta-template', messageController.sendMetaTemplate);

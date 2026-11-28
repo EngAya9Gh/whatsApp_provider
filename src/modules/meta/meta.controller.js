@@ -325,7 +325,12 @@ class MetaController {
           createdAt: true
         }
       });
-      res.status(200).json({ success: true, data: channels });
+      // Employees limited to some numbers see only those (the sidebar selector), their own number first
+      const allowed = await require('../channels/channel.access').allowedChannelIds(req);
+      const own = req.subUser?.channelId;
+      const visible = (allowed ? channels.filter(c => allowed.includes(c.id)) : channels)
+        .sort((a, b) => (b.id === own) - (a.id === own));
+      res.status(200).json({ success: true, data: visible });
     } catch (error) {
       next(error);
     }

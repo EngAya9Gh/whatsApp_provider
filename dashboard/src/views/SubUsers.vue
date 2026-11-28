@@ -176,7 +176,7 @@
                     — {{ ch.status }}
                   </option>
                 </select>
-                <div class="field-hint">{{ isAr ? 'سيُستخدم هذا الرقم تلقائياً عند إرسال الرسائل' : 'This number will be used automatically when sending messages' }}</div>
+                <div class="field-hint">{{ isAr ? 'يعمل الموظف على هذا الرقم وأرقام فرقه فقط (المسؤول Admin: كل الأرقام). بدون رقم ولا فريق: كل الأرقام.' : 'The employee works only on this number and their teams\' numbers (Admin: every number). No number and no team: every number.' }}</div>
               </div>
             </div>
 

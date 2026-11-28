@@ -91,6 +91,10 @@ router.post('/embedded-signup/exchange', canSettings, embeddedSignupController.e
 
 router.use(requireMetaEnabled);
 
+// An employee limited to some numbers only works on those (channels/channel.access)
+const { channelGuard } = require('../channels/channel.access');
+router.use(['/channel/:channelId', '/agent/:channelId'], channelGuard);
+
 router.post('/channel', canSettings, metaController.addChannel.bind(metaController));
 router.get('/channels', metaController.getChannels.bind(metaController));
 router.delete('/channel/:id', canSettings, metaController.deleteChannel.bind(metaController));

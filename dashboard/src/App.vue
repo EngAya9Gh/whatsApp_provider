@@ -15,6 +15,9 @@
         </button>
       </a>
 
+      <!-- The WhatsApp number the Meta pages work on: always in view at the top -->
+      <GlobalMetaSelector v-if="hasAnyMeta" :can-connect="!isSubUser || !!subUserPerms?.can_manage_settings" />
+
       <nav class="sidebar-nav" @click="handleNavClick">
         <!-- GENERAL -->
         <div class="nav-section-title">General</div>
@@ -123,7 +126,6 @@
         <!-- META CLOUD -->
         <template v-if="$hasFeature('META_API') || $hasFeature('META_CAMPAIGN') || $hasFeature('META_AUTORESPONDER')">
           <div class="nav-section-title mt-4" style="color:#25D366">{{ $t('sidebar.meta_cloud') }}</div>
-          <GlobalMetaSelector />
           <router-link v-if="$hasFeature('META_SEND_MESSAGE') && (!isSubUser || subUserPerms?.can_send_message)" to="/meta-send-message" class="nav-item" active-class="active">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             <span class="nav-label">{{ $t('sidebar.meta_send_message') }}</span>

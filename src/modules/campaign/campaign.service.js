@@ -573,10 +573,12 @@ class CampaignService {
     return { success: true, status: 'CANCELLED', cancelled: cancelled.count, refunded: billing?.refunded || 0 };
   }
 
-  async getCampaigns(tenantId, { page = 1, limit = 50, campaignType, channelId } = {}) {
+  /** channelIds: limit to these numbers (and campaigns without a number), for employees limited to some numbers */
+  async getCampaigns(tenantId, { page = 1, limit = 50, campaignType, channelId, channelIds } = {}) {
     const where = { tenantId };
     if (campaignType) where.campaignType = campaignType;
     if (channelId) where.channelId = channelId;
+    else if (channelIds) where.OR = [{ channelId: { in: channelIds } }, { channelId: null }];
 
     const total = await prisma.campaign.count({ where });
     const data = await prisma.campaign.findMany({
