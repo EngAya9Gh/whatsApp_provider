@@ -1041,6 +1041,9 @@ const fetchPlans = async () => {
   .threads { display: none; }
   .floating-card { padding: 10px 12px; }
   .floating-card b { font-size: 0.8rem; }
-  .card-meta { display: none; } /* phones: the badge under the buttons shows it */
+  /* Phones: Meta's badge floats on the window's top edge; the route card moves down to make room */
+  .hero-visual { padding-top: 2.75rem; }
+  .card-meta { top: 4px; inset-inline: 0; margin-inline: auto; width: max-content; }
+  .card-route { top: auto; bottom: 72px; }
 }
 </style>
